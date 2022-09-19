@@ -1,0 +1,40 @@
+{
+ ### Environment Parameters
+ mode: train,  # train, calibrate
+ cuda: true,
+ pin_memory: true,
+ wandb: false,
+ worker: 16,
+ log_interval: 10000,
+ save_interval: 1,
+ saved_model_directory: 'model_checkpoints',
+ train_fold: 1,  # fold train data and start validate. 1 for default
+ project_name: 'ambiguous_label',
+ CUDA_VISIBLE_DEVICES: '0',
+
+ ### Train Parameters
+ model_name: 'ResNet18_multihead',
+ dataloader: 'Image2Vector',
+ num_class: 6,
+ criterion: 'CE',
+ task: 'classification',
+ input_space: 'RGB',
+ input_channel: 3,
+ input_size: [480, 640],  # (height, width)
+ crop_size: '320',
+ # resolution: [1280, 1024],
+ scheduler: 'CosineAnnealingLR', # WarmupCosine, CosineAnnealingLR
+ batch_size: 128,
+ epoch: 1000,
+ lr: 0.001,
+ class_weight: [1.0, 1.0],
+
+  ### Data Parameters
+ transform_blur: true,
+ transform_jitter: false,
+ transform_hflip: true,
+ transform_perspective: false,
+
+ train_csv_path: 'awesome/path/to/csv/tmp.csv',
+ val_csv_path:   'awesome/path/to/csv/tmp.csv',
+}

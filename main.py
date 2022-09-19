@@ -1,0 +1,88 @@
+import torch
+import os
+import argparse
+import wandb
+import yaml
+import numpy as np
+import random
+
+from train_segmentation import Trainer_seg
+from train_classification import Trainer_cls
+from inference import Inferencer
+from torch.cuda import is_available
+from datetime import datetime
+
+
+# fix seed for reproducibility
+seed = 3407
+torch.manual_seed(seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+np.random.seed(seed)
+random.seed(seed)
+
+
+def conf_to_args(args, **kwargs):    # pass in variable numbers of args
+    var = vars(args)
+
+    for key, value in kwargs.items():
+        var[key] = value
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config_path', type=str)
+    arg = parser.parse_args()
+
+    with open(arg.config_path, 'rb') as f:
+        conf = yaml.load(f.read(), Loader=yaml.Loader)  # load the config file
+        conf['config_path'] = arg.config_path
+
+    args = argparse.Namespace()
+    conf_to_args(args, **conf)  # pass in keyword args
+
+    now_time = datetime.now().strftime("%Y-%m-%d %H%M%S")
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.CUDA_VISIBLE_DEVICES
+
+    if args.wandb:
+        wandb.init(project='lululab ensemble {}'.format(args.project_name), config=args, name=now_time,
+                   settings=wandb.Settings(start_method="fork"))
+
+    print('Use CUDA :', args.cuda and is_available())
+
+    if args.mode not in 'inference':
+
+        # save hyper-parameters
+        with open(args.config_path, 'r') as f_r:
+            file_path = args.saved_model_directory + '/' + now_time
+            if not os.path.exists(file_path):
+                os.makedirs(file_path)
+            with open(os.path.join(file_path, args.config_path.split('/')[-1]), 'w') as f_w:
+                f_w.write(f_r.read())
+
+        if args.mode == 'train' or args.mode == 'calibrate':
+            if args.task == 'segmentation':
+                trainer = Trainer_seg(args, now_time)
+            elif args.task == 'classification':
+                trainer = Trainer_cls(args, now_time)
+        else:
+            raise Exception('Invalid mode')
+
+        trainer.start_train()
+
+    elif args.mode in 'inference':
+        inferencer = Inferencer(args)
+
+        if args.inference_mode == 'segmentation':
+            inferencer.start_inference_segmentation()
+        elif args.inference_mode == 'classification':
+            inferencer.start_inference_classification()
+        else:
+            raise ValueError('Please select correct inference_mode !!!')
+    else:
+        print('No mode supported.')
+
+
+if __name__ == "__main__":
+    main()

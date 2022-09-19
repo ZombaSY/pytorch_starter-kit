@@ -1,0 +1,25 @@
+{
+ ### Environment Parameters
+  mode: inference,
+  cuda: true,
+  pin_memory: true,
+  wandb: false,
+  worker: 2,
+  project_name: 'ambiguous_label',
+  CUDA_VISIBLE_DEVICES: '0',
+
+  model_name: 'Unet',
+  inference_mode: 'segmentation',
+  task: 'segmentation',
+  inference_level: 100,
+  dataloader: 'Image2Image',
+  num_class: 3,
+  input_space: 'RGB',
+  input_channel: 3,
+  input_size: [640, 480],  # (height, width)
+
+  model_path: 'model_checkpoints/2022-09-19 022303/Unet_Epoch_209_mIoU_0.6730570017398687.pt',
+
+  val_x_path: 'awesome/path/to/dataset',
+  val_y_path: 'awesome/path/to/dataset',
+}

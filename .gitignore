@@ -1,0 +1,8 @@
+wandb/
+model_checkpoints/
+.idea/
+
+*.pt
+*.pyc
+
+**/__pycache__/**
