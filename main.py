@@ -51,7 +51,7 @@ def main():
 
     print('Use CUDA :', args.cuda and is_available())
 
-    if args.mode not in 'inference':
+    if args.mode in 'train':
 
         # save hyper-parameters
         with open(args.config_path, 'r') as f_r:
@@ -61,7 +61,7 @@ def main():
             with open(os.path.join(file_path, args.config_path.split('/')[-1]), 'w') as f_w:
                 f_w.write(f_r.read())
 
-        if args.mode == 'train' or args.mode == 'calibrate':
+        if args.mode == 'train':
             if args.task == 'segmentation':
                 trainer = Trainer_seg(args, now_time)
             elif args.task == 'classification':

@@ -36,9 +36,14 @@ class Trainer_cls:
         self.optimizer = self._init_optimizer(self.model, self.args.lr)
         self.scheduler = self._set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
 
-        if self.args.mode == 'calibrate':
-            self.model.load_state_dict(torch.load(self.args.model_path))
-            print('Model loaded successfully!!!')
+        if self.args.model_path != '':
+            if 'imagenet' in self.args.model_path.lower():
+                self.model.module.load_pretrained_imagenet(self.args.model_path)
+                print('Model loaded successfully!!! (ImageNet)')
+            else:
+                self.model.module.load_pretrained(self.args.model_path)    # TODO: define "load_pretrained" abstract method to all models
+                print('Model loaded successfully!!! (Custom)')
+            self.model.to(self.device)
 
         self.criterion = self._init_criterion(self.args.criterion)
 

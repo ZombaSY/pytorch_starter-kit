@@ -1,6 +1,6 @@
 {
  ### Environment Parameters
- mode: train,  # train, calibrate
+ mode: train,  # train
  cuda: true,
  pin_memory: true,
  wandb: false,
