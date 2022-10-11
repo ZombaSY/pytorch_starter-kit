@@ -9,6 +9,19 @@
 - CUDA: 11.2
 - Pytorch 1.8.1
 
+## Dataset
+Make dataset to follow hierarchy
+
+```
+[root_path]
+├── [train]
+│   ├── [input]
+│   └── [label]
+└── [val]
+    ├── [input]
+    └── [label]
+```
+
 ## Train
 
 If you have installed 'WandB', login your ID in command line.<br>

@@ -2,17 +2,11 @@ import cv2
 import numpy as np
 import torch
 import math
-import torch.nn as nn
-import torch.nn.functional as F
+import random
 import time
-import warnings
-import copy
-import os
 
-from sklearn.metrics import f1_score
-from skimage.exposure import cumulative_distribution
 from torch.autograd import Variable
-from torchvision import transforms
+
 from matplotlib.image import imread
 from PIL import Image
 
@@ -748,6 +742,56 @@ class ImageProcessing(object):
         return img, slope_sqr_diff
 
 
+def cut_mix(_input, mask_1, _refer, mask_2) -> (Image, Image):
+    """
+    :param _input: PIL.Image
+    :param mask_1: PIL.Image
+    :param _refer: PIL.Image
+    :param mask_2: PIL.Image
+
+    :returns: cut-mixed image
+    """
+    random_gen = random.Random()
+
+    _input_np = np.array(_input)
+    mask_1_np = np.array(mask_1)
+    _refer_np = np.array(_refer)
+    mask_2_np = np.array(mask_2)
+
+    h1, w1, _ = _input_np.shape
+    h2, w2, _ = _refer_np.shape
+
+    # cutout positions
+    rand_x = random_gen.random() * 0.75
+    rand_y = random_gen.random() * 0.75
+    rand_w = random_gen.random() * 0.5
+    rand_h = random_gen.random() * 0.5
+
+    cx_1 = int(rand_x * w1)  # range of [0, 0.5]
+    cy_1 = int(rand_y * h1)
+    cw_1 = int((rand_w + 0.25) * w1)  # range of [0.25, 0.75]
+    ch_1 = int((rand_h + 0.25) * h1)
+
+    cx_2 = int(rand_x * w2)
+    cy_2 = int(rand_y * h2)
+    cw_2 = int((rand_w + 0.25) * w2)
+    ch_2 = int((rand_h + 0.25) * h2)
+
+    if cy_1 + ch_1 > h1: ch_1 = h1 - cy_1  # push overflowing area
+    if cx_1 + cw_1 > w1: cw_1 = w1 - cx_1
+
+    cutout_img = _refer_np[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
+    cutout_mask = mask_2_np[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
+
+    cutout_img = cv2.resize(cutout_img, (cw_1, ch_1))
+    cutout_mask = cv2.resize(cutout_mask, (cw_1, ch_1), interpolation=cv2.INTER_NEAREST)
+
+    _input_np[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_img
+    mask_1_np[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_mask
+
+    return Image.fromarray(_input_np.astype(np.uint8)), Image.fromarray(mask_1_np.astype(np.uint8))
+
+
 def grey_to_heatmap(img):
     """
     img: numpy.ndarray, or [0, 255] range of integer
@@ -759,4 +803,3 @@ def grey_to_heatmap(img):
     heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
 
     return heatmap
-

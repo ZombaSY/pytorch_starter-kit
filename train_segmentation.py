@@ -57,6 +57,7 @@ class Trainer_seg:
         self.metric_val = metrics.StreamSegMetrics_segmentation(self.args.num_class)
         self.metric_best = {'cIoU': 0, 'mIoU': 0}
         self.model_post_path_dict = {}
+        self.last_saved_epoch = 0
 
         self.__validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold
 
@@ -186,6 +187,10 @@ class Trainer_seg:
 
         self.metric_val.reset()
 
+        if (epoch - self.last_saved_epoch) > 500:
+            print('The model seems to be converged. End training.')
+            exit(0)
+
     def start_train(self):
         for epoch in range(1, self.args.epoch + 1):
             self._train(epoch)
@@ -209,6 +214,7 @@ class Trainer_seg:
         torch.save(self.model.state_dict(), file_format)
 
         print(file_format + '\t model saved!!')
+        self.last_saved_epoch = epoch
 
     def __init_data_loader(self,
                            x_path,

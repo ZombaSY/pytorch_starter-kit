@@ -37,19 +37,8 @@ class Image2ImageLoader(Dataset):
         self.mode = mode
         self.args = kwargs['args']
 
-        if hasattr(self.args, 'input_size'):
-            h, w = self.args.input_size[0], self.args.input_size[1]
-            self.size_1x = [int(h), int(w)]
-
-        if hasattr(self.args, 'crop_size'):
-            self.crop_factor = int(self.args.crop_size)
-
-        if self.args.project_name == 'ADE':
-            self.image_mean = [0.485, 0.456, 0.406]
-            self.image_std = [0.229, 0.224, 0.225]
-        else:
-            self.image_mean = [0.512, 0.459, 0.353]
-            self.image_std = [0.254, 0.226, 0.219]
+        self.image_mean = [0.485, 0.456, 0.406]
+        self.image_std = [0.229, 0.224, 0.225]
 
         if platform.system() == 'Linux' and hasattr(self.args, 'offset'):
             self.offset = self.__offset(self.args.offset)
@@ -78,39 +67,58 @@ class Image2ImageLoader(Dataset):
         del y_img_name
 
     def transform(self, image, target):
-
         if hasattr(self.args, 'input_size'):
-            image = tf.resize(image, self.size_1x, interpolation=InterpolationMode.BILINEAR)
-            target = tf.resize(target, self.size_1x, interpolation=InterpolationMode.NEAREST)
+            image = tf.resize(image, [int(self.args.input_size[0]), int(self.args.input_size[1])])
+            target = tf.resize(target, [int(self.args.input_size[0]), int(self.args.input_size[1])], interpolation=InterpolationMode.NEAREST)
 
-        if hasattr(self, 'offset') and not self.mode == 'validation':
-            image_np = np.array(image)
-            image_np = self.offset(image_np)
-            image = Image.fromarray(image_np.astype(np.uint8))
+        if not self.mode == 'validation':
+            random_gen = random.Random()  # thread-safe random
 
-        if hasattr(self.args, 'crop_size') and not self.mode == 'validation':
-            i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(self.crop_factor, self.crop_factor))
-            image = tf.crop(image, i, j, h, w)
-            target = tf.crop(target, i, j, h, w)
+            if (random_gen.random() < 0.8) and self.args.transform_cutmix:
+                rand_n = random_gen.randint(0, self.len - 1)     # randomly generates reference image on dataset
+                image_refer = Image.open(self.x_img_path[rand_n]).convert('RGB')
+                target_refer = Image.open(self.y_img_path[rand_n]).convert('L')
+                image, target = utils.cut_mix(image, target, image_refer, target_refer)
 
-        if (random.random() < 0.5) and not self.mode == 'validation' and self.args.transform_hflip:
-            image = tf.hflip(image)
-            target = tf.hflip(target)
+            if (random_gen.random() < 0.8) and self.args.transform_rand_resize:
+                rand_h = (random_gen.random() * 1.5) + 0.5  # [0.5, 2.0]
+                rand_w = (random_gen.random() * 1.5) + 0.5
+                resize_h = int((self.args.input_size[0] * rand_h).__round__())
+                resize_w = int((self.args.input_size[1] * rand_w).__round__())
 
-        if (random.random() < 0.8) and not self.mode == 'validation' and self.args.transform_jitter:
-            transform = transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15, hue=0.02)
-            image = transform(image)
+                image = tf.resize(image, [resize_h, resize_w])
+                target = tf.resize(target, [resize_h, resize_w], interpolation=InterpolationMode.NEAREST)
 
-        if (random.random() < 0.3) and not self.mode == 'validation' and self.args.transform_blur:
-            transform = transforms.GaussianBlur(kernel_size=3)
-            image = transform(image)
+            if hasattr(self, 'offset'):
+                image_np = np.array(image)
+                image_np = self.offset(image_np)
+                image = Image.fromarray(image_np.astype(np.uint8))
 
-        # recommend to use at the end.
-        # recommend to use in same shape both image and target
-        if (random.random() < 0.3) and not self.mode == 'validation' and self.args.transform_perspective:
-            start_p, end_p = transforms.RandomPerspective.get_params(image.width, image.height, distortion_scale=0.5)
-            image = tf.perspective(image, start_p, end_p)
-            target = tf.perspective(target, start_p, end_p)
+            if hasattr(self.args, 'transform_rand_crop'):
+                i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(int(self.args.transform_rand_crop), int(self.args.transform_rand_crop)))
+                image = tf.crop(image, i, j, h, w)
+                target = tf.crop(target, i, j, h, w)
+
+            if (random_gen.random() < 0.5) and self.args.transform_hflip:
+                image = tf.hflip(image)
+                target = tf.hflip(target)
+
+            if (random_gen.random() < 0.8) and self.args.transform_jitter:
+                transform = transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)
+                image = transform(image)
+
+            if (random_gen.random() < 0.5) and self.args.transform_blur:
+                kernel_size = int((random.random() * 8 + 3).__round__())
+                if kernel_size % 2 == 0:
+                    kernel_size -= 1
+                transform = transforms.GaussianBlur(kernel_size=kernel_size)
+                image = transform(image)
+
+            # recommend to use at the end.
+            if (random_gen.random() < 0.3) and self.args.transform_perspective:
+                start_p, end_p = transforms.RandomPerspective.get_params(image.width, image.height, distortion_scale=0.5)
+                image = tf.perspective(image, start_p, end_p)
+                target = tf.perspective(target, start_p, end_p, interpolation=InterpolationMode.NEAREST)
 
         image_tensor = tf.to_tensor(image)
         target_tensor = torch.tensor(np.array(target))
@@ -127,7 +135,7 @@ class Image2ImageLoader(Dataset):
                                         mean=self.image_mean,
                                         std=self.image_std)
 
-        if self.args.num_class == 2:  # for binary label with {0, 255} set
+        if self.args.num_class == 2:  # for binary label
             target_tensor[target_tensor < 128] = 0
             target_tensor[target_tensor >= 128] = 1
         target_tensor = target_tensor.unsqueeze(0)    # expand 'grey channel' for loss function dependency
@@ -179,15 +187,8 @@ class Image2VectorLoader(Dataset):
             h, w = self.args.input_size[0], self.args.input_size[1]
             self.size_1x = [int(h), int(w)]
 
-        if hasattr(self.args, 'crop_size'):
-            self.crop_factor = int(self.args.crop_size)
-
-        if self.args.project_name == 'ADE':
-            self.image_mean = [0.485, 0.456, 0.406]
-            self.image_std = [0.229, 0.224, 0.225]
-        else:
-            self.image_mean = [0.512, 0.459, 0.353]
-            self.image_std = [0.254, 0.226, 0.219]
+        self.image_mean = [0.485, 0.456, 0.406]
+        self.image_std = [0.229, 0.224, 0.225]
 
         self.data_root_path = os.path.split(csv_path)[0]
         self.df = pd.read_csv(csv_path)
@@ -196,28 +197,47 @@ class Image2VectorLoader(Dataset):
     def transform(self, image):
 
         if hasattr(self.args, 'input_size'):
-            image = tf.resize(image, self.size_1x, interpolation=InterpolationMode.BILINEAR)
+            image = tf.resize(image, [int(self.args.input_size[0]), int(self.args.input_size[1])])
 
-        if hasattr(self.args, 'crop_size') and not self.mode == 'validation':
-            i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(self.crop_factor, self.crop_factor))
-            image = tf.crop(image, i, j, h, w)
+        if not self.mode == 'validation':
+            random_gen = random.Random()  # thread-safe random
 
-        if (random.random() < 0.5) and not self.mode == 'validation' and self.args.transform_hflip:
-            image = tf.hflip(image)
+            if (random_gen.random() < 0.8) and self.args.transform_rand_resize:
+                rand_h = (random_gen.random() * 1.5) + 0.5  # [0.5, 2.0]
+                rand_w = (random_gen.random() * 1.5) + 0.5
+                resize_h = int((self.args.input_size[0] * rand_h).__round__())
+                resize_w = int((self.args.input_size[1] * rand_w).__round__())
 
-        if (random.random() < 0.8) and not self.mode == 'validation' and self.args.transform_jitter:
-            transform = transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15, hue=0.02)
-            image = transform(image)
+                image = tf.resize(image, [resize_h, resize_w])
 
-        if (random.random() < 0.3) and not self.mode == 'validation' and self.args.transform_blur:
-            transform = transforms.GaussianBlur(kernel_size=3)
-            image = transform(image)
+            if hasattr(self, 'offset'):
+                image_np = np.array(image)
+                image_np = self.offset(image_np)
+                image = Image.fromarray(image_np.astype(np.uint8))
 
-        # recommend to use at the end.
-        # recommend to use in same shape both image and target
-        if (random.random() < 0.3) and not self.mode == 'validation' and self.args.transform_perspective:
-            start_p, end_p = transforms.RandomPerspective.get_params(image.width, image.height, distortion_scale=0.5)
-            image = tf.perspective(image, start_p, end_p)
+            if hasattr(self.args, 'transform_rand_crop'):
+                i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(
+                int(self.args.transform_rand_crop), int(self.args.transform_rand_crop)))
+                image = tf.crop(image, i, j, h, w)
+
+            if (random_gen.random() < 0.5) and self.args.transform_hflip:
+                image = tf.hflip(image)
+
+            if (random_gen.random() < 0.8) and self.args.transform_jitter:
+                transform = transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)
+                image = transform(image)
+
+            if (random_gen.random() < 0.5) and self.args.transform_blur:
+                kernel_size = int((random.random() * 8 + 3).__round__())
+                if kernel_size % 2 == 0:
+                    kernel_size -= 1
+                transform = transforms.GaussianBlur(kernel_size=kernel_size)
+                image = transform(image)
+
+            # recommend to use at the end.
+            if (random_gen.random() < 0.3) and self.args.transform_perspective:
+                start_p, end_p = transforms.RandomPerspective.get_params(image.width, image.height, distortion_scale=0.5)
+                image = tf.perspective(image, start_p, end_p)
 
         image_tensor = tf.to_tensor(image)
 
