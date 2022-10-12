@@ -10,7 +10,7 @@
 - Pytorch 1.8.1
 
 ## Dataset
-Make dataset to follow hierarchy
+The dataset should follow below hierarchy
 
 ```
 [root_path]
@@ -29,12 +29,12 @@ If not, fix to 'wandb: false,' in "./hyper_parameters/train_***.yml"
 
 For <b>Segmentation</b>, fix the "hyper_parameters/train_segmentation.yml", "bash_train_segmentation.sh" and execute command
 ```
-bash bash_train_flush.sh
+bash bash_train_segmentation.sh
 ```
 
 For <b>Classification</b>, fix the "hyper_parameters/train_classification.yml", "bash_train_classification.sh" and execute command
 ```
-bash bash_train_darkcircle.sh
+bash bash_train_classification.sh
 ```
 
 

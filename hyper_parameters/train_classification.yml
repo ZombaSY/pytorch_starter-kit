@@ -9,7 +9,7 @@
  save_interval: 1,
  saved_model_directory: 'model_checkpoints',
  train_fold: 1,  # fold train data and start validate. 1 for default
- project_name: 'ambiguous_label',
+ project_name: 'my_wandb_project',
  CUDA_VISIBLE_DEVICES: '0',
 
  ### Train Parameters
@@ -21,19 +21,21 @@
  input_space: 'RGB',
  input_channel: 3,
  input_size: [480, 640],  # (height, width)
- crop_size: '320',
- # resolution: [1280, 1024],
- scheduler: 'CosineAnnealingLR', # WarmupCosine, CosineAnnealingLR
+ scheduler: 'CosineAnnealingLR',
  batch_size: 128,
  epoch: 1000,
  lr: 0.001,
  class_weight: [1.0, 1.0],
+ model_path: 'pretrained/imagenet/pretrained_model.pt',  # set empty to deactivate
 
-  ### Data Parameters
- transform_blur: true,
- transform_jitter: false,
- transform_hflip: true,
- transform_perspective: false,
+   ### Data Parameters
+  transform_blur: true,
+  transform_jitter: true,
+  transform_hflip: true,
+  transform_perspective: true,
+  transform_cutmix: true,
+  transform_rand_resize: true,
+  transform_rand_crop: 224,
 
  train_csv_path: 'awesome/path/to/csv/tmp.csv',
  val_csv_path:   'awesome/path/to/csv/tmp.csv',
