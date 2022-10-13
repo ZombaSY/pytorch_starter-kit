@@ -46,7 +46,7 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = args.CUDA_VISIBLE_DEVICES
 
     if args.wandb:
-        wandb.init(project='lululab ensemble {}'.format(args.project_name), config=args, name=now_time,
+        wandb.init(project='{}'.format(args.project_name), config=args, name=now_time,
                    settings=wandb.Settings(start_method="fork"))
 
     print('Use CUDA :', args.cuda and is_available())
