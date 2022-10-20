@@ -11,6 +11,7 @@ from models import losses as loss_hub
 from models import metrics
 
 from datetime import datetime
+from timm.utils import ModelEmaV2, get_state_dict
 
 
 class Trainer_seg:
@@ -37,14 +38,19 @@ class Trainer_seg:
         self.optimizer = self._init_optimizer(self.model, self.args.lr)
         self.scheduler = self._set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
 
-        if self.args.model_path != '':
-            if 'imagenet' in self.args.model_path.lower():
-                self.model.module.load_pretrained_imagenet(self.args.model_path)
-                print('Model loaded successfully!!! (ImageNet)')
-            else:
-                self.model.module.load_pretrained(self.args.model_path)    # TODO: define "load_pretrained" abstract method to all models
-                print('Model loaded successfully!!! (Custom)')
-            self.model.to(self.device)
+        if hasattr(self.args, 'model_path'):
+            if self.args.model_path != '':
+                if 'imagenet' in self.args.model_path.lower():
+                    self.model.module.load_pretrained_imagenet(self.args.model_path)
+                    print('Model loaded successfully!!! (ImageNet)')
+                else:
+                    self.model.module.load_pretrained(self.args.model_path)    # TODO: define "load_pretrained" abstract method to all models
+                    print('Model loaded successfully!!! (Custom)')
+                self.model.to(self.device)
+
+        # Important to create EMA model after cuda(), DP wrapper, and AMP but before SyncBN and DDP wrapper
+        if self.args.ema_decay != 0:
+            self.model_ema = ModelEmaV2(self.model, decay=self.args.ema_decay, device=self.device)
 
         self.criterion = self._init_criterion(self.args.criterion)
 
@@ -95,12 +101,17 @@ class Trainer_seg:
             self.optimizer.step()
             if self.scheduler is not None:
                 self.scheduler.step()
+            if self.args.ema_decay != 0:
+                self.model_ema.update(self.model)
 
             batch_losses.append(loss.item())
 
             if hasattr(self.args, 'train_fold'):
                 if batch_idx != 0 and (batch_idx % self.__validate_interval) == 0:
-                    self._validate(epoch)
+                    if self.args.ema_decay != 0:
+                        self._validate(self.model_ema.module, epoch)
+                    else:
+                        self._validate(self.model, epoch)
 
             if (batch_idx != 0) and (batch_idx % (self.args.log_interval // self.args.batch_size) == 0):
                 loss_mean = np.mean(batch_losses)
@@ -133,8 +144,8 @@ class Trainer_seg:
 
         self.metric_train.reset()
 
-    def _validate(self, epoch):
-        self.model.eval()
+    def _validate(self, model, epoch):
+        model.eval()
 
         for batch_idx, (x_in, target) in enumerate(self.loader_val):
             with torch.no_grad():
@@ -144,7 +155,7 @@ class Trainer_seg:
 
                 target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
 
-                output = self.model(x_in)
+                output = model(x_in)
 
                 # compute metric
                 output_argmax = torch.argmax(output, dim=1).cpu()
@@ -187,7 +198,7 @@ class Trainer_seg:
         for key in model_metrics.keys():
             if model_metrics[key] > self.metric_best[key]:
                 self.metric_best[key] = model_metrics[key]
-                self.save_model(self.args.model_name, epoch, model_metrics[key], best_flag=True, metric_name=key)
+                self.save_model(model, self.args.model_name, epoch, model_metrics[key], best_flag=True, metric_name=key)
 
         self.metric_val.reset()
 
@@ -198,11 +209,14 @@ class Trainer_seg:
     def start_train(self):
         for epoch in range(1, self.args.epoch + 1):
             self._train(epoch)
-            self._validate(epoch)
+            if self.args.ema_decay != 0:
+                self._validate(self.model_ema.module, epoch)
+            else:
+                self._validate(self.model, epoch)
 
             print('### {} / {} epoch ended###'.format(epoch, self.args.epoch))
 
-    def save_model(self, model_name, epoch, metric=None, best_flag=False, metric_name='metric'):
+    def save_model(self, model, model_name, epoch, metric=None, best_flag=False, metric_name='metric'):
         file_path = self.saved_model_directory + '/'
 
         file_format = file_path + model_name + '_Epoch_' + str(epoch) + '_' + metric_name + '_' + str(metric) + '.pt'
@@ -215,7 +229,10 @@ class Trainer_seg:
                 os.remove(self.model_post_path_dict[metric_name])
             self.model_post_path_dict[metric_name] = file_format
 
-        torch.save(self.model.state_dict(), file_format)
+        if self.args.ema_decay != 0:
+            torch.save(get_state_dict(model), file_format)
+        else:
+            torch.save(model.state_dict(), file_format)
 
         print(file_format + '\t model saved!!')
         self.last_saved_epoch = epoch

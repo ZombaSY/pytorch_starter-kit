@@ -25,6 +25,7 @@
   batch_size: 32,
   epoch: 10000,
   lr: 0.0001,
+  ema_decay: 0.99, # set 0 to deactivate
   class_weight: [1.0, 1.0],
   model_path: 'pretrained/imagenet/pretrained_model.pt',  # set empty to deactivate
 

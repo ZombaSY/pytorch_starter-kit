@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import fastseg
-import copy
+
 
 from models.backbones import Resnet
 from models.backbones import Unet_part
 from models.backbones.Swin import SwinTransformer
 from models.blocks.Blocks import Upsample
 from models.heads.UPerHead import M_UPerHead
+
+from collections import OrderedDict
 
 
 def initialize_weights(layer, activation='relu'):
@@ -102,6 +102,30 @@ class Swin(nn.Module):
                                     dropout_ratio=0.1,
                                     num_classes=num_classes,
                                     align_corners=False,)
+
+    def load_pretrained(self, dst):
+        pretrained_states = torch.load(dst)
+        pretrained_states_backbone = OrderedDict()
+        for item in pretrained_states.keys():
+            if 'swin_transformer' in item:
+                key = item.replace('module.', '')   # strip wrapper class
+                key = key.replace('swin_transformer.', '')  # strip "swin_transformer" class
+                pretrained_states_backbone[key] = pretrained_states[item]
+
+        self.swin_transformer.load_state_dict(pretrained_states_backbone)
+
+    def load_pretrained_imagenet(self, dst):
+        pretrained_states = torch.load(dst)['model']
+        pretrained_states_backbone = OrderedDict()
+
+        for item in pretrained_states.keys():
+            if 'head.weight' == item or 'head.bias' == item or 'norm.weight' == item or 'norm.bias' == item or 'layers.0.blocks.1.attn_mask' == item or 'layers.1.blocks.1.attn_mask' == item or 'layers.2.blocks.1.attn_mask' == item or 'layers.2.blocks.3.attn_mask' == item or 'layers.2.blocks.5.attn_mask' == item:
+                continue
+            pretrained_states_backbone[item] = pretrained_states[item]
+
+        self.swin_transformer.remove_fpn_norm_layers()  # temporally remove fpn norm layers that not included on public-release model
+        self.swin_transformer.load_state_dict(pretrained_states_backbone)
+        self.swin_transformer.add_fpn_norm_layers()
 
     def forward(self, x):
         x_size = x.shape[2:]
