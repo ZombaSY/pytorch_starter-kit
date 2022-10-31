@@ -40,9 +40,6 @@ class Image2ImageLoader(Dataset):
         self.image_mean = [0.485, 0.456, 0.406]
         self.image_std = [0.229, 0.224, 0.225]
 
-        if platform.system() == 'Linux' and hasattr(self.args, 'offset'):
-            self.offset = self.__offset(self.args.offset)
-
         x_img_name = os.listdir(x_path)
         y_img_name = os.listdir(y_path)
         x_img_name = filter(is_image, x_img_name)
@@ -88,11 +85,6 @@ class Image2ImageLoader(Dataset):
 
                 image = tf.resize(image, [resize_h, resize_w])
                 target = tf.resize(target, [resize_h, resize_w], interpolation=InterpolationMode.NEAREST)
-
-            if hasattr(self, 'offset'):
-                image_np = np.array(image)
-                image_np = self.offset(image_np)
-                image = Image.fromarray(image_np.astype(np.uint8))
 
             if hasattr(self.args, 'transform_rand_crop'):
                 i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(int(self.args.transform_rand_crop), int(self.args.transform_rand_crop)))
@@ -149,15 +141,6 @@ class Image2ImageLoader(Dataset):
 
         return image_tensor, target_tensor
 
-    def __offset(self, offset):
-        if offset == 1:
-            scaler = [10, 10, -10]
-            return lambda x: np.clip(x + scaler, 0, 255)
-
-        elif offset == 2:
-            scaler = [10, 10, -10]
-            return lambda x: np.clip(x - scaler, 0, 255)
-
     def __getitem__(self, index):
         x_path = self.x_img_path[index]
         y_path = self.y_img_path[index]
@@ -209,11 +192,6 @@ class Image2VectorLoader(Dataset):
                 resize_w = int((self.args.input_size[1] * rand_w).__round__())
 
                 image = tf.resize(image, [resize_h, resize_w])
-
-            if hasattr(self, 'offset'):
-                image_np = np.array(image)
-                image_np = self.offset(image_np)
-                image = Image.fromarray(image_np.astype(np.uint8))
 
             if hasattr(self.args, 'transform_rand_crop'):
                 i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(
