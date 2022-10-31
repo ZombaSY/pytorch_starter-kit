@@ -279,7 +279,7 @@ class Trainer_seg:
         optimizer = None
 
         optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
-                                      lr=lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.01, amsgrad=False)
+                                      lr=lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-8, amsgrad=False)
 
         return optimizer
 
