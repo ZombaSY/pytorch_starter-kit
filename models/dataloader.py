@@ -1,14 +1,9 @@
-import copy
 import os
-import platform
 
 import torch
 import torchvision.transforms.functional as tf
-import torch.nn.functional as F
-import albumentations
 import random
 import numpy as np
-import cv2
 import pandas as pd
 
 from PIL import Image
@@ -100,7 +95,7 @@ class Image2ImageLoader(Dataset):
                 image = transform(image)
 
             if (random_gen.random() < 0.5) and self.args.transform_blur:
-                kernel_size = int((random.random() * 8 + 3).__round__())
+                kernel_size = int((random.random() * 10 + 2.5).__round__())    # random kernel size 3 to 11
                 if kernel_size % 2 == 0:
                     kernel_size -= 1
                 transform = transforms.GaussianBlur(kernel_size=kernel_size)
