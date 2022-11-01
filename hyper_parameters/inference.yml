@@ -5,7 +5,7 @@
   pin_memory: true,
   wandb: false,
   worker: 2,
-  project_name: 'ambiguous_label',
+  project_name: 'my_wandb_project',
   CUDA_VISIBLE_DEVICES: '0',
 
   model_name: 'Unet',

@@ -3,6 +3,7 @@ import time
 import os
 import wandb
 import numpy as np
+import sys
 
 from models import dataloader as dataloader_hub
 from models import lr_scheduler
@@ -202,9 +203,11 @@ class Trainer_seg:
 
         self.metric_val.reset()
 
-        if (epoch - self.last_saved_epoch) > 100:
-            print('The model seems to be converged. End training.')
-            exit(0)
+        if (epoch - self.last_saved_epoch) > 200:
+            print('The model seems to be converged. Early stop training.')
+            print(f'Best mIoU -----> {self.metric_best["mIoU"]}')
+            wandb.log({f'Best mIoU': self.metric_best['mIoU']})
+            sys.exit()  # safe exit
 
     def start_train(self):
         for epoch in range(1, self.args.epoch + 1):
