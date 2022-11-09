@@ -21,10 +21,14 @@
   input_space: 'RGB',
   input_channel: 3,
   input_size: [640, 480],  # (height, width)
-  scheduler: 'CosineAnnealingLR',
+  optimizer: 'AdamW',
+    lr: 0.0001,
+    scheduler: 'WarmupCosine',   # WarmupCosine, CosineAnnealingLR
+    cycles: 100,
+    warmup_epoch: 20,
+    weight_decay: 0.05,
   batch_size: 16,
   epoch: 10000,
-  lr: 0.00005,
   ema_decay: 0, # set 0 to deactivate
   class_weight: [1.0, 1.0],
   model_path: 'pretrained/imagenet/pretrained_model.pt',  # set empty to deactivate

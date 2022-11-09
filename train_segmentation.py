@@ -61,8 +61,6 @@ class Trainer_seg:
 
         now_time = now if now is not None else datetime.now().strftime("%Y%m%d %H%M%S")
         self.saved_model_directory = self.args.saved_model_directory + '/' + now_time
-        self.num_batches_train = int(len(self.loader_train))
-        self.num_batches_val = int(len(self.loader_val))
 
         self.metric_train = metrics.StreamSegMetrics_segmentation(self.args.num_class)
         self.metric_val = metrics.StreamSegMetrics_segmentation(self.args.num_class)
@@ -76,7 +74,7 @@ class Trainer_seg:
         self.model.train()
         batch_losses = []
         print('Start Train')
-        for batch_idx, (x_in, target) in enumerate(self.loader_train):
+        for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
             if (x_in[0].shape[0] / torch.cuda.device_count()) <= torch.cuda.device_count():   # if has 1 batch per GPU
                 break   # avoid BN issue
             x_in, _ = x_in
@@ -148,7 +146,7 @@ class Trainer_seg:
     def _validate(self, model, epoch):
         model.eval()
 
-        for batch_idx, (x_in, target) in enumerate(self.loader_val):
+        for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
             with torch.no_grad():
                 x_in, _ = x_in
                 target, _ = target
@@ -203,7 +201,7 @@ class Trainer_seg:
 
         self.metric_val.reset()
 
-        if (epoch - self.last_saved_epoch) > 200:
+        if (epoch - self.last_saved_epoch) > self.args.cycles * 2:
             print('The model seems to be converged. Early stop training.')
             print(f'Best mIoU -----> {self.metric_best["mIoU"]}')
             wandb.log({f'Best mIoU': self.metric_best['mIoU']})
@@ -257,7 +255,7 @@ class Trainer_seg:
         else:
             raise Exception('No datalodaer named', self.args.dataloader)
 
-        return loader.Loader
+        return loader
 
     def __init_model(self, model_name):
         if model_name == 'Unet':
@@ -278,31 +276,32 @@ class Trainer_seg:
 
         return criterion
 
-    def _init_optimizer(self, model, lr):
+    def _init_optimizer(self, optimizer_name, model, lr):
         optimizer = None
 
-        optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
-                                      lr=lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-8, amsgrad=False)
+        if optimizer_name == 'AdamW':
+            optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
+                                          lr=lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=self.args.weight_decay)
 
         return optimizer
 
     def _set_scheduler(self, optimizer, scheduler_name, data_loader, batch_size):
         scheduler = None
-        step_per_epoch = data_loader.__len__() // batch_size
+        steps_per_epoch = (data_loader.__len__() // batch_size) + 1
 
         if hasattr(self.args, 'scheduler'):
             if scheduler_name == 'WarmupCosine':
                 scheduler = lr_scheduler.WarmupCosineSchedule(optimizer=optimizer,
-                                                              warmup_steps=step_per_epoch,
-                                                              t_total=data_loader.__len__(),
-                                                              cycles=10,
+                                                              warmup_steps=steps_per_epoch * self.args.warmup_epoch,
+                                                              t_total=self.args.epoch * steps_per_epoch,
+                                                              cycles=self.args.epoch / self.args.cycles,
                                                               last_epoch=-1)
             elif scheduler_name == 'CosineAnnealingLR':
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100, eta_min=0)
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.cycles, eta_min=0)
             elif scheduler_name == 'ConstantLRSchedule':
                 scheduler = lr_scheduler.ConstantLRSchedule(optimizer, last_epoch=-1)
             elif scheduler_name == 'WarmupConstantSchedule':
-                scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=step_per_epoch * 100)
+                scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=steps_per_epoch * self.args.warmup_epoch)
             else:
                 raise Exception('No scheduler named', scheduler_name)
         else:

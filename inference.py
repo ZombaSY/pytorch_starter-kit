@@ -106,50 +106,11 @@ class Inferencer:
                 target, _ = target
 
                 x_in = x_in.to(self.device)
-
                 target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
 
                 output = self.model(x_in)
 
-                # compute metric
-                output_argmax = torch.argmax(output, dim=1).cpu()
-                self.metric.update(target.cpu().detach().numpy(), output_argmax.numpy())
-
-                x_img = x_img.squeeze(0).data.cpu().numpy()
-                x_img = np.transpose(x_img, (1, 2, 0))
-                x_img = x_img * np.array(self.image_std)
-                x_img = x_img + np.array(self.image_mean)
-                x_img = x_img * 255.0
-                x_img = x_img.astype(np.uint8)
-
-                output_prob = F.softmax(output[0], dim=0)
-                # output_prob = F.sigmoid(output[0, 1, :, :])
-                output_grey = (output_prob.cpu().detach().numpy() * 255).astype(np.uint8)
-
-                output_heatmap_overlay = []
-                for i in range(1, self.args.num_class):
-                    output_grey_tmp = output_grey[i]
-                    output_heatmap = utils.grey_to_heatmap(output_grey_tmp)
-                    output_grey_tmp = np.repeat(output_grey_tmp[:, :, None] / 255, 3, 2)
-                    output_heatmap_overlay.append((x_img * (1 - output_grey_tmp)) + (output_heatmap * output_grey_tmp))
-                output_heatmap_overlay = np.array(output_heatmap_overlay)
-
-                path, fn = os.path.split(img_id[0])
-                img_id, ext = os.path.splitext(fn)
-
-                dir_path, fn = os.path.split(self.args.model_path)
-                fn, ext = os.path.splitext(fn)
-                save_dir = dir_path + '/' + fn + '/'
-
-                if not os.path.exists(save_dir):
-                    os.mkdir(save_dir)
-
-                # Image.fromarray(x_img).save(save_dir + img_id + '.png', quality=100)
-                # for i in range(1, self.args.num_class):
-                #     Image.fromarray(output_grey[i]).save(save_dir + img_id + f'_zargmax_class_{i}.png', quality=100)
-                    # Image.fromarray(output_heatmap_overlay[i - 1].astype(np.uint8)).save(save_dir + img_id + f'_heatmap_overlay_class_{i}.png', quality=100)
-
-                print(f'{batch_idx} batch {img_id} \t Done !!')
+                self.post_process(output, target, x_in, img_id, batch_idx, draw_results=False)
 
                 img_id_list.append(img_id)
 
@@ -166,6 +127,54 @@ class Inferencer:
                            # 'target': label_list,
                            })
         df.to_csv(self.dir_path + '/' + self.model_fn + '_score.csv', encoding='utf-8-sig', index=False)
+
+    def post_process(self, output, target, x_img, img_id, batch_idx, draw_results=False):
+
+        if self.args.criterion == 'CE':
+            output_argmax = torch.argmax(output, dim=1).cpu()
+            self.metric.update(target.squeeze(1).cpu().detach().numpy(), output_argmax.numpy())
+
+            if draw_results:
+                # reconstruct original image
+                x_img = x_img.squeeze(0).data.cpu().numpy()
+                x_img = np.transpose(x_img, (1, 2, 0))
+                x_img = x_img * np.array(self.image_std)
+                x_img = x_img + np.array(self.image_mean)
+                x_img = x_img * 255.0
+                x_img = x_img.astype(np.uint8)
+
+                output_prob = F.softmax(output[0], dim=0)
+                # output_prob = F.sigmoid(output[0, 1, :, :])
+                output_grey = (output_prob.cpu().detach().numpy() * 255).astype(np.uint8)
+
+                # draw heatmap
+                output_heatmap_overlay = []
+                for i in range(1, self.args.num_class):
+                    output_grey_tmp = output_grey[i]
+                    output_heatmap = utils.grey_to_heatmap(output_grey_tmp)
+                    output_grey_tmp = np.repeat(output_grey_tmp[:, :, None] / 255, 3, 2)
+                    output_heatmap_overlay.append((x_img * (1 - output_grey_tmp)) + (output_heatmap * output_grey_tmp))
+                output_heatmap_overlay = np.array(output_heatmap_overlay)
+
+                path, fn = os.path.split(img_id[0])
+                img_id, ext = os.path.splitext(fn)
+                dir_path, fn = os.path.split(self.args.model_path)
+                fn, ext = os.path.splitext(fn)
+                save_dir = dir_path + '/' + fn + '/'
+                if not os.path.exists(save_dir):
+                    os.mkdir(save_dir)
+
+                Image.fromarray(x_img).save(save_dir + img_id + '.png', quality=100)
+                for i in range(1, self.args.num_class):
+                    Image.fromarray(output_grey[i]).save(save_dir + img_id + f'_zargmax_class_{i}.png', quality=100)
+                    Image.fromarray(output_heatmap_overlay[i - 1].astype(np.uint8)).save(save_dir + img_id + f'_heatmap_overlay_class_{i}.png', quality=100)
+
+        metric_result = {}
+        # metric_result = utils.metrics_np(output_argmax[None, :], target.squeeze(0).detach().cpu().numpy(), b_auc=True)
+        # keys = [metric_result.keys()]
+
+        print(f'batch {batch_idx} -> {img_id} \t Done !!')
+        return metric_result
 
     def __init_model(self, model_name):
         if model_name == 'Unet':

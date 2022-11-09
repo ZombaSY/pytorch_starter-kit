@@ -6,7 +6,7 @@ import random
 import time
 
 from torch.autograd import Variable
-
+from sklearn.metrics import auc, roc_curve, confusion_matrix
 from matplotlib.image import imread
 from PIL import Image
 
@@ -803,3 +803,62 @@ def grey_to_heatmap(img):
     heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
 
     return heatmap
+
+
+def metrics_np(np_res, np_gnd, b_auc=False):
+    f1m = []
+    accm = []
+    aucm = []
+    specificitym = []
+    precisionm = []
+    sensitivitym = []
+    ioum = []
+
+    epsilon = 2.22045e-16
+
+    # pdb.set_trace()
+    for i in range(np_res.shape[0]):
+        # np_res = np.array(np_res, dtype=np.int)
+        # np_gnd = np.array(np_gnd, dtype=np.int)
+        label = np_gnd[i, :, :]
+        pred = np_res[i, :, :]
+        label = label.flatten()
+        pred = pred.flatten()
+        assert label.max() == 1 and (pred).max() <= 1
+        assert label.min() == 0 and (pred).min() >= 0
+
+        y_pred = np.zeros_like(pred)
+        y_pred[pred > 0.5] = 1
+
+        confusion = confusion_matrix(y_true=label, y_pred=y_pred)
+
+        accuracy = float(confusion[0, 0] + confusion[1, 1]) / float(np.sum(confusion) + epsilon)
+        specificity = float(confusion[0, 0]) / float(confusion[0, 0] + confusion[0, 1] + epsilon)
+        sensitivity = float(confusion[1, 1]) / float(confusion[1, 1] + confusion[1, 0] + epsilon)
+        precision = float(confusion[1, 1]) / float(confusion[1, 1] + confusion[0, 1] + epsilon)
+        f1_score = 2 * precision * sensitivity / (precision + sensitivity + epsilon)
+        iou = float(confusion[1, 1]) / float(confusion[1, 1] + confusion[0, 1] + confusion[1, 0] + epsilon)
+
+        f1m.append(f1_score)
+        accm.append(accuracy)
+        specificitym.append(specificity)
+        precisionm.append(precision)
+        sensitivitym.append(sensitivity)
+        ioum.append(iou)
+        if b_auc:
+            fpr, tpr, thresholds = roc_curve(sorted(y_pred), sorted(label))
+            AUC = auc(fpr, tpr)
+            aucm.append(AUC)
+
+    output = dict()
+    output['f1'] = np.array(f1m).mean()
+    output['acc'] = np.array(accm).mean()
+    output['spe'] = np.array(specificitym).mean()
+    output['sen'] = np.array(sensitivitym).mean()
+    output['iou'] = np.array(ioum).mean()
+
+    if b_auc:
+        output['auc'] = np.array(aucm).mean()
+
+    return output
+
