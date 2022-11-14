@@ -36,7 +36,7 @@ class Trainer_seg:
                                                   mode='validation')
 
         self.model = self.__init_model(self.args.model_name)
-        self.optimizer = self._init_optimizer(self.model, self.args.lr)
+        self.optimizer = self._init_optimizer(self.args.optimizer, self.model, self.args.lr)
         self.scheduler = self._set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
 
         if hasattr(self.args, 'model_path'):

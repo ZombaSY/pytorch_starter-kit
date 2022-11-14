@@ -10,7 +10,7 @@
 - Pytorch 1.8.1
 
 ## Dataset
-The dataset should follow below hierarchy
+The dataset recommend following below hierarchy
 
 ```
 [root_path]
