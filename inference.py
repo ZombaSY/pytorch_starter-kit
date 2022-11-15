@@ -42,7 +42,7 @@ class Inferencer:
         self.model_fn = fn
         self.img_save_dir = save_dir
         self.num_batches_val = int(len(self.loader_val))
-        self.metric = self._init_metric(self.args.task, self.args.num_class)
+        self.metric = self._init_metric(self.args.inference_mode, self.args.num_class)
 
         self.image_mean = self.loader_form.image_loader.image_mean
         self.image_std = self.loader_form.image_loader.image_std
@@ -208,12 +208,12 @@ class Inferencer:
 
         return loader
 
-    def _init_metric(self, task_name, num_class):
-        if task_name == 'segmentation':
+    def _init_metric(self, mode, num_class):
+        if mode == 'segmentation':
             metric = metrics.StreamSegMetrics_segmentation(num_class)
-        elif task_name == 'classification':
+        elif mode == 'classification':
             metric = metrics.StreamSegMetrics_classification(num_class)
         else:
-            raise Exception('No task named', task_name)
+            raise Exception('No mode named', mode)
 
         return metric

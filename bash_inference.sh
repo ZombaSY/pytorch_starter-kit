@@ -1,0 +1,1 @@
+python main.py --config_path "hyper_parameters/inference.yml"
