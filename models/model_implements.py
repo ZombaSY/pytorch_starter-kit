@@ -165,3 +165,68 @@ class ResNet18_multihead(nn.Module):
         output = output.view([-1, self.sub_classes, self.num_classes])  # reshape for CE loss
 
         return output
+
+
+class DeepLabV3_Res50(nn.Module):
+    def __init__(self, num_classes=2):
+        super(DeepLabV3_Res50, self).__init__()
+
+        self.model_0 = nn.Sequential(*[
+            Resnet.ResNet50(),
+            ASPP.ASPP(num_classes=num_classes, in_channel=2048)
+        ])
+        self.model_1 = nn.Sequential(*[
+            Resnet.ResNet50(),
+            ASPP.ASPP(num_classes=num_classes, in_channel=2048)
+        ])
+        self.model_2 = nn.Sequential(*[
+            Resnet.ResNet50(),
+            ASPP.ASPP(num_classes=num_classes, in_channel=2048)
+        ])
+        self.model_3 = nn.Sequential(*[
+            Resnet.ResNet50(),
+            ASPP.ASPP(num_classes=num_classes, in_channel=2048)
+        ])
+        self.model_4 = nn.Sequential(*[
+            Resnet.ResNet50(),
+            ASPP.ASPP(num_classes=num_classes, in_channel=2048)
+        ])
+
+        self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            trunc_normal_(m.weight, std=.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+
+    def forward(self, x, prefix):
+        x = x.contiguous()
+        _, _, h, w = x.shape
+
+        output = []
+        for idx, item in enumerate(prefix):
+            if item == 0:
+                _, _, _, tmp = self.model_0[0](x[idx])
+                output.append(self.model_0[1](tmp))
+            elif item == 1:
+                _, _, _, tmp = self.model_1[0](x[idx])
+                output.append(self.model_1[1](tmp))
+            elif item == 2:
+                _, _, _, tmp = self.model_2[0](x[idx])
+                output.append(self.model_2[1](tmp))
+            elif item == 3:
+                _, _, _, tmp = self.model_3[0](x[idx])
+                output.append(self.model_3[1](tmp))
+            elif item == 4:
+                _, _, _, tmp = self.model_4[0](x[idx])
+                output.append(self.model_4[1](tmp))
+
+        output = torch.cat([item for item in output], dim=0)
+
+        output = F.interpolate(x, size=[h, w], mode='bilinear', align_corners=False)
+
+        return output

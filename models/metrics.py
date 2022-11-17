@@ -234,3 +234,4 @@ class StreamSegMetrics_classification:
     def reset(self):
         self.pred_list = []
         self.target_list = []
+

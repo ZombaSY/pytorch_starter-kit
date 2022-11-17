@@ -106,7 +106,7 @@ class Trainer_seg:
             batch_losses.append(loss.item())
 
             if hasattr(self.args, 'train_fold'):
-                if batch_idx != 0 and (batch_idx % self.__validate_interval) == 0:
+                if batch_idx != 0 and (batch_idx % self.__validate_interval) == 0 and not (batch_idx != len(self.loader_train) - 1):
                     if self.args.ema_decay != 0:
                         self._validate(self.model_ema.module, epoch)
                     else:

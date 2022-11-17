@@ -813,31 +813,34 @@ def metrics_np(np_res, np_gnd, b_auc=False):
     precisionm = []
     sensitivitym = []
     ioum = []
+    mccm = []
 
     epsilon = 2.22045e-16
 
-    # pdb.set_trace()
     for i in range(np_res.shape[0]):
-        # np_res = np.array(np_res, dtype=np.int)
-        # np_gnd = np.array(np_gnd, dtype=np.int)
         label = np_gnd[i, :, :]
         pred = np_res[i, :, :]
         label = label.flatten()
         pred = pred.flatten()
-        assert label.max() == 1 and (pred).max() <= 1
-        assert label.min() == 0 and (pred).min() >= 0
+        # assert label.max() == 1 and (pred).max() <= 1
+        # assert label.min() == 0 and (pred).min() >= 0
 
         y_pred = np.zeros_like(pred)
         y_pred[pred > 0.5] = 1
 
-        confusion = confusion_matrix(y_true=label, y_pred=y_pred)
+        try:
+            tn, fp, fn, tp = confusion_matrix(y_true=label, y_pred=y_pred).ravel()  # for binary
+        except ValueError as e:
+            tn, fp, fn, tp = 0, 0, 0, 0
+        accuracy = (tp + tn) / (tp + tn + fp + fn + epsilon)
+        specificity = tn / (tn + fp + epsilon)  #
+        sensitivity = tp / (tp + fn + epsilon)  # Recall
+        precision = tp / (tp + fp + epsilon)
+        f1_score = (2 * sensitivity * precision) / (sensitivity + precision + epsilon)
+        iou = tp + (tp + fp + fn + epsilon)
 
-        accuracy = float(confusion[0, 0] + confusion[1, 1]) / float(np.sum(confusion) + epsilon)
-        specificity = float(confusion[0, 0]) / float(confusion[0, 0] + confusion[0, 1] + epsilon)
-        sensitivity = float(confusion[1, 1]) / float(confusion[1, 1] + confusion[1, 0] + epsilon)
-        precision = float(confusion[1, 1]) / float(confusion[1, 1] + confusion[0, 1] + epsilon)
-        f1_score = 2 * precision * sensitivity / (precision + sensitivity + epsilon)
-        iou = float(confusion[1, 1]) / float(confusion[1, 1] + confusion[0, 1] + confusion[1, 0] + epsilon)
+        tp_tmp, tn_tmp, fp_tmp, fn_tmp = tp / 1000, tn / 1000, fp / 1000, fn / 1000     # to prevent overflowing
+        mcc = (tp_tmp * tn_tmp - fp_tmp * fn_tmp) / math.sqrt((tp_tmp + fp_tmp) * (tp_tmp + fn_tmp) * (tn_tmp + fp_tmp) * (tn_tmp + fn_tmp) + epsilon)  # Matthews correlation coefficient
 
         f1m.append(f1_score)
         accm.append(accuracy)
@@ -845,6 +848,7 @@ def metrics_np(np_res, np_gnd, b_auc=False):
         precisionm.append(precision)
         sensitivitym.append(sensitivity)
         ioum.append(iou)
+        mccm.append(mcc)
         if b_auc:
             fpr, tpr, thresholds = roc_curve(sorted(y_pred), sorted(label))
             AUC = auc(fpr, tpr)
@@ -856,6 +860,8 @@ def metrics_np(np_res, np_gnd, b_auc=False):
     output['spe'] = np.array(specificitym).mean()
     output['sen'] = np.array(sensitivitym).mean()
     output['iou'] = np.array(ioum).mean()
+    output['pre'] = np.array(precisionm).mean()
+    output['mcc'] = np.array(mccm).mean()
 
     if b_auc:
         output['auc'] = np.array(aucm).mean()
