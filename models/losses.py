@@ -4,6 +4,7 @@ import numpy as np
 import cv2 as cv
 import torch.nn.functional as F
 
+from torch.autograd import Variable
 from scipy.ndimage.morphology import distance_transform_edt as edt
 from scipy.ndimage import convolve
 
@@ -17,6 +18,29 @@ class CrossEntropy(nn.Module):
         y = y.squeeze(1)
 
         return self.loss(x, y)
+
+
+class FocalLoss(nn.Module):
+    """
+    Multi-class Focal loss implementation
+    """
+    def __init__(self, gamma=2, weight=None):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.weight = weight
+
+    def forward(self, y_pred, y):
+        """
+        input: [N, C]
+        target: [N, 1]
+        """
+        y = y.squeeze(1)
+        log_pt = F.log_softmax(y_pred, dim=1)
+        pt = torch.exp(log_pt)
+        log_pt = (1 - pt)**self.gamma * log_pt
+        loss = F.nll_loss(log_pt, y, self.weight)
+
+        return loss
 
 
 class KLDivergence(nn.Module):

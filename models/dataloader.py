@@ -20,6 +20,38 @@ def is_image(src):
     return True if ext in ['.jpg', '.png', '.JPG', '.PNG'] else False
 
 
+# https://github.com/rwightman/pytorch-image-models/blob/d72ac0db259275233877be8c1d4872163954dfbb/timm/data/loader.py
+class MultiEpochsDataLoader(torch.utils.data.DataLoader):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._DataLoader__initialized = False
+        self.batch_sampler = _RepeatSampler(self.batch_sampler)
+        self._DataLoader__initialized = True
+        self.iterator = super().__iter__()
+
+    def __len__(self):
+        return len(self.batch_sampler.sampler)
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield next(self.iterator)
+
+
+class _RepeatSampler(object):
+    """ Sampler that repeats forever.
+    Args:
+        sampler (Sampler)
+    """
+
+    def __init__(self, sampler):
+        self.sampler = sampler
+
+    def __iter__(self):
+        while True:
+            yield from iter(self.sampler)
+
+
 class Image2ImageLoader(Dataset):
 
     def __init__(self,
@@ -271,11 +303,11 @@ class Image2ImageDataLoader:
                                               **kwargs)
 
         # use your own data loader
-        self.Loader = DataLoader(self.image_loader,
-                                 batch_size=batch_size,
-                                 num_workers=num_workers,
-                                 shuffle=(not mode == 'validation'),
-                                 pin_memory=pin_memory)
+        self.Loader = MultiEpochsDataLoader(self.image_loader,
+                                            batch_size=batch_size,
+                                            num_workers=num_workers,
+                                            shuffle=(not mode == 'validation'),
+                                            pin_memory=pin_memory)
 
     def __len__(self):
         return self.Loader.__len__()
@@ -296,11 +328,11 @@ class Image2VectorDataLoader:
                                                **kwargs)
 
         # use your own data loader
-        self.Loader = DataLoader(self.image_loader,
-                                 batch_size=batch_size,
-                                 num_workers=num_workers,
-                                 shuffle=(not mode == 'validation'),
-                                 pin_memory=pin_memory)
+        self.Loader = MultiEpochsDataLoader(self.image_loader,
+                                            batch_size=batch_size,
+                                            num_workers=num_workers,
+                                            shuffle=(not mode == 'validation'),
+                                            pin_memory=pin_memory)
 
     def __len__(self):
         return self.Loader.__len__()

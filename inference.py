@@ -31,7 +31,8 @@ class Inferencer:
         self.loader_val = self.loader_form.Loader
 
         self.model = self.__init_model(self.args.model_name)
-        self.model.load_state_dict(torch.load(args.model_path))
+        self.model.load_state_dict(torch.load(args.model_path, map_location=self.device))
+        print('Model loaded successfully!!!')
         self.model.eval()
 
         dir_path, fn = os.path.split(self.args.model_path)
@@ -110,7 +111,7 @@ class Inferencer:
 
                 output = self.model(x_in)
 
-                self.post_process(output, target, x_in, img_id, batch_idx, draw_results=False)
+                result_dict = self.post_process(output, target, x_in, img_id, batch_idx, draw_results=False)
 
                 img_id_list.append(img_id)
 
