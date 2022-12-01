@@ -17,7 +17,7 @@ from datetime import datetime
 seed = 3407
 torch.manual_seed(seed)
 torch.backends.cudnn.deterministic = True
-torch.use_deterministic_algorithms(True)
+# torch.use_deterministic_algorithms(True)# raise error if CUDA >= 10.2
 torch.backends.cudnn.benchmark = False
 np.random.seed(seed)
 random.seed(seed)
