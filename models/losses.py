@@ -4,7 +4,6 @@ import numpy as np
 import cv2 as cv
 import torch.nn.functional as F
 
-from torch.autograd import Variable
 from scipy.ndimage.morphology import distance_transform_edt as edt
 from scipy.ndimage import convolve
 
@@ -37,7 +36,7 @@ class FocalLoss(nn.Module):
         y = y.squeeze(1)
         log_pt = F.log_softmax(y_pred, dim=1)
         pt = torch.exp(log_pt)
-        log_pt = (1 - pt)**self.gamma * log_pt
+        log_pt = (1 - pt) ** self.gamma * log_pt
         loss = F.nll_loss(log_pt, y, self.weight)
 
         return loss

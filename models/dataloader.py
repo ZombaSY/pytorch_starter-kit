@@ -13,8 +13,14 @@ from models import utils
 from multiprocessing import set_start_method
 
 
-# function for non-utf-8 string
+# fix randomness on DataLoader
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
 
+
+# function for non-utf-8 string
 def is_image(src):
     ext = os.path.splitext(src)[1]
     return True if ext in ['.jpg', '.png', '.JPG', '.PNG'] else False
@@ -297,6 +303,9 @@ class Image2ImageDataLoader:
                  pin_memory=True,
                  **kwargs):
 
+        g = torch.Generator()
+        g.manual_seed(3407)
+
         self.image_loader = Image2ImageLoader(x_path,
                                               y_path,
                                               mode=mode,
@@ -307,6 +316,8 @@ class Image2ImageDataLoader:
                                             batch_size=batch_size,
                                             num_workers=num_workers,
                                             shuffle=(not mode == 'validation'),
+                                            worker_init_fn=seed_worker,
+                                            generator=g,
                                             pin_memory=pin_memory)
 
     def __len__(self):
@@ -323,6 +334,9 @@ class Image2VectorDataLoader:
                  pin_memory=True,
                  **kwargs):
 
+        g = torch.Generator()
+        g.manual_seed(3407)
+
         self.image_loader = Image2VectorLoader(csv_path,
                                                mode=mode,
                                                **kwargs)
@@ -332,6 +346,8 @@ class Image2VectorDataLoader:
                                             batch_size=batch_size,
                                             num_workers=num_workers,
                                             shuffle=(not mode == 'validation'),
+                                            worker_init_fn=seed_worker,
+                                            generator=g,
                                             pin_memory=pin_memory)
 
     def __len__(self):
