@@ -17,10 +17,12 @@ from datetime import datetime
 seed = 3407
 torch.manual_seed(seed)
 torch.backends.cudnn.deterministic = True
-# torch.use_deterministic_algorithms(True)# raise error if CUDA >= 10.2
+# torch.use_deterministic_algorithms(True)  # raise error if CUDA >= 10.2
 torch.backends.cudnn.benchmark = False
+torch.cuda.manual_seed_all(seed)
 np.random.seed(seed)
 random.seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
 
 
 def conf_to_args(args, **kwargs):    # pass in variable numbers of args
