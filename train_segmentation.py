@@ -297,7 +297,7 @@ class Trainer_seg:
                                                               cycles=self.args.epoch / self.args.cycles,
                                                               last_epoch=-1)
             elif scheduler_name == 'CosineAnnealingLR':
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.cycles, eta_min=0)
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.cycles, eta_min=self.args.lr / 100)
             elif scheduler_name == 'ConstantLRSchedule':
                 scheduler = lr_scheduler.ConstantLRSchedule(optimizer, last_epoch=-1)
             elif scheduler_name == 'WarmupConstantSchedule':

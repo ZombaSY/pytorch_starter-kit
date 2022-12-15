@@ -5,6 +5,7 @@ import wandb
 import yaml
 import numpy as np
 import random
+import ast
 
 from train_segmentation import Trainer_seg
 from train_classification import Trainer_cls
@@ -37,9 +38,27 @@ def main():
     parser.add_argument('--config_path', type=str)
     arg = parser.parse_args()
 
-    with open(arg.config_path, 'rb') as f:
-        conf = yaml.load(f.read(), Loader=yaml.Loader)  # load the config file
-        conf['config_path'] = arg.config_path
+    if arg.config_path is not None:
+        with open(arg.config_path, 'rb') as f:
+            conf = yaml.load(f.read(), Loader=yaml.Loader)  # load the config file
+            conf['config_path'] = arg.config_path
+    else:
+        # make unrecognized args to dict
+        conf = {'config_path': 'configs/sweep_config.yaml'}
+        for item in unknown_arg:
+            item = item.strip('--')
+            key, value = item.split('=')
+            if key != 'CUDA_VISIBLE_DEVICES':
+                try:
+                    if value == 'true' or value == 'false':
+                        value = value.title()
+                    value = ast.literal_eval(value)
+                except ValueError:
+                    if value.isalpha(): pass
+                except SyntaxError as e:
+                    if '/' in value: pass
+                    else: raise e
+            conf[key] = value
 
     args = argparse.Namespace()
     conf_to_args(args, **conf)  # pass in keyword args
