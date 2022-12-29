@@ -287,7 +287,7 @@ class Trainer_seg:
 
     def _set_scheduler(self, optimizer, scheduler_name, data_loader, batch_size):
         scheduler = None
-        steps_per_epoch = (data_loader.__len__() // batch_size) + 1
+        steps_per_epoch = math.ceil((data_loader.__len__() / batch_size))
 
         if hasattr(self.args, 'scheduler'):
             if scheduler_name == 'WarmupCosine':
