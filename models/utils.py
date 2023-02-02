@@ -868,3 +868,8 @@ def metrics_np(np_res, np_gnd, b_auc=False):
 
     return output
 
+
+class TrainerCallBack:
+
+    def train_callback(self):
+        pass

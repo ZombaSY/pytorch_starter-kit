@@ -10,6 +10,7 @@ from models import lr_scheduler
 from models import model_implements
 from models import losses as loss_hub
 from models import metrics
+from models import utils
 
 from datetime import datetime
 from timm.utils import ModelEmaV2, get_state_dict
@@ -69,9 +70,14 @@ class Trainer_seg:
         self.last_saved_epoch = 0
 
         self.__validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold
+        self.callback = utils.TrainerCallBack()
+        if hasattr(self.model.module, 'train_callback'):
+            self.callback.train_callback = self.model.module.train_callback
 
     def _train(self, epoch):
         self.model.train()
+        self.callback.train_callback()
+
         batch_losses = []
         print('Start Train')
         for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
@@ -137,9 +143,11 @@ class Trainer_seg:
 
         if self.args.wandb:
             wandb.log({'Train Loss {}'.format(self.args.criterion): loss_mean,
-                       'Train mIoU': mIoU})
+                       'Train mIoU': mIoU},
+                      step=epoch)
             for i in range(self.args.num_class):
-                wandb.log({f'Train Class {i} IoU': cIoU[i]})
+                wandb.log({f'Train Class {i} IoU': cIoU[i]},
+                          step=epoch)
 
         self.metric_train.reset()
 
@@ -188,9 +196,11 @@ class Trainer_seg:
             print(f'{epoch} epoch / Val Class {i} IoU: {cIoU[i]}')
 
         if self.args.wandb:
-            wandb.log({'Val mIoU': mIoU})
+            wandb.log({'Val mIoU': mIoU},
+                      step=epoch)
             for i in range(self.args.num_class):
-                wandb.log({f'Val Class {i} IoU': cIoU[i]})
+                wandb.log({f'Val Class {i} IoU': cIoU[i]},
+                          step=epoch)
 
         model_metrics = {'cIoU': cIoU[1], 'mIoU': mIoU}     # cIoU
 
@@ -204,7 +214,8 @@ class Trainer_seg:
         if (epoch - self.last_saved_epoch) > self.args.cycles * 2:
             print('The model seems to be converged. Early stop training.')
             print(f'Best mIoU -----> {self.metric_best["mIoU"]}')
-            wandb.log({f'Best mIoU': self.metric_best['mIoU']})
+            wandb.log({f'Best mIoU': self.metric_best['mIoU']},
+                      step=epoch)
             sys.exit()  # safe exit
 
     def start_train(self):
