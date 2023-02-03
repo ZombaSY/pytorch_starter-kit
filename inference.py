@@ -1,4 +1,3 @@
-import cv2
 import torch
 import time
 import numpy as np
@@ -171,7 +170,7 @@ class Inferencer:
                     Image.fromarray(output_heatmap_overlay[i - 1].astype(np.uint8)).save(save_dir + img_id + f'_heatmap_overlay_class_{i}.png', quality=100)
 
         metric_result = {}
-        # metric_result = utils.metrics_np(output_argmax[None, :], target.squeeze(0).detach().cpu().numpy(), b_auc=True)
+        # metric_result = metrics.metrics_np(output_argmax[None, :], target.squeeze(0).detach().cpu().numpy(), b_auc=True)
         # keys = [metric_result.keys()]
 
         print(f'batch {batch_idx} -> {img_id} \t Done !!')

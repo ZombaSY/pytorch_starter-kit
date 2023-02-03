@@ -6,6 +6,7 @@ import numpy as np
 from torch.autograd import Variable
 from sklearn.metrics import cohen_kappa_score, accuracy_score
 from scipy.ndimage.morphology import distance_transform_edt as edt
+from sklearn.metrics import auc, roc_curve, confusion_matrix
 
 
 class SSIM(torch.nn.Module):
@@ -235,3 +236,66 @@ class StreamSegMetrics_classification:
         self.pred_list = []
         self.target_list = []
 
+
+def metrics_np(np_res, np_gnd, b_auc=False):
+    f1m = []
+    accm = []
+    aucm = []
+    specificitym = []
+    precisionm = []
+    sensitivitym = []
+    ioum = []
+    mccm = []
+
+    epsilon = 2.22045e-16
+
+    for i in range(np_res.shape[0]):
+        label = np_gnd[i, :, :]
+        pred = np_res[i, :, :]
+        label = label.flatten()
+        pred = pred.flatten()
+        # assert label.max() == 1 and (pred).max() <= 1
+        # assert label.min() == 0 and (pred).min() >= 0
+
+        y_pred = np.zeros_like(pred)
+        y_pred[pred > 0.5] = 1
+
+        try:
+            tn, fp, fn, tp = confusion_matrix(y_true=label, y_pred=y_pred).ravel()  # for binary
+        except ValueError as e:
+            tn, fp, fn, tp = 0, 0, 0, 0
+        accuracy = (tp + tn) / (tp + tn + fp + fn + epsilon)
+        specificity = tn / (tn + fp + epsilon)  #
+        sensitivity = tp / (tp + fn + epsilon)  # Recall
+        precision = tp / (tp + fp + epsilon)
+        f1_score = (2 * sensitivity * precision) / (sensitivity + precision + epsilon)
+        iou = tp + (tp + fp + fn + epsilon)
+
+        tp_tmp, tn_tmp, fp_tmp, fn_tmp = tp / 1000, tn / 1000, fp / 1000, fn / 1000     # to prevent overflowing
+        mcc = (tp_tmp * tn_tmp - fp_tmp * fn_tmp) / math.sqrt((tp_tmp + fp_tmp) * (tp_tmp + fn_tmp) * (tn_tmp + fp_tmp) * (tn_tmp + fn_tmp) + epsilon)  # Matthews correlation coefficient
+
+        f1m.append(f1_score)
+        accm.append(accuracy)
+        specificitym.append(specificity)
+        precisionm.append(precision)
+        sensitivitym.append(sensitivity)
+        ioum.append(iou)
+        mccm.append(mcc)
+        if b_auc:
+            fpr, tpr, thresholds = roc_curve(sorted(y_pred), sorted(label))
+            AUC = auc(fpr, tpr)
+            aucm.append(AUC)
+
+    output = dict()
+    output['f1'] = np.array(f1m).mean()
+    output['acc'] = np.array(accm).mean()
+    output['spe'] = np.array(specificitym).mean()
+    output['sen'] = np.array(sensitivitym).mean()
+    output['iou'] = np.array(ioum).mean()
+    output['pre'] = np.array(precisionm).mean()
+    output['mcc'] = np.array(mccm).mean()
+
+    if b_auc:
+        output['auc'] = np.array(aucm).mean()
+
+    return output
