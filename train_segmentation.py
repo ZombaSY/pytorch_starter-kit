@@ -212,8 +212,8 @@ class Trainer_seg:
         self.metric_val.reset()
 
         if (epoch - self.last_saved_epoch) > self.args.cycles * 2:
-            print('The model seems to be converged. Early stop training.')
-            print(f'Best mIoU -----> {self.metric_best["mIoU"]}')
+            print(f'{utils.Colors.CYAN}The model seems to be converged. Early stop training.')
+            print(f'Best mIoU -----> {self.metric_best["mIoU"]}{utils.Colors.END}')
             wandb.log({f'Best mIoU': self.metric_best['mIoU']},
                       step=epoch)
             sys.exit()  # safe exit
