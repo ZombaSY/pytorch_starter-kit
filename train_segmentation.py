@@ -132,14 +132,17 @@ class Trainer_seg:
         cIoU = [metrics['Class IoU'][i] for i in range(self.args.num_class)]
         mIoU = sum(cIoU) / self.args.num_class
 
-        print('{} epoch / Train Loss {} : {}, lr {}'.format(epoch,
-                                                            self.args.criterion,
-                                                            loss_mean,
-                                                            self.optimizer.param_groups[0]['lr']))
+        print('{}{} epoch / Train Loss {} : {}, lr {} \n'
+              '{:.4f} epoch / Train mIoU: {:.4f}'.format(utils.Colors.LIGHT_GREEN,
+                                                         epoch,
+                                                         self.args.criterion,
+                                                         loss_mean,
+                                                         self.optimizer.param_groups[0]['lr'],
+                                                         epoch,
+                                                         mIoU))
 
-        print('{} epoch / Train mIoU: {}'.format(epoch, mIoU))
         for i in range(self.args.num_class):
-            print(f'{epoch} epoch / Train Class {i} IoU: {cIoU[i]}')
+            print(f'{epoch} epoch / Train Class {i} IoU: {cIoU[i]}{utils.Colors.END}')
 
         if self.args.wandb:
             wandb.log({'Train Loss {}'.format(self.args.criterion): loss_mean,
@@ -191,9 +194,11 @@ class Trainer_seg:
         cIoU = [metrics['Class IoU'][i] for i in range(self.args.num_class)]
         mIoU = sum(cIoU) / self.args.num_class
 
-        print('{} epoch / Val mIoU: {}'.format(epoch, mIoU))
+        print('{}{} epoch / Val mIoU: {:.4f}'.format(utils.Colors.LIGHT_GREEN,
+                                                     epoch,
+                                                     mIoU))
         for i in range(self.args.num_class):
-            print(f'{epoch} epoch / Val Class {i} IoU: {cIoU[i]}')
+            print(f'{epoch} epoch / Val Class {i} IoU: {cIoU[i]}{utils.Colors.END}')
 
         if self.args.wandb:
             wandb.log({'Val mIoU': mIoU},
