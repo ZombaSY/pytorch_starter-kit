@@ -132,17 +132,18 @@ class Trainer_seg:
         cIoU = [metrics['Class IoU'][i] for i in range(self.args.num_class)]
         mIoU = sum(cIoU) / self.args.num_class
 
-        print('{}{} epoch / Train Loss {} : {}, lr {} \n'
-              '{:.4f} epoch / Train mIoU: {:.4f}'.format(utils.Colors.LIGHT_GREEN,
-                                                         epoch,
-                                                         self.args.criterion,
-                                                         loss_mean,
-                                                         self.optimizer.param_groups[0]['lr'],
-                                                         epoch,
-                                                         mIoU))
+        print('{}{} epoch / Train Loss {}: {:.5f}, lr {:.5f} \n'
+              '{:.5f} epoch / Train mIoU: {:.5f}{}'.format(utils.Colors.LIGHT_CYAN,
+                                                           epoch,
+                                                           self.args.criterion,
+                                                           loss_mean,
+                                                           self.optimizer.param_groups[0]['lr'],
+                                                           epoch,
+                                                           mIoU,
+                                                           utils.Colors.END))
 
         for i in range(self.args.num_class):
-            print(f'{epoch} epoch / Train Class {i} IoU: {cIoU[i]}{utils.Colors.END}')
+            print('{}{} epoch / Train Class {} IoU: {}{}'.format(utils.Colors.LIGHT_CYAN, epoch, i, cIoU[i], utils.Colors.END))
 
         if self.args.wandb:
             wandb.log({'Train Loss {}'.format(self.args.criterion): loss_mean,
@@ -194,11 +195,12 @@ class Trainer_seg:
         cIoU = [metrics['Class IoU'][i] for i in range(self.args.num_class)]
         mIoU = sum(cIoU) / self.args.num_class
 
-        print('{}{} epoch / Val mIoU: {:.4f}'.format(utils.Colors.LIGHT_GREEN,
-                                                     epoch,
-                                                     mIoU))
+        print('{}{} epoch / Val mIoU: {:.5f}{}'.format(utils.Colors.LIGHT_GREEN,
+                                                       epoch,
+                                                       mIoU,
+                                                       utils.Colors.END))
         for i in range(self.args.num_class):
-            print(f'{epoch} epoch / Val Class {i} IoU: {cIoU[i]}{utils.Colors.END}')
+            print('{}{} epoch / Val Class {} IoU: {:.5f}{}'.format(utils.Colors.LIGHT_GREEN, epoch, i, cIoU[i], utils.Colors.END))
 
         if self.args.wandb:
             wandb.log({'Val mIoU': mIoU},
@@ -217,7 +219,7 @@ class Trainer_seg:
         self.metric_val.reset()
 
         if (epoch - self.last_saved_epoch) > self.args.cycles * 2:
-            print(f'{utils.Colors.CYAN}The model seems to be converged. Early stop training.')
+            print(f'{utils.Colors.LIGHT_RED}The model seems to be converged. Early stop training.')
             print(f'Best mIoU -----> {self.metric_best["mIoU"]}{utils.Colors.END}')
             wandb.log({f'Best mIoU': self.metric_best['mIoU']},
                       step=epoch)
