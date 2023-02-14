@@ -36,7 +36,7 @@ def conf_to_args(args, **kwargs):    # pass in variable numbers of args
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', type=str)
-    arg = parser.parse_args()
+    arg, unknown_arg = parser.parse_known_args()
 
     if arg.config_path is not None:
         with open(arg.config_path, 'rb') as f:

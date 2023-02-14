@@ -25,14 +25,14 @@ The dataset recommend following below hierarchy
 ## Train
 
 If you have installed 'WandB', login your ID in command line.<br>
-If not, fix to 'wandb: false,' in "./hyper_parameters/train_***.yml"
+If not, fix to 'wandb: false,' in "./configs/train_***.yml"
 
-For <b>Segmentation</b>, fix the "hyper_parameters/train_segmentation.yml", "bash_train_segmentation.sh" and execute command
+For <b>Segmentation</b>, fix the "configs/train_segmentation.yml", "bash_train_segmentation.sh" and execute command
 ```
 bash bash_train_segmentation.sh
 ```
 
-For <b>Classification</b>, fix the "hyper_parameters/train_classification.yml", "bash_train_classification.sh" and execute command
+For <b>Classification</b>, fix the "configs/train_classification.yml", "bash_train_classification.sh" and execute command
 ```
 bash bash_train_classification.sh
 ```
@@ -40,7 +40,7 @@ bash bash_train_classification.sh
 
 ## Inference
 
-For <b>Inference</b>, fix the 'hyper_parameters/inference.yml' and execute below command
+For <b>Inference</b>, fix the 'configs/inference.yml' and execute below command
 ```
 bash bash_inference.sh
 ```

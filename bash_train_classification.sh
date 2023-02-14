@@ -1,1 +1,1 @@
-python main.py --config_path "hyper_parameters/train_classification.yml"
+python main.py --config_path "configs/train_classification.yml"

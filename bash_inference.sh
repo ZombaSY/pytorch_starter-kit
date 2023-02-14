@@ -1,1 +1,1 @@
-python main.py --config_path "hyper_parameters/inference.yml"
+python main.py --config_path "configs/inference.yml"

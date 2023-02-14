@@ -1,1 +1,1 @@
-python main.py --config_path "hyper_parameters/train_segmentation.yml"
+python main.py --config_path "configs/train_segmentation.yml"
