@@ -4,6 +4,7 @@ import os
 import wandb
 import numpy as np
 import sys
+import math
 
 from models import dataloader as dataloader_hub
 from models import lr_scheduler
@@ -171,25 +172,6 @@ class Trainer_seg:
                 # compute metric
                 output_argmax = torch.argmax(output, dim=1).cpu()
                 self.metric_val.update(target.cpu().detach().numpy(), output_argmax.numpy())
-
-                # Log Image on WandB
-                # if (batch_idx == 0) and self.args.wandb and (epoch % self.args.save_interval == 0):
-                #     print('logging image on wandb...')
-                #     target = target[0]
-                #
-                #     # resize image for the log
-                #     x_in = F.interpolate(x_in, scale_factor=0.5)
-                #     output = F.interpolate(output, scale_factor=0.5)
-                #
-                #     x_in = x_in[0]    # detach batch
-                #     output = output[0]
-                #
-                #     target = target.float()
-                #     target = target.repeat(3, 1, 1)  # repeat 3 channel on grey scale image
-                #
-                #     wandb.log({'input': [wandb.Image(x_in.cpu().detach())]})
-                #     wandb.log({'target': [wandb.Image(target.cpu().detach())]})
-                #     wandb.log({'output': [wandb.Image(output.cpu().detach())]})
 
         metrics = self.metric_val.get_results()
         cIoU = [metrics['Class IoU'][i] for i in range(self.args.num_class)]

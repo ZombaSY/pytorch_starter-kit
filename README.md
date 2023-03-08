@@ -44,3 +44,5 @@ For <b>Inference</b>, fix the 'configs/inference.yml' and execute below command
 ```
 bash bash_inference.sh
 ```
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
