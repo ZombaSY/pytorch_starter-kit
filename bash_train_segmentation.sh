@@ -1,1 +1,1 @@
-python main.py --config_path "configs/train_segmentation.yml"
+python3 main.py --config_path "configs/train_segmentation.yml"

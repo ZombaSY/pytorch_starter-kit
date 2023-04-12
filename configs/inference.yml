@@ -1,24 +1,25 @@
 {
-  ## Environment Parameters
+ ### Environment Parameters
   mode: inference,
   cuda: true,
   pin_memory: true,
-  wandb: false,
-  worker: 2,
-  project_name: 'my_wandb_project',
-  CUDA_VISIBLE_DEVICES: '0',
+  worker: 4,
+  CUDA_VISIBLE_DEVICES: '2',
 
-  model_name: 'Swin',
-  inference_mode: 'segmentation',
-  criterion: 'CE',
-  dataloader: 'Image2Image',
+  task: 'classification', # segmentation, classification
+  model_name: 'ResNet18_multihead',
+  criterion: 'CE',  # CE, DiceBCE
+  dataloader: 'Image2Vector', # Image2Image, Image2Vector
   num_class: 2,
   input_space: 'RGB',
   input_channel: 3,
-  input_size: [640, 480],  # (height, width)
+  input_size: [512, 512],  # (height, width)
+  mount_data_on_memory: false,
+  draw_results: false,
 
-  model_path: '/PATH/TO/model.pt',
+  model_path: 'path/to/model.pt',
 
-  val_x_path: '/DATA/sample/images',
-  val_y_path: '/DATA/sample/mask',
+  val_x_path:   '/path/to/data/val/input',
+  val_y_path:   '/path/to/data/val/label',
+  val_csv_path: '/path/to/data/val.csv',
 }

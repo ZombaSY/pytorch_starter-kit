@@ -1,100 +1,53 @@
 import torch
-import time
-import os
 import wandb
 import numpy as np
 import sys
-import math
 
-from models import dataloader as dataloader_hub
-from models import lr_scheduler
-from models import model_implements
-from models import losses as loss_hub
-from models import metrics
 from models import utils
-
-from datetime import datetime
-from timm.utils import ModelEmaV2, get_state_dict
+from trainer_base import TrainerBase
 
 
-class Trainer_seg:
+class TrainerSegmentation(TrainerBase):
     def __init__(self, args, now=None):
-        self.start_time = time.time()
-        self.args = args
-
-        # Check cuda available and assign to device
-        use_cuda = self.args.cuda and torch.cuda.is_available()
-        self.device = torch.device('cuda' if use_cuda else 'cpu')
+        super(TrainerSegmentation, self).__init__(args, now=now)
 
         # 'init' means that this variable must be initialized.
-        # 'set' means that this variable is available of being set, not must.
-        self.loader_train = self.__init_data_loader(self.args.train_x_path,
-                                                    self.args.train_y_path,
-                                                    self.args.batch_size,
-                                                    mode='train')
-        self.loader_val = self.__init_data_loader(self.args.val_x_path,
-                                                  self.args.val_y_path,
-                                                  batch_size=1,
-                                                  mode='validation')
+        # 'set' means that this variable is available to being set, not must.
+        self.loader_train = self.init_data_loader(batch_size=self.args.batch_size,
+                                                  mode='train',
+                                                  dataloader_name=self.args.dataloader,
+                                                  x_path=self.args.train_x_path,
+                                                  y_path=self.args.train_y_path)
+        self.loader_val = self.init_data_loader(batch_size=self.args.batch_size // 4,
+                                                mode='validation',
+                                                dataloader_name=self.args.dataloader,
+                                                x_path=self.args.train_x_path,
+                                                y_path=self.args.train_y_path)
 
-        self.model = self.__init_model(self.args.model_name)
-        self.optimizer = self._init_optimizer(self.args.optimizer, self.model, self.args.lr)
-        self.scheduler = self._set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
-
-        if hasattr(self.args, 'model_path'):
-            if self.args.model_path != '':
-                if 'imagenet' in self.args.model_path.lower():
-                    self.model.module.load_pretrained_imagenet(self.args.model_path)
-                    print('Model loaded successfully!!! (ImageNet)')
-                else:
-                    self.model.module.load_pretrained(self.args.model_path)    # TODO: define "load_pretrained" abstract method to all models
-                    print('Model loaded successfully!!! (Custom)')
-                self.model.to(self.device)
-
-        # Important to create EMA model after cuda(), DP wrapper, and AMP but before SyncBN and DDP wrapper
-        if self.args.ema_decay != 0:
-            self.model_ema = ModelEmaV2(self.model, decay=self.args.ema_decay, device=self.device)
-
-        self.criterion = self._init_criterion(self.args.criterion)
-
-        if self.args.wandb:
-            if self.args.mode == 'train':
-                wandb.watch(self.model)
-
-        now_time = now if now is not None else datetime.now().strftime("%Y%m%d %H%M%S")
-        self.saved_model_directory = self.args.saved_model_directory + '/' + now_time
-
-        self.metric_train = metrics.StreamSegMetrics_segmentation(self.args.num_class)
-        self.metric_val = metrics.StreamSegMetrics_segmentation(self.args.num_class)
-        self.metric_best = {'cIoU': 0, 'mIoU': 0}
-        self.model_post_path_dict = {}
-        self.last_saved_epoch = 0
-
-        self.__validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold
-        self.callback = utils.TrainerCallBack()
-        if hasattr(self.model.module, 'train_callback'):
-            self.callback.train_callback = self.model.module.train_callback
+        self.scheduler = self.set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
+        self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold
 
     def _train(self, epoch):
         self.model.train()
         self.callback.train_callback()
 
         batch_losses = []
-        print('Start Train')
         for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
-            if (x_in[0].shape[0] / torch.cuda.device_count()) <= torch.cuda.device_count():   # if has 1 batch per GPU
-                break   # avoid BN issue
             x_in, _ = x_in
             target, _ = target
 
             x_in = x_in.to(self.device)
             target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
 
-            output = self.model(x_in)
+            if (x_in.shape[0] / torch.cuda.device_count()) <= torch.cuda.device_count():   # if has 1 batch per GPU
+                break   # avoid BN issue
+
+            output, _ = self.model(x_in)
 
             # compute metric
-            output_argmax = torch.argmax(output, dim=1).cpu()
-            self.metric_train.update(target.cpu().detach().numpy(), output_argmax.numpy())
+            output_argmax = torch.argmax(output, dim=1)
+            for b in range(output.shape[0]):
+                self.metric_train.update(target[b][0].cpu().detach().numpy(), output_argmax[b].cpu().detach().numpy())
 
             # compute loss
             loss = self.criterion(output, target)
@@ -102,18 +55,19 @@ class Trainer_seg:
             if not torch.isfinite(loss):
                 raise Exception('Loss is NAN. End training.')
 
-            self.optimizer.zero_grad()
+            # ----- backward ----- #
             loss.backward()
             self.optimizer.step()
-            if self.scheduler is not None:
-                self.scheduler.step()
+            self.optimizer.zero_grad()
             if self.args.ema_decay != 0:
                 self.model_ema.update(self.model)
+            if self.scheduler is not None:
+                self.scheduler.step()
 
             batch_losses.append(loss.item())
 
             if hasattr(self.args, 'train_fold'):
-                if batch_idx != 0 and (batch_idx % self.__validate_interval) == 0 and not (batch_idx != len(self.loader_train) - 1):
+                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and not (batch_idx != len(self.loader_train) - 1):
                     if self.args.ema_decay != 0:
                         self._validate(self.model_ema.module, epoch)
                     else:
@@ -126,33 +80,26 @@ class Trainer_seg:
                                                                     loss_mean,
                                                                     self.optimizer.param_groups[0]['lr']))
 
-            torch.cuda.empty_cache()
-
         loss_mean = np.mean(batch_losses)
         metrics = self.metric_train.get_results()
         cIoU = [metrics['Class IoU'][i] for i in range(self.args.num_class)]
         mIoU = sum(cIoU) / self.args.num_class
 
-        print('{}{} epoch / Train Loss {}: {:.5f}, lr {:.5f} \n'
-              '{:.5f} epoch / Train mIoU: {:.5f}{}'.format(utils.Colors.LIGHT_CYAN,
-                                                           epoch,
-                                                           self.args.criterion,
-                                                           loss_mean,
-                                                           self.optimizer.param_groups[0]['lr'],
-                                                           epoch,
-                                                           mIoU,
-                                                           utils.Colors.END))
-
+        print('{}{} epoch / Train Loss {}: {:.4f}, lr {:.7f} \n Train mIoU: {:.4f}{}'.format(utils.Colors.LIGHT_CYAN,
+                                                                                             epoch,
+                                                                                             self.args.criterion,
+                                                                                             loss_mean,
+                                                                                             self.optimizer.param_groups[0]['lr'],
+                                                                                             mIoU, utils.Colors.END))
         for i in range(self.args.num_class):
-            print('{}{} epoch / Train Class {} IoU: {}{}'.format(utils.Colors.LIGHT_CYAN, epoch, i, cIoU[i], utils.Colors.END))
+            print(f'{utils.Colors.LIGHT_CYAN}{epoch} epoch / Train Class {i} IoU: {cIoU[i]}{utils.Colors.END}')
 
         if self.args.wandb:
             wandb.log({'Train Loss {}'.format(self.args.criterion): loss_mean,
                        'Train mIoU': mIoU},
                       step=epoch)
             for i in range(self.args.num_class):
-                wandb.log({f'Train Class {i} IoU': cIoU[i]},
-                          step=epoch)
+                wandb.log({f'Train Class {i} IoU': cIoU[i]}, step=epoch)
 
         self.metric_train.reset()
 
@@ -163,51 +110,50 @@ class Trainer_seg:
             with torch.no_grad():
                 x_in, _ = x_in
                 target, _ = target
-                x_in = x_in.to(self.device)
 
+                x_in = x_in.to(self.device)
                 target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
 
-                output = model(x_in)
+                output, _ = model(x_in)
 
                 # compute metric
                 output_argmax = torch.argmax(output, dim=1).cpu()
-                self.metric_val.update(target.cpu().detach().numpy(), output_argmax.numpy())
+                for b in range(output.shape[0]):
+                    self.metric_val.update(target[b][0].cpu().detach().numpy(), output_argmax[b].cpu().detach().numpy())
 
-        metrics = self.metric_val.get_results()
-        cIoU = [metrics['Class IoU'][i] for i in range(self.args.num_class)]
+        metrics_out = self.metric_val.get_results()
+        cIoU = [metrics_out['Class IoU'][i] for i in range(self.args.num_class)]
         mIoU = sum(cIoU) / self.args.num_class
 
-        print('{}{} epoch / Val mIoU: {:.5f}{}'.format(utils.Colors.LIGHT_GREEN,
-                                                       epoch,
-                                                       mIoU,
-                                                       utils.Colors.END))
+        print('{}{} epoch / Val mIoU: {}{}'.format(utils.Colors.LIGHT_GREEN, epoch, mIoU, utils.Colors.END))
         for i in range(self.args.num_class):
-            print('{}{} epoch / Val Class {} IoU: {:.5f}{}'.format(utils.Colors.LIGHT_GREEN, epoch, i, cIoU[i], utils.Colors.END))
+            print(f'{utils.Colors.LIGHT_GREEN}{epoch} epoch / Val Segmentation Class {i} IoU: {cIoU[i]}{utils.Colors.END}')
 
         if self.args.wandb:
-            wandb.log({'Val mIoU': mIoU},
+            wandb.log({'Val Segmentation mIoU': mIoU},
                       step=epoch)
             for i in range(self.args.num_class):
-                wandb.log({f'Val Class {i} IoU': cIoU[i]},
+                wandb.log({f'Val Segmentation Class {i} IoU': cIoU[i]},
                           step=epoch)
 
-        model_metrics = {'cIoU': cIoU[1], 'mIoU': mIoU}     # cIoU
+        if epoch == 1:  # initialize value
+            if hasattr(self, 'metric_best'):
+                self.metric_best['mIoU'] = mIoU
+            else:
+                self.metric_best = {'mIoU': mIoU}
+        model_metrics = {'mIoU': mIoU}
 
         for key in model_metrics.keys():
-            if model_metrics[key] > self.metric_best[key]:
+            if model_metrics[key] > self.metric_best[key] or epoch % self.args.save_interval == 0:
+                best_flag = True
+                if epoch % self.args.save_interval == 0:
+                    best_flag = False
                 self.metric_best[key] = model_metrics[key]
-                self.save_model(model, self.args.model_name, epoch, model_metrics[key], best_flag=True, metric_name=key)
+                self.save_model(model, self.args.model_name, epoch, model_metrics[key], best_flag=best_flag, metric_name=key)
 
         self.metric_val.reset()
 
-        if (epoch - self.last_saved_epoch) > self.args.cycles * 2:
-            print(f'{utils.Colors.LIGHT_RED}The model seems to be converged. Early stop training.')
-            print(f'Best mIoU -----> {self.metric_best["mIoU"]}{utils.Colors.END}')
-            wandb.log({f'Best mIoU': self.metric_best['mIoU']},
-                      step=epoch)
-            sys.exit()  # safe exit
-
-    def start_train(self):
+    def run(self):
         for epoch in range(1, self.args.epoch + 1):
             self._train(epoch)
             if self.args.ema_decay != 0:
@@ -215,96 +161,8 @@ class Trainer_seg:
             else:
                 self._validate(self.model, epoch)
 
-            print('### {} / {} epoch ended###'.format(epoch, self.args.epoch))
-
-    def save_model(self, model, model_name, epoch, metric=None, best_flag=False, metric_name='metric'):
-        file_path = self.saved_model_directory + '/'
-
-        file_format = file_path + model_name + '_Epoch_' + str(epoch) + '_' + metric_name + '_' + str(metric) + '.pt'
-
-        if not os.path.exists(file_path):
-            os.mkdir(file_path)
-
-        if best_flag:
-            if metric_name in self.model_post_path_dict.keys():
-                os.remove(self.model_post_path_dict[metric_name])
-            self.model_post_path_dict[metric_name] = file_format
-
-        if self.args.ema_decay != 0:
-            torch.save(get_state_dict(model), file_format)
-        else:
-            torch.save(model.state_dict(), file_format)
-
-        print(file_format + '\t model saved!!')
-        self.last_saved_epoch = epoch
-
-    def __init_data_loader(self,
-                           x_path,
-                           y_path,
-                           batch_size,
-                           mode):
-
-        if self.args.dataloader == 'Image2Image':
-            loader = dataloader_hub.Image2ImageDataLoader(x_path=x_path,
-                                                          y_path=y_path,
-                                                          batch_size=batch_size,
-                                                          num_workers=self.args.worker,
-                                                          pin_memory=self.args.pin_memory,
-                                                          mode=mode,
-                                                          args=self.args)
-        else:
-            raise Exception('No datalodaer named', self.args.dataloader)
-
-        return loader
-
-    def __init_model(self, model_name):
-        if model_name == 'Unet':
-            model = model_implements.Unet(n_channels=self.args.input_channel, n_classes=self.args.num_class).to(self.device)
-        elif model_name == 'Swin':
-            model = model_implements.Swin(num_classes=self.args.num_class,
-                                          in_channel=self.args.input_channel).to(self.device)
-        else:
-            raise Exception('No model named', model_name)
-
-        return torch.nn.DataParallel(model)
-
-    def _init_criterion(self, criterion_name):
-        if criterion_name == 'CE':
-            criterion = loss_hub.CrossEntropy().to(self.device)
-        else:
-            raise Exception('No criterion named', criterion_name)
-
-        return criterion
-
-    def _init_optimizer(self, optimizer_name, model, lr):
-        optimizer = None
-
-        if optimizer_name == 'AdamW':
-            optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
-                                          lr=lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=self.args.weight_decay)
-
-        return optimizer
-
-    def _set_scheduler(self, optimizer, scheduler_name, data_loader, batch_size):
-        scheduler = None
-        steps_per_epoch = math.ceil((data_loader.__len__() / batch_size))
-
-        if hasattr(self.args, 'scheduler'):
-            if scheduler_name == 'WarmupCosine':
-                scheduler = lr_scheduler.WarmupCosineSchedule(optimizer=optimizer,
-                                                              warmup_steps=steps_per_epoch * self.args.warmup_epoch,
-                                                              t_total=self.args.epoch * steps_per_epoch,
-                                                              cycles=self.args.epoch / self.args.cycles,
-                                                              last_epoch=-1)
-            elif scheduler_name == 'CosineAnnealingLR':
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.cycles, eta_min=self.args.lr / 100)
-            elif scheduler_name == 'ConstantLRSchedule':
-                scheduler = lr_scheduler.ConstantLRSchedule(optimizer, last_epoch=-1)
-            elif scheduler_name == 'WarmupConstantSchedule':
-                scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=steps_per_epoch * self.args.warmup_epoch)
-            else:
-                raise Exception('No scheduler named', scheduler_name)
-        else:
-            pass
-
-        return scheduler
+            if (epoch - self.last_saved_epoch) > self.args.early_stop_epoch:
+                print('The model seems to be converged. Early stop training.')
+                print(f'Best mIoU -----> {self.metric_best["mIoU"]}')
+                wandb.log({f'Best mIoU': self.metric_best['mIoU']})
+                sys.exit()  # safe exit

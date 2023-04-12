@@ -1,6 +1,7 @@
 # Pytorch Start-kit Project
-There are so enormous pytorch environments in research and projects. <br/>
-To minimize your efforts on setting own scripts, this repository introduces the skeletons for pytorch-beginners.
+There are enormous pytorch environments in research and projects. <br/>
+To minimize your efforts on setting own scripts, this repository introduces the skeletons for pytorch-beginners. <br/>
+Now version is only supported for Image Segmentation and Image Classification.
 
 
 ## Dataset
@@ -38,5 +39,10 @@ For <b>Inference</b>, fix the 'configs/inference.yml' and execute below command
 ```
 bash bash_inference.sh
 ```
+
+
+## 💕💕 Customizing your scripts!
+- To update hyper-parameters, adding your [variable] in ".yml" will automatically add your variables to "self.args.[variable]"
+
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)

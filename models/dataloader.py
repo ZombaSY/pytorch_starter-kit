@@ -1,6 +1,5 @@
 import os
 import torch
-import torchvision.transforms.functional as tf
 import random
 import numpy as np
 import pandas as pd
@@ -8,7 +7,6 @@ import cv2
 import multiprocessing
 import albumentations
 import itertools
-
 
 from torch.utils.data import Dataset
 from models import utils
@@ -226,8 +224,8 @@ class Image2VectorLoader(Dataset):
             x_img_path = []
             self.memory_data_y = []
             for idx in range(self.len):
-                x_img_path.append(os.path.join(*[self.data_root_path, 'input_crop', self.df['FILENAME'][idx]]) + '.jpg')    # TODO: remove darkcircle flush...
-                self.memory_data_y.append(torch.tensor([self.df['DARKCIRCLE_AVG'][idx], self.df['FLUSH'][idx]]) - 1)
+                x_img_path.append(os.path.join(*[self.data_root_path, 'input_crop', self.df['FILENAME'][idx]]) + '.jpg')
+                self.memory_data_y.append(torch.tensor([self.df['COL1'][idx], self.df['COL2'][idx]]))
             with multiprocessing.Pool(multiprocessing.cpu_count()) as pools:
                 self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
 
@@ -253,9 +251,9 @@ class Image2VectorLoader(Dataset):
             albumentations.Normalize(mean=self.image_mean, std=self.image_std)
         ])
 
-        self.mixup_sample_1 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['DARKCIRCLE_AVG']), -1)))
-        self.mixup_sample_2 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['FLUSH']), -1)))
-        self.mixup_sample = (self.mixup_sample_1 + self.mixup_sample_2) / 2
+        self.mixup_sample_1 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['COL1']), -1)))
+        self.mixup_sample_2 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['COL2']), -1)))
+        self.mixup_sample = (self.mixup_sample_1 + self.mixup_sample_2) / 2     # get the average of sample
 
     def transform(self, _input, _label, idx_1):
         random_gen = random.Random()
@@ -274,7 +272,7 @@ class Image2VectorLoader(Dataset):
                 x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
                 transform = self.transform1(image=x_img)
                 _input_2 = transform['image']
-                _label_2 = torch.tensor([self.df['DARKCIRCLE_AVG'][idx_2], self.df['FLUSH'][idx_2]])
+                _label_2 = torch.tensor([self.df['COL1'][idx_2], self.df['COL2'][idx_2]])
 
                 lam = np.random.beta(2, 2)
 
@@ -303,9 +301,8 @@ class Image2VectorLoader(Dataset):
         else:
             x_path = os.path.join(*[self.data_root_path, 'input_crop', self.df['FILENAME'][index]]) + '.jpg' # non-safe function
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
-            y_vec = torch.tensor([self.df['DARKCIRCLE_AVG'][index],
-                                  self.df['FLUSH'][index]])
-            y_vec = y_vec - 1   # for tensor dependency, range [1, 5] to [0, 4]
+            y_vec = torch.tensor([self.df['COL1'][index],
+                                  self.df['COL2'][index]])
 
         x_img_tr, y_vec = self.transform(x_img, y_vec, index)
 

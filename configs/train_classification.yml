@@ -1,42 +1,51 @@
 {
  ### Environment Parameters
- mode: train,  # train
- cuda: true,
- pin_memory: true,
- wandb: false,
- worker: 16,
- log_interval: 10000,
- save_interval: 1,
- saved_model_directory: 'model_checkpoints',
- train_fold: 1,  # fold train data and start validate. 1 for default
- project_name: 'my_wandb_project',
- CUDA_VISIBLE_DEVICES: '0',
+  mode: train,   # train
+  cuda: true,
+  pin_memory: true,
+  wandb: false,
+  worker: 8,
+  log_interval: 9999,
+  save_interval: 3,
+  saved_model_directory: 'model_checkpoints',
+  train_fold: 1,  # fold train data and start validate
+  project_name: 'my_wandb_project',
+  CUDA_VISIBLE_DEVICES: '2',
 
- ### Train Parameters
- model_name: 'ResNet18_multihead',
- dataloader: 'Image2Vector',
- num_class: 6,
- criterion: 'CE',
- task: 'classification',
- input_space: 'RGB',
- input_channel: 3,
- input_size: [480, 640],  # (height, width)
- scheduler: 'CosineAnnealingLR',
- batch_size: 128,
- epoch: 1000,
- lr: 0.001,
- class_weight: [1.0, 1.0],
- model_path: 'pretrained/imagenet/pretrained_model.pt',  # set empty to deactivate
+  ### Train Parameters
+  task: 'classification',
+  model_name: 'ResNet18_multihead',
+  dataloader: 'Image2Vector',
+  num_class: 2,
+  criterion: 'MSE',
+  input_space: 'RGB',
+  input_channel: 3,
+  input_size: [512, 512],  # (height, width)
+  optimizer: 'AdamW',
+    lr: 0.0001,
+    scheduler: 'WarmupCosine',   # WarmupCosine, CosineAnnealingLR
+    cycles: 100,
+    warmup_epoch: 20,
+    weight_decay: 0.05,
+    early_stop_epoch: 300,
+  batch_size: 64,
+  epoch: 5000,
+  ema_decay: 0,
+  class_weight: [1.0, 1.0],
+  model_path: '',  # pretrained/ImageNet/swin_tiny_patch4_window7_224.pth
 
-   ### Data Parameters
-  transform_blur: true,
-  transform_jitter: true,
-  transform_hflip: true,
-  transform_perspective: true,
-  transform_cutmix: true,
-  transform_rand_resize: true,
+  ### Data Parameters
+  mount_data_on_memory: false,
+  transform_blur: 0.3,
+  transform_jitter: 0.7,
+  transform_hflip: 0.5,
+  transform_vflip: 0.0,
+  transform_perspective: 0.3,
+  transform_rand_resize: 0.8,
   transform_rand_crop: 224,
+  transform_cutmix: 0.0,
+  transform_mixup: 1.0,
 
- train_csv_path: 'awesome/path/to/csv/tmp.csv',
- val_csv_path:   'awesome/path/to/csv/tmp.csv',
+  train_csv_path: '/path/to/data/train.csv',
+  val_csv_path: '/path/to/data/val.csv',
 }

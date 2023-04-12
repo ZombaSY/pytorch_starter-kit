@@ -3,47 +3,50 @@
   mode: train,   # train
   cuda: true,
   pin_memory: true,
-  wandb: true,
+  wandb: false,
   worker: 8,
   log_interval: 9999,
-  save_interval: 1,
+  save_interval: 3,
   saved_model_directory: 'model_checkpoints',
   train_fold: 1,  # fold train data and start validate
   project_name: 'my_wandb_project',
-  CUDA_VISIBLE_DEVICES: '0',
+  CUDA_VISIBLE_DEVICES: '2',
 
   ### Train Parameters
   model_name: 'Swin',
   dataloader: 'Image2Image',
-  num_class: 2,
+  num_class: 3,
   criterion: 'CE',
   task: 'segmentation',
   input_space: 'RGB',
   input_channel: 3,
-  input_size: [640, 480],  # (height, width)
+  input_size: [512, 512],  # (height, width)
   optimizer: 'AdamW',
     lr: 0.0001,
     scheduler: 'WarmupCosine',   # WarmupCosine, CosineAnnealingLR
     cycles: 100,
     warmup_epoch: 20,
     weight_decay: 0.05,
+    early_stop_epoch: 400,
   batch_size: 16,
-  epoch: 10000,
+  epoch: 1000,
   ema_decay: 0, # set 0 to deactivate
   class_weight: [1.0, 1.0],
-  model_path: 'pretrained/imagenet/pretrained_model.pt',  # set empty to deactivate
+  model_path: '',  # set empty to deactivate
 
    ### Data Parameters
-  transform_blur: true,
-  transform_jitter: false,
-  transform_hflip: true,
-  transform_perspective: true,
-  transform_cutmix: true,
-  transform_rand_resize: true,
+  mount_data_on_memory: false,
+  transform_blur: 0.3,
+  transform_jitter: 0.7,
+  transform_hflip: 0.5,
+  transform_vflip: 0.0,
+  transform_perspective: 0.3,
+  transform_rand_resize: 0.8,
   transform_rand_crop: 224,
+  transform_cutmix: 0.8,
 
-  train_x_path: 'awesome/path/to/dataset',
-  train_y_path: 'awesome/path/to/dataset',
-  val_x_path:   'awesome/path/to/dataset',
-  val_y_path:   'awesome/path/to/dataset',
+  train_x_path: '/path/to/data/train/label',
+  train_y_path: '/path/to/data/train/label',
+  val_x_path:   '/path/to/data/val/input',
+  val_y_path:   '/path/to/data/val/label',
 }

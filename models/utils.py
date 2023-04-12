@@ -714,7 +714,7 @@ def cut_mix(_input, mask_1, _refer, mask_2) -> (Image.Image, Image.Image):
         return _input.astype(np.uint8), mask_1.astype(np.uint8)
 
 
-def grey_to_heatmap(img, is_bgr=True):
+def grey_to_heatmap(img):
     """
     img: numpy.ndarray, or [0, 255] range of integer
 
@@ -722,8 +722,6 @@ def grey_to_heatmap(img, is_bgr=True):
     """
 
     heatmap = cv2.applyColorMap(img, cv2.COLORMAP_TURBO)
-    if not is_bgr:
-        heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
 
     return heatmap
 

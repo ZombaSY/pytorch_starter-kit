@@ -1,14 +1,13 @@
 import torch
 import os
 import argparse
-import wandb
 import yaml
 import numpy as np
 import random
 import ast
 
-from train_segmentation import Trainer_seg
-from train_classification import Trainer_cls
+from train_segmentation import TrainerSegmentation
+from train_classification import TrainerClassification
 from inference import Inferencer
 from torch.cuda import is_available
 from datetime import datetime
@@ -67,38 +66,24 @@ def main():
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.CUDA_VISIBLE_DEVICES
 
-    if args.wandb:
-        wandb.init(project='{}'.format(args.project_name), config=args, name=now_time,
-                   settings=wandb.Settings(start_method="fork"))
-
     print('Use CUDA :', args.cuda and is_available())
 
-    if args.mode in 'train':
-
-        # save hyper-parameters
-        with open(args.config_path, 'r') as f_r:
-            file_path = args.saved_model_directory + '/' + now_time
-            if not os.path.exists(file_path):
-                os.makedirs(file_path)
-            with open(os.path.join(file_path, args.config_path.split('/')[-1]), 'w') as f_w:
-                f_w.write(f_r.read())
-
-        if args.mode == 'train':
-            if args.task == 'segmentation':
-                trainer = Trainer_seg(args, now_time)
-            elif args.task == 'classification':
-                trainer = Trainer_cls(args, now_time)
+    if args.mode == 'train':
+        if args.task == 'segmentation':
+            trainer = TrainerSegmentation(args, now_time)
+        elif args.task == 'classification':
+            trainer = TrainerClassification(args, now_time)
         else:
-            raise Exception('Invalid mode')
+            raise ValueError('')
 
-        trainer.start_train()
+        trainer.run()
 
     elif args.mode in 'inference':
         inferencer = Inferencer(args)
 
-        if args.inference_mode == 'segmentation':
+        if args.task == 'segmentation':
             inferencer.start_inference_segmentation()
-        elif args.inference_mode == 'classification':
+        elif args.task == 'classification':
             inferencer.start_inference_classification()
         else:
             raise ValueError('Please select correct inference_mode !!!')
