@@ -4,10 +4,12 @@ import torch
 import math
 import random
 import time
+import os
 
 from torch.autograd import Variable
 from matplotlib.image import imread
 from PIL import Image
+from sklearn.neighbors import KernelDensity
 
 
 class Colors:
@@ -656,24 +658,27 @@ class ImageProcessing(object):
         return img, slope_sqr_diff
 
 
-def cut_mix(_input, mask_1, _refer, mask_2) -> (Image, Image):
+# https://arxiv.org/abs/1905.04899
+def cut_mix(_input, mask_1, _refer, mask_2) -> (Image.Image, Image.Image):
     """
-    :param _input: PIL.Image
-    :param mask_1: PIL.Image
-    :param _refer: PIL.Image
-    :param mask_2: PIL.Image
+    :param _input: PIL.Image or ndarray
+    :param mask_1: PIL.Image or ndarray
+    :param _refer: PIL.Image or ndarray
+    :param mask_2: PIL.Image or ndarray
 
     :returns: cut-mixed image
     """
+    _is_pil = isinstance(_input, Image.Image)
     random_gen = random.Random()
 
-    _input_np = np.array(_input)
-    mask_1_np = np.array(mask_1)
-    _refer_np = np.array(_refer)
-    mask_2_np = np.array(mask_2)
+    if _is_pil:
+        _input = np.array(_input)
+        mask_1 = np.array(mask_1)
+        _refer = np.array(_refer)
+        mask_2 = np.array(mask_2)
 
-    h1, w1, _ = _input_np.shape
-    h2, w2, _ = _refer_np.shape
+    h1, w1, _ = _input.shape
+    h2, w2, _ = _refer.shape
 
     # cutout positions
     rand_x = random_gen.random() * 0.75
@@ -681,9 +686,9 @@ def cut_mix(_input, mask_1, _refer, mask_2) -> (Image, Image):
     rand_w = random_gen.random() * 0.5
     rand_h = random_gen.random() * 0.5
 
-    cx_1 = int(rand_x * w1)  # range of [0, 0.5]
+    cx_1 = int(rand_x * w1)  # range [0, 0.5]
     cy_1 = int(rand_y * h1)
-    cw_1 = int((rand_w + 0.25) * w1)  # range of [0.25, 0.75]
+    cw_1 = int((rand_w + 0.25) * w1)  # range [0.25, 0.75]
     ch_1 = int((rand_h + 0.25) * h1)
 
     cx_2 = int(rand_x * w2)
@@ -694,16 +699,19 @@ def cut_mix(_input, mask_1, _refer, mask_2) -> (Image, Image):
     if cy_1 + ch_1 > h1: ch_1 = h1 - cy_1  # push overflowing area
     if cx_1 + cw_1 > w1: cw_1 = w1 - cx_1
 
-    cutout_img = _refer_np[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
-    cutout_mask = mask_2_np[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
+    cutout_img = _refer[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
+    cutout_mask = mask_2[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
 
     cutout_img = cv2.resize(cutout_img, (cw_1, ch_1))
     cutout_mask = cv2.resize(cutout_mask, (cw_1, ch_1), interpolation=cv2.INTER_NEAREST)
 
-    _input_np[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_img
-    mask_1_np[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_mask
+    _input[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_img
+    mask_1[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_mask
 
-    return Image.fromarray(_input_np.astype(np.uint8)), Image.fromarray(mask_1_np.astype(np.uint8))
+    if _is_pil:
+        return Image.fromarray(_input.astype(np.uint8)), Image.fromarray(mask_1.astype(np.uint8))
+    else:
+        return _input.astype(np.uint8), mask_1.astype(np.uint8)
 
 
 def grey_to_heatmap(img, is_bgr=True):
@@ -718,6 +726,65 @@ def grey_to_heatmap(img, is_bgr=True):
         heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
 
     return heatmap
+
+
+# function for non-utf-8 string
+def cv2_imread(fns_img, color=cv2.IMREAD_UNCHANGED):
+    img_array = np.fromfile(fns_img, np.uint8)
+    img = cv2.imdecode(img_array, color)
+    return img
+
+
+def cv2_imwrite(fns_img, img):
+    extension = os.path.splitext(fns_img)[1]
+    result, encoded_img = cv2.imencode(extension, img)
+
+    if result:
+        with open(fns_img, mode='w+b') as f:
+            encoded_img.tofile(f)
+
+
+# https://arxiv.org/abs/2210.05775
+def get_mixup_sample_rate(y_list):
+
+    def stats_values(targets):
+        mean = np.mean(targets)
+        min = np.min(targets)
+        max = np.max(targets)
+        std = np.std(targets)
+        print(f'y stats: mean = {mean}, max = {max}, min = {min}, std = {std}')
+        return mean, min, max, std
+
+    mix_idx = []
+    is_np = isinstance(y_list, np.ndarray)
+    if is_np:
+        data_list = torch.tensor(y_list, dtype=torch.float32)
+    else:
+        data_list = y_list
+
+    data_len = len(data_list)
+
+    for i in range(data_len):
+        data_i = data_list[i]
+        data_i = data_i.reshape(-1, data_i.shape[0])  # get 2Dn
+
+        # if i % (data_len // 10) == 0:
+        #     print('Mixup sample prepare {:.2f}%'.format(i * 100.0 / data_len))
+        # if i == 0: print(f'data_list.shape = {data_list.shape}, std(data_list) = {torch.std(data_list)}')#, data_i = {data_i}' + f'data_i.shape = {data_i.shape}')
+
+        # KDE sample rate
+        kd = KernelDensity(kernel='gaussian', bandwidth=1.75).fit(data_i)  # should be 2D
+        each_rate = np.exp(kd.score_samples(data_list))
+        each_rate /= np.sum(each_rate)  # norm
+
+        # visualization: observe relative rate distribution shot
+        # stats_values(each_rate)
+
+        mix_idx.append(each_rate)
+
+    mix_idx = np.array(mix_idx)
+
+    return mix_idx
 
 
 class TrainerCallBack:

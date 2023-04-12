@@ -1,6 +1,7 @@
 # Pytorch Start-kit Project
 There are so enormous pytorch environments in research and projects. <br/>
-To minimize your efforts on settings your own scripts, this repository introduces the skeletons for pytorch-beginners.
+To minimize your efforts on setting own scripts, this repository introduces the skeletons for pytorch-beginners.
+
 
 ## Dataset
 The dataset recommend following hierarchy

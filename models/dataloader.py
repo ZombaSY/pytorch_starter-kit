@@ -4,13 +4,14 @@ import torchvision.transforms.functional as tf
 import random
 import numpy as np
 import pandas as pd
+import cv2
+import multiprocessing
+import albumentations
+import itertools
 
-from PIL import Image
-from torchvision import transforms
-from torchvision.transforms import InterpolationMode
-from torch.utils.data import Dataset, DataLoader
+
+from torch.utils.data import Dataset
 from models import utils
-from multiprocessing import set_start_method
 
 
 # fix randomness on DataLoader
@@ -20,10 +21,19 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 
-# function for non-utf-8 string
+# to avoid cache files
 def is_image(src):
     ext = os.path.splitext(src)[1]
-    return True if ext in ['.jpg', '.png', '.JPG', '.PNG'] else False
+    return True if ext.lower() in ['.jpeg', '.jpg', '.png', '.gif'] else False
+
+
+def mount_data_on_memory_wrapper(args):
+    return mount_data_on_memory(*args)
+
+
+def mount_data_on_memory(img_path, CV_COLOR):
+    img = utils.cv2_imread(img_path, CV_COLOR)
+    return {'data': img, 'path': img_path}
 
 
 # https://github.com/rwightman/pytorch-image-models/blob/d72ac0db259275233877be8c1d4872163954dfbb/timm/data/loader.py
@@ -69,8 +79,15 @@ class Image2ImageLoader(Dataset):
         self.mode = mode
         self.args = kwargs['args']
 
-        self.image_mean = [0.485, 0.456, 0.406]
-        self.image_std = [0.229, 0.224, 0.225]
+        if hasattr(self.args, 'input_size'):
+            h, w = self.args.input_size[0], self.args.input_size[1]
+            self.size_1x = [int(h), int(w)]
+
+        if hasattr(self.args, 'transform_rand_crop'):
+            self.crop_factor = int(self.args.transform_rand_crop)
+
+        self.image_mean = [0.5, 0.5, 0.5]
+        self.image_std = [0.25, 0.25, 0.25]
 
         x_img_name = os.listdir(x_path)
         y_img_name = os.listdir(y_path)
@@ -92,93 +109,85 @@ class Image2ImageLoader(Dataset):
 
         self.len = len(x_img_name)
 
-        del x_img_name
-        del y_img_name
+        # mount_data_on_memory
+        if self.args.mount_data_on_memory:
+            with multiprocessing.Pool(multiprocessing.cpu_count()) as pools:
+                self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(self.x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
+                self.memory_data_y = pools.map(mount_data_on_memory_wrapper, zip(self.y_img_path, itertools.repeat(cv2.IMREAD_GRAYSCALE)))
 
-    def transform(self, image, target):
-        if hasattr(self.args, 'input_size'):
-            image = tf.resize(image, [int(self.args.input_size[0]), int(self.args.input_size[1])])
-            target = tf.resize(target, [int(self.args.input_size[0]), int(self.args.input_size[1])], interpolation=InterpolationMode.NEAREST)
+        # initialize albumentation transforms
+        if self.mode != 'validation':
+            self.transform1 = albumentations.Compose([
+                albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
+            ])
+            self.transform2 = albumentations.Compose([
+                albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=self.args.transform_rand_resize),
+                albumentations.RandomCrop(height=self.crop_factor, width=self.crop_factor, p=1.0),
+                albumentations.HorizontalFlip(p=self.args.transform_hflip),
+                albumentations.VerticalFlip(p=self.args.transform_vflip),
+                albumentations.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=self.args.transform_jitter),
+                albumentations.GaussianBlur(p=self.args.transform_blur),
+                albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=self.args.transform_perspective),
+            ])
+        else:
+            self.transforms = albumentations.Compose([
+                albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1.0)
+            ])
 
-        if not self.mode == 'validation':
-            random_gen = random.Random()  # thread-safe random
+        self.transforms_normalize = albumentations.Compose([
+            albumentations.Normalize(mean=self.image_mean, std=self.image_std)
+        ])
 
-            if (random_gen.random() < 0.8) and self.args.transform_cutmix:
-                rand_n = random_gen.randint(0, self.len - 1)     # randomly generates reference image on dataset
-                image_refer = Image.open(self.x_img_path[rand_n]).convert('RGB')
-                target_refer = Image.open(self.y_img_path[rand_n]).convert('L')
-                image, target = utils.cut_mix(image, target, image_refer, target_refer)
+    def transform(self, _input, _label):
+        random_gen = random.Random()
 
-            if (random_gen.random() < 0.8) and self.args.transform_rand_resize:
-                rand_h = (random_gen.random() * 1.5) + 0.5  # [0.5, 2.0]
-                rand_w = (random_gen.random() * 1.5) + 0.5
-                resize_h = int((self.args.input_size[0] * rand_h).__round__())
-                resize_w = int((self.args.input_size[1] * rand_w).__round__())
+        if self.mode != 'validation':
+            transform = self.transform1(image=_input, mask=_label)
+            _input = transform['image']
+            _label = transform['mask']
 
-                image = tf.resize(image, [resize_h, resize_w])
-                target = tf.resize(target, [resize_h, resize_w], interpolation=InterpolationMode.NEAREST)
+            if random_gen.random() < self.args.transform_cutmix:
+                rand_n = random_gen.randint(0, self.len - 1)
+                _input_refer = utils.cv2_imread(self.x_img_path[rand_n], cv2.IMREAD_COLOR)
+                _label_refer = utils.cv2_imread(self.y_img_path[rand_n], cv2.IMREAD_GRAYSCALE)
+                transform_ref = self.transform1(image=_input_refer, mask=_label_refer)
+                _input_refer = transform_ref['image']
+                _label_refer = transform_ref['mask']
+                _input, _label = utils.cut_mix(_input, _label, _input_refer, _label_refer)
 
-            if hasattr(self.args, 'transform_rand_crop'):
-                i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(int(self.args.transform_rand_crop), int(self.args.transform_rand_crop)))
-                image = tf.crop(image, i, j, h, w)
-                target = tf.crop(target, i, j, h, w)
+            transform = self.transform2(image=_input, mask=_label)
+        else:
+            transform = self.transforms(image=_input, mask=_label)
 
-            if (random_gen.random() < 0.5) and self.args.transform_hflip:
-                image = tf.hflip(image)
-                target = tf.hflip(target)
-
-            if (random_gen.random() < 0.8) and self.args.transform_jitter:
-                transform = transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)
-                image = transform(image)
-
-            if (random_gen.random() < 0.5) and self.args.transform_blur:
-                kernel_size = int((random.random() * 10 + 2.5).__round__())    # random kernel size 3 to 11
-                if kernel_size % 2 == 0:
-                    kernel_size -= 1
-                transform = transforms.GaussianBlur(kernel_size=kernel_size)
-                image = transform(image)
-
-            # recommend to use at the end.
-            if (random_gen.random() < 0.3) and self.args.transform_perspective:
-                start_p, end_p = transforms.RandomPerspective.get_params(image.width, image.height, distortion_scale=0.5)
-                image = tf.perspective(image, start_p, end_p)
-                target = tf.perspective(target, start_p, end_p, interpolation=InterpolationMode.NEAREST)
-
-        image_tensor = tf.to_tensor(image)
-        target_tensor = torch.tensor(np.array(target))
-
-        if self.args.input_space == 'GR':   # grey, red
-            image_tensor_r = image_tensor[0].unsqueeze(0)
-            image_tensor_grey = tf.to_tensor(tf.to_grayscale(image))
-
-            image_tensor = torch.cat((image_tensor_r, image_tensor_grey), dim=0)
-
-        # 'mean' and 'std' are acquired by cropped face from sense-time landmark
-        if self.args.input_space == 'RGB':
-            image_tensor = tf.normalize(image_tensor,
-                                        mean=self.image_mean,
-                                        std=self.image_std)
+        norm = self.transforms_normalize(image=transform['image'])
+        _input = norm['image']
+        _label = transform['mask']
 
         if self.args.num_class == 2:  # for binary label
-            target_tensor[target_tensor < 128] = 0
-            target_tensor[target_tensor >= 128] = 1
-        target_tensor = target_tensor.unsqueeze(0)    # expand 'grey channel' for loss function dependency
+            _label[_label < 128] = 0
+            _label[_label >= 128] = 1
 
-        if self.args.input_space == 'HSV':
-            try:
-                set_start_method('spawn')
-                image_tensor = utils.ImageProcessing.rgb_to_hsv(image_tensor)
-            except RuntimeError:
-                pass
+        _input = np.transpose(_input, [2, 0, 1])
 
-        return image_tensor, target_tensor
+        _input = torch.from_numpy(_input.astype(np.float32))  # (3, 640, 480)
+        _label = torch.from_numpy(_label)  # (640, 480)
+        _label = _label.unsqueeze(0)    # expand 'grey channel' for loss function dependency
+
+        return _input, _label
 
     def __getitem__(self, index):
-        x_path = self.x_img_path[index]
-        y_path = self.y_img_path[index]
+        if self.args.mount_data_on_memory:
+            img_x = self.memory_data_x[index]['data']
+            img_y = self.memory_data_y[index]['data']
+            x_path = self.memory_data_x[index]['path']
+            y_path = self.memory_data_y[index]['path']
 
-        img_x = Image.open(x_path).convert('RGB')
-        img_y = Image.open(y_path).convert('L')
+        else:
+            x_path = self.x_img_path[index]
+            y_path = self.y_img_path[index]
+
+            img_x = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
+            img_y = utils.cv2_imread(y_path, cv2.IMREAD_GRAYSCALE)
 
         img_x_tr, img_y_tr = self.transform(img_x, img_y)
 
@@ -202,91 +211,105 @@ class Image2VectorLoader(Dataset):
             h, w = self.args.input_size[0], self.args.input_size[1]
             self.size_1x = [int(h), int(w)]
 
-        self.image_mean = [0.485, 0.456, 0.406]
-        self.image_std = [0.229, 0.224, 0.225]
+        if hasattr(self.args, 'transform_rand_crop'):
+            self.crop_factor = int(self.args.transform_rand_crop)
+
+        self.image_mean = [0.5, 0.5, 0.5]
+        self.image_std = [0.25, 0.25, 0.25]
 
         self.data_root_path = os.path.split(csv_path)[0]
         self.df = pd.read_csv(csv_path)
-        self.len = len(self.df['value_1'])
+        self.len = len(self.df['FILENAME'])
 
-    def transform(self, image):
+        # mount_data_on_memory
+        if self.args.mount_data_on_memory:
+            x_img_path = []
+            self.memory_data_y = []
+            for idx in range(self.len):
+                x_img_path.append(os.path.join(*[self.data_root_path, 'input_crop', self.df['FILENAME'][idx]]) + '.jpg')    # TODO: remove darkcircle flush...
+                self.memory_data_y.append(torch.tensor([self.df['DARKCIRCLE_AVG'][idx], self.df['FLUSH'][idx]]) - 1)
+            with multiprocessing.Pool(multiprocessing.cpu_count()) as pools:
+                self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
 
-        if hasattr(self.args, 'input_size'):
-            image = tf.resize(image, [int(self.args.input_size[0]), int(self.args.input_size[1])])
+        # initialize albumentation transforms
+        if self.mode != 'validation':
+            self.transform1 = albumentations.Compose([
+                albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
+            ])
+            self.transform2 = albumentations.Compose([
+                albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=self.args.transform_rand_resize),
+                albumentations.RandomCrop(height=self.crop_factor, width=self.crop_factor, p=1.0),
+                albumentations.HorizontalFlip(p=self.args.transform_hflip),
+                albumentations.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=self.args.transform_jitter),
+                albumentations.GaussianBlur(p=self.args.transform_blur),
+                albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=self.args.transform_perspective),
+            ])
+        else:
+            self.transforms = albumentations.Compose([
+                albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1.0)
+            ])
 
-        if not self.mode == 'validation':
-            random_gen = random.Random()  # thread-safe random
+        self.transforms_normalize = albumentations.Compose([
+            albumentations.Normalize(mean=self.image_mean, std=self.image_std)
+        ])
 
-            if (random_gen.random() < 0.8) and self.args.transform_rand_resize:
-                rand_h = (random_gen.random() * 1.5) + 0.5  # [0.5, 2.0]
-                rand_w = (random_gen.random() * 1.5) + 0.5
-                resize_h = int((self.args.input_size[0] * rand_h).__round__())
-                resize_w = int((self.args.input_size[1] * rand_w).__round__())
+        self.mixup_sample_1 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['DARKCIRCLE_AVG']), -1)))
+        self.mixup_sample_2 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['FLUSH']), -1)))
+        self.mixup_sample = (self.mixup_sample_1 + self.mixup_sample_2) / 2
 
-                image = tf.resize(image, [resize_h, resize_w])
+    def transform(self, _input, _label, idx_1):
+        random_gen = random.Random()
 
-            if hasattr(self.args, 'transform_rand_crop'):
-                i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(
-                int(self.args.transform_rand_crop), int(self.args.transform_rand_crop)))
-                image = tf.crop(image, i, j, h, w)
+        if self.mode != 'validation':
+            transform = self.transform1(image=_input)
+            _input = transform['image']
 
-            if (random_gen.random() < 0.5) and self.args.transform_hflip:
-                image = tf.hflip(image)
+            # MixUp
+            if random_gen.random() < self.args.transform_mixup:
+                # select index from pre-defined sampler
+                idx_2 = np.random.choice(np.arange(self.len), p=self.mixup_sample[idx_1])
 
-            if (random_gen.random() < 0.8) and self.args.transform_jitter:
-                transform = transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)
-                image = transform(image)
+                # load the pair of X and Y
+                x_path = os.path.join(*[self.data_root_path, 'input_crop', self.df['FILENAME'][idx_2] + '.jpg'] )
+                x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
+                transform = self.transform1(image=x_img)
+                _input_2 = transform['image']
+                _label_2 = torch.tensor([self.df['DARKCIRCLE_AVG'][idx_2], self.df['FLUSH'][idx_2]])
 
-            if (random_gen.random() < 0.5) and self.args.transform_blur:
-                kernel_size = int((random.random() * 8 + 3).__round__())
-                if kernel_size % 2 == 0:
-                    kernel_size -= 1
-                transform = transforms.GaussianBlur(kernel_size=kernel_size)
-                image = transform(image)
+                lam = np.random.beta(2, 2)
 
-            # recommend to use at the end.
-            if (random_gen.random() < 0.3) and self.args.transform_perspective:
-                start_p, end_p = transforms.RandomPerspective.get_params(image.width, image.height, distortion_scale=0.5)
-                image = tf.perspective(image, start_p, end_p)
+                _input = _input * lam + _input_2 * (1 - lam)
+                _label = _label * lam + _label_2 * (1 - lam)
 
-        image_tensor = tf.to_tensor(image)
+                _input = _input.astype(np.float32)
 
-        if self.args.input_space == 'GR':   # grey, red
-            image_tensor_r = image_tensor[0].unsqueeze(0)
-            image_tensor_grey = tf.to_tensor(tf.to_grayscale(image))
+            transform = self.transform2(image=_input)
+        else:
+            transform = self.transforms(image=_input)
 
-            image_tensor = torch.cat((image_tensor_r, image_tensor_grey), dim=0)
+        norm = self.transforms_normalize(image=transform['image'])
+        _input = norm['image']
+        _input = np.transpose(_input, [2, 0, 1])
 
-        # 'mean' and 'std' are acquired by cropped face from sense-time landmark
-        if self.args.input_space == 'RGB':
-            image_tensor = tf.normalize(image_tensor,
-                                        mean=self.image_mean,
-                                        std=self.image_std)
+        _input = torch.from_numpy(_input.astype(np.float32))  # (3, 640, 480)
 
-        if self.args.input_space == 'HSV':
-            try:
-                set_start_method('spawn')
-                image_tensor = utils.ImageProcessing.rgb_to_hsv(image_tensor)
-            except RuntimeError:
-                pass
-
-        return image_tensor
+        return _input, _label.float()
 
     def __getitem__(self, index):
-        x_path = os.path.join(*[self.data_root_path, self.df['sub_path'][index], self.df['image_file_name'][index]])
+        if self.args.mount_data_on_memory:
+            x_img = self.memory_data_x[index]['data']
+            y_vec = self.memory_data_y[index]
+            x_path = self.memory_data_x[index]['path']
+        else:
+            x_path = os.path.join(*[self.data_root_path, 'input_crop', self.df['FILENAME'][index]]) + '.jpg' # non-safe function
+            x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
+            y_vec = torch.tensor([self.df['DARKCIRCLE_AVG'][index],
+                                  self.df['FLUSH'][index]])
+            y_vec = y_vec - 1   # for tensor dependency, range [1, 5] to [0, 4]
 
-        img_x = Image.open(x_path).convert('RGB')
-        img_x = self.transform(img_x)
+        x_img_tr, y_vec = self.transform(x_img, y_vec, index)
 
-        # example for csv column
-        vec_y = torch.tensor([self.df['value_1'][index],
-                              self.df['value_2'][index],
-                              self.df['value_3'][index],
-                              self.df['value_4'][index],
-                              self.df['value_5'][index],
-                              self.df['value_6'][index]])
-
-        return (img_x, x_path), (vec_y, torch.tensor(0))
+        return (x_img_tr, x_path), (y_vec, x_path)
 
     def __len__(self):
         return self.len

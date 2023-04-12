@@ -10,7 +10,6 @@ from models import dataloader as dataloader_hub
 from models import model_implements
 
 from torch.nn import functional as F
-from PIL import Image
 
 
 class Inferencer:
