@@ -141,7 +141,6 @@ def conv_block_3_3(in_dim, out_dim):
     return model
 
 
-# TODO: Change order of block: BN + Activation + Conv
 def conv_decod_block(in_dim, out_dim, act_fn):
     model = nn.Sequential(
         nn.ConvTranspose2d(in_dim, out_dim, kernel_size=3, stride=2, padding=1, output_padding=1),
