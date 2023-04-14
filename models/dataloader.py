@@ -109,6 +109,7 @@ class Image2ImageLoader(Dataset):
 
         # mount_data_on_memory
         if self.args.mount_data_on_memory:
+            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory using multiprocess...{utils.Colors.END}')
             with multiprocessing.Pool(multiprocessing.cpu_count()) as pools:
                 self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(self.x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
                 self.memory_data_y = pools.map(mount_data_on_memory_wrapper, zip(self.y_img_path, itertools.repeat(cv2.IMREAD_GRAYSCALE)))
@@ -221,6 +222,7 @@ class Image2VectorLoader(Dataset):
 
         # mount_data_on_memory
         if self.args.mount_data_on_memory:
+            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory using multiprocess...{utils.Colors.END}')
             x_img_path = []
             self.memory_data_y = []
             for idx in range(self.len):

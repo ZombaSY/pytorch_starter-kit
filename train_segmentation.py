@@ -21,8 +21,8 @@ class TrainerSegmentation(TrainerBase):
         self.loader_val = self.init_data_loader(batch_size=self.args.batch_size // 4,
                                                 mode='validation',
                                                 dataloader_name=self.args.dataloader,
-                                                x_path=self.args.train_x_path,
-                                                y_path=self.args.train_y_path)
+                                                x_path=self.args.val_x_path,
+                                                y_path=self.args.val_y_path)
 
         self.scheduler = self.set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
         self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold

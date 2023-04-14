@@ -6,7 +6,7 @@
   wandb: false,
   worker: 8,
   log_interval: 9999,
-  save_interval: 3,
+  save_interval: 9999,
   saved_model_directory: 'model_checkpoints',
   train_fold: 1,  # fold train data and start validate
   project_name: 'my_wandb_project',
