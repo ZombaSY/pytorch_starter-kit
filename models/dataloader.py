@@ -34,6 +34,22 @@ def mount_data_on_memory(img_path, CV_COLOR):
     return {'data': img, 'path': img_path}
 
 
+def augmentations(args, target_size):
+    return [albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=args.transform_rand_resize),
+            albumentations.RandomCrop(height=target_size, width=target_size, p=1.0),
+            albumentations.HorizontalFlip(p=args.transform_hflip),
+            albumentations.VerticalFlip(p=args.transform_vflip),
+            albumentations.ImageCompression(quality_lower=90, quality_upper=100, p=args.transform_jpeg),
+            albumentations.GaussianBlur(p=args.transform_blur),
+            albumentations.CLAHE(p=args.transform_clahe),
+            albumentations.RandomRain(p=args.transform_rain),
+            albumentations.RandomFog(p=args.transform_fog),
+            albumentations.GaussNoise(p=args.transform_g_noise),
+            albumentations.FancyPCA(p=args.transform_fancyPCA),
+            albumentations.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=args.transform_jitter),
+            albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=args.transform_perspective)]
+
+
 # https://github.com/rwightman/pytorch-image-models/blob/d72ac0db259275233877be8c1d4872163954dfbb/timm/data/loader.py
 class MultiEpochsDataLoader(torch.utils.data.DataLoader):
 
@@ -108,8 +124,8 @@ class Image2ImageLoader(Dataset):
         self.len = len(x_img_name)
 
         # mount_data_on_memory
-        if self.args.mount_data_on_memory:
-            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory using multiprocess...{utils.Colors.END}')
+        if self.args.data_cache:
+            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.mode}{utils.Colors.END}')
             with multiprocessing.Pool(multiprocessing.cpu_count()) as pools:
                 self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(self.x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
                 self.memory_data_y = pools.map(mount_data_on_memory_wrapper, zip(self.y_img_path, itertools.repeat(cv2.IMREAD_GRAYSCALE)))
@@ -120,13 +136,7 @@ class Image2ImageLoader(Dataset):
                 albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
             ])
             self.transform2 = albumentations.Compose([
-                albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=self.args.transform_rand_resize),
-                albumentations.RandomCrop(height=self.crop_factor, width=self.crop_factor, p=1.0),
-                albumentations.HorizontalFlip(p=self.args.transform_hflip),
-                albumentations.VerticalFlip(p=self.args.transform_vflip),
-                albumentations.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=self.args.transform_jitter),
-                albumentations.GaussianBlur(p=self.args.transform_blur),
-                albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=self.args.transform_perspective),
+                *augmentations(self.args, self.crop_factor)
             ])
         else:
             self.transforms = albumentations.Compose([
@@ -175,7 +185,7 @@ class Image2ImageLoader(Dataset):
         return _input, _label
 
     def __getitem__(self, index):
-        if self.args.mount_data_on_memory:
+        if self.args.data_cache:
             img_x = self.memory_data_x[index]['data']
             img_y = self.memory_data_y[index]['data']
             x_path = self.memory_data_x[index]['path']
@@ -221,8 +231,8 @@ class Image2VectorLoader(Dataset):
         self.len = len(self.df['FILENAME'])
 
         # mount_data_on_memory
-        if self.args.mount_data_on_memory:
-            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory using multiprocess...{utils.Colors.END}')
+        if self.args.data_cache:
+            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.mode}{utils.Colors.END}')
             x_img_path = []
             self.memory_data_y = []
             for idx in range(self.len):
@@ -237,12 +247,7 @@ class Image2VectorLoader(Dataset):
                 albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
             ])
             self.transform2 = albumentations.Compose([
-                albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=self.args.transform_rand_resize),
-                albumentations.RandomCrop(height=self.crop_factor, width=self.crop_factor, p=1.0),
-                albumentations.HorizontalFlip(p=self.args.transform_hflip),
-                albumentations.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=self.args.transform_jitter),
-                albumentations.GaussianBlur(p=self.args.transform_blur),
-                albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=self.args.transform_perspective),
+                *augmentations(self.args, self.crop_factor)
             ])
         else:
             self.transforms = albumentations.Compose([
@@ -296,7 +301,7 @@ class Image2VectorLoader(Dataset):
         return _input, _label.float()
 
     def __getitem__(self, index):
-        if self.args.mount_data_on_memory:
+        if self.args.data_cache:
             x_img = self.memory_data_x[index]['data']
             y_vec = self.memory_data_y[index]
             x_path = self.memory_data_x[index]['path']

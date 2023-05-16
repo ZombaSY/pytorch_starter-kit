@@ -35,16 +35,21 @@
   model_path: '',  # pretrained/ImageNet/swin_tiny_patch4_window7_224.pth
 
   ### Data Parameters
-  mount_data_on_memory: false,
+  data_cache: true,
   transform_blur: 0.3,
-  transform_jitter: 0.7,
+  transform_clahe: 0.2,
+  transform_rain: 0.0,
+  transform_fog: 0.0,
+  transform_g_noise: 0.0,
+  transform_fancyPCA: 0.0,
+  transform_jitter: 0.2,
   transform_hflip: 0.5,
   transform_vflip: 0.0,
+  transform_jpeg: 0.5,
   transform_perspective: 0.3,
   transform_rand_resize: 0.8,
   transform_rand_crop: 224,
-  transform_cutmix: 0.0,
-  transform_mixup: 1.0,
+  transform_cutmix: 0.8,
 
   train_csv_path: '/path/to/data/train.csv',
   val_csv_path: '/path/to/data/val.csv',

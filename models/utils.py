@@ -7,6 +7,7 @@ import time
 import os
 
 from torch.autograd import Variable
+from timm.models.layers import trunc_normal_
 from matplotlib.image import imread
 from PIL import Image
 from sklearn.neighbors import KernelDensity
@@ -714,7 +715,7 @@ def cut_mix(_input, mask_1, _refer, mask_2) -> (Image.Image, Image.Image):
         return _input.astype(np.uint8), mask_1.astype(np.uint8)
 
 
-def grey_to_heatmap(img):
+def grey_to_heatmap(img, is_bgr=True):
     """
     img: numpy.ndarray, or [0, 255] range of integer
 
@@ -722,6 +723,8 @@ def grey_to_heatmap(img):
     """
 
     heatmap = cv2.applyColorMap(img, cv2.COLORMAP_TURBO)
+    if not is_bgr:
+        heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
 
     return heatmap
 
@@ -783,6 +786,12 @@ def get_mixup_sample_rate(y_list):
     mix_idx = np.array(mix_idx)
 
     return mix_idx
+
+
+def init_weights(m):
+    if isinstance(m, (torch.nn.Conv2d, torch.nn.Linear)):
+        trunc_normal_(m.weight, std=.02)
+        torch.nn.init.constant_(m.bias, 0)
 
 
 class TrainerCallBack:

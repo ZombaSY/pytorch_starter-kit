@@ -17,7 +17,7 @@ class TrainerClassification(TrainerBase):
                                                   mode='train',
                                                   dataloader_name=self.args.dataloader,
                                                   csv_path=self.args.train_csv_path)
-        self.loader_val = self.init_data_loader(batch_size=self.args.batch_size // 4,
+        self.loader_val = self.init_data_loader(batch_size=1,
                                                 mode='validation',
                                                 dataloader_name=self.args.dataloader,
                                                 csv_path=self.args.val_csv_path)
