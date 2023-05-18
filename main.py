@@ -7,7 +7,7 @@ import random
 import ast
 
 from train_segmentation import TrainerSegmentation
-from train_classification import TrainerClassification
+from train_segmentation_score_repr import Trainer_segScoreRepr
 from inference import Inferencer
 from torch.cuda import is_available
 from datetime import datetime
@@ -71,22 +71,24 @@ def main():
     if args.mode == 'train':
         if args.task == 'segmentation':
             trainer = TrainerSegmentation(args, now_time)
-        elif args.task == 'classification':
-            trainer = TrainerClassification(args, now_time)
+        elif args.task == 'segmentation_score_cycle_repr':
+            args.task = 'segmentation'
+            trainer = Trainer_segScoreRepr(args, now_time)
         else:
             raise ValueError('')
 
         trainer.run()
 
     elif args.mode in 'inference':
-        inferencer = Inferencer(args)
 
         if args.task == 'segmentation':
-            inferencer.start_inference_segmentation()
-        elif args.task == 'classification':
-            inferencer.start_inference_classification()
+            inferencer = Inferencer(args)
+        elif args.task == 'segmentation_score_cycle':
+            inferencer = Inferencer(args)
         else:
             raise ValueError('Please select correct inference_mode !!!')
+
+        inferencer.inference()
     else:
         print('No mode supported.')
 

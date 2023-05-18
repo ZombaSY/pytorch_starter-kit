@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
-
-from models.backbones import Resnet
-from models.backbones import Unet_part
-from models.backbones.Swin import SwinTransformer
-from models.blocks.Blocks import Upsample
+from models.backbones.NeighborhoodTransformer import DiNAT_s
+from models.blocks import Blocks as Blocks
 from models.heads.UPerHead import M_UPerHead
+from models.necks import perturbations
 
 from collections import OrderedDict
 
@@ -40,60 +39,18 @@ def initialize_weights(layer, activation='relu'):
             pass
 
 
-class Unet(nn.Module):
-    def __init__(self, n_channels=3, n_classes=2, bilinear=True):
-        super(Unet, self).__init__()
-        self.n_channels = n_channels
-        self.n_classes = n_classes
-        self.bilinear = bilinear
-
-        self.inc = Unet_part.DoubleConv(n_channels, 64)
-        self.down1 = Unet_part.Down(64, 128)
-        self.down2 = Unet_part.Down(128, 256)
-        self.down3 = Unet_part.Down(256, 512)
-        factor = 2 if bilinear else 1
-        self.down4 = Unet_part.Down(512, 1024 // factor)
-        self.up1 = Unet_part.Up(1024, 512 // factor, bilinear)
-        self.up2 = Unet_part.Up(512, 256 // factor, bilinear)
-        self.up3 = Unet_part.Up(256, 128 // factor, bilinear)
-        self.up4 = Unet_part.Up(128, 64, bilinear)
-        self.outc = Unet_part.OutConv(64, n_classes)
-
-    def forward(self, x):
-        x1 = self.inc(x)
-        x2 = self.down1(x1)
-        x3 = self.down2(x2)
-        x4 = self.down3(x3)
-        x5 = self.down4(x4)
-
-        x = self.up1(x5, x4)
-        x = self.up2(x, x3)
-        x = self.up3(x, x2)
-        x = self.up4(x, x1)
-        logits = self.outc(x)
-
-        return logits
-
-
-class Swin(nn.Module):
+class DiNAT_s_T(nn.Module):
     def __init__(self, num_classes=2, in_channel=3):
-        super(Swin, self).__init__()
+        super(DiNAT_s_T, self).__init__()
 
-        self.swin_transformer = SwinTransformer(in_chans=in_channel,
+        self.neighborhood_transformer = DiNAT_s(in_chans=in_channel,
                                                 embed_dim=96,
                                                 depths=[2, 2, 6, 2],
                                                 num_heads=[3, 6, 12, 24],
-                                                window_size=7,
-                                                mlp_ratio=4.,
-                                                qkv_bias=True,
-                                                qk_scale=None,
-                                                drop_rate=0.,
-                                                attn_drop_rate=0.,
                                                 drop_path_rate=0.3,
-                                                ape=False,
                                                 patch_norm=True,
-                                                out_indices=(0, 1, 2, 3),
-                                                use_checkpoint=False)
+                                                kernel_size=7,
+                                                dilations=[[1, 16], [1, 8], [1, 2, 1, 3, 1, 4], [1, 2]])
 
         self.uper_head = M_UPerHead(in_channels=[96, 192, 384, 768],
                                     in_index=[0, 1, 2, 3],
@@ -105,17 +62,20 @@ class Swin(nn.Module):
 
     def load_pretrained(self, dst):
         pretrained_states = torch.load(dst)
-        pretrained_states_backbone = OrderedDict()
+        pretrained_states_new = OrderedDict()
         for item in pretrained_states.keys():
-            if 'swin_transformer' in item:
-                key = item.replace('module.', '')   # strip wrapper class
-                key = key.replace('swin_transformer.', '')  # strip "swin_transformer" class
-                pretrained_states_backbone[key] = pretrained_states[item]
+            if 'neighborhood_transformer' in item:
+                key = item.replace('module.', '')
+                key = key.replace('neighborhood_transformer.', '')
+                if key[:4] == 'norm':
+                    key = key.replace('norm', '')
+                    key = 'norm_layer_list.' + key
+                pretrained_states_new[key] = pretrained_states[item]
 
-        self.swin_transformer.load_state_dict(pretrained_states_backbone)
+        self.neighborhood_transformer.load_state_dict(pretrained_states_new)
 
-    def load_pretrained_imagenet(self, dst):
-        pretrained_states = torch.load(dst)['model']
+    def load_pretrained_imagenet(self, dst, device):
+        pretrained_states = torch.load(dst)
         pretrained_states_backbone = OrderedDict()
 
         for item in pretrained_states.keys():
@@ -123,45 +83,85 @@ class Swin(nn.Module):
                 continue
             pretrained_states_backbone[item] = pretrained_states[item]
 
-        self.swin_transformer.remove_fpn_norm_layers()  # temporally remove fpn norm layers that not included on public-release model
-        self.swin_transformer.load_state_dict(pretrained_states_backbone)
-        self.swin_transformer.add_fpn_norm_layers()
+        self.neighborhood_transformer.remove_fpn_norm_layers()
+        self.neighborhood_transformer.load_state_dict(pretrained_states_backbone)
+        self.neighborhood_transformer.add_fpn_norm_layers()
+
+        self.to(device)
 
     def forward(self, x):
         x_size = x.shape[2:]
 
-        feat = self.swin_transformer(x)     # list of feature pyramid
-        feat = self.uper_head(feat)
-        feat = Upsample(feat, x_size)
+        feat1, feat2, feat3, feat4 = self.neighborhood_transformer(x)
 
-        return feat, None
+        feat = self.uper_head(feat1, feat2, feat3, feat4)
+        feat = F.interpolate(feat, x_size, mode='bilinear', align_corners=False)
+
+        return feat, [feat1, feat2, feat3, feat4]
 
 
-class ResNet18_multihead(nn.Module):
-    def __init__(self, num_classes=6, sub_classes=4):
-        super(ResNet18_multihead, self).__init__()
+class DiNAT_s_T_segMap_score_multi_stem_repr(DiNAT_s_T):
+    def __init__(self, num_classes=2, in_channel=3):
+        super(DiNAT_s_T_segMap_score_multi_stem_repr, self).__init__(num_classes, in_channel)
 
-        self.num_classes = num_classes
-        self.sub_classes = sub_classes
+        self.classifier = Blocks.Classifier_map_score_multi_stem()
 
-        self.resnet = Resnet.ResNet18()
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.classifiers = nn.ModuleList([nn.Sequential(*[
-            nn.Linear(512 * 4, 512),
-            nn.ReLU(),
-            nn.Dropout(),
-            nn.Linear(512, sub_classes)
-        ]) for _ in range(num_classes)])
+        self.perturbations_pos = nn.Sequential(*[
+            perturbations.FeatureNoise(),
+            perturbations.VATDecoder(16, 768, num_classes),
+            perturbations.DropOut(),
+        ])
 
-    def forward(self, x):
-        x = x.contiguous()
-        s1_feature, s2_feature, s3_feature, final_feature = self.resnet(x)
+        self.perturbations_neg = nn.Sequential(*[
+            perturbations.VATDecoderNegative(16, 768, num_classes),
+        ])
 
-        final_feature = self.avgpool(final_feature)
-        final_feature = torch.flatten(final_feature, 1)
-        outputs = [self.classifiers[i](final_feature) for i in range(self.num_classes)]
+        self.repr = nn.Sequential(
+            nn.Conv2d(768, 256, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(0.1),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(0.1),
+            nn.Conv2d(256, 256, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(),
+        )
 
-        output = torch.cat([output.unsqueeze(1) for output in outputs], dim=1)
-        output = output.view([-1, self.sub_classes, self.num_classes])  # reshape for CE loss
+    def train_score_callback(self):
+        self.uper_head.eval()
 
-        return output, None
+    def forward(self, x, is_val=False):
+        x_h, x_w, = x.shape[-2:]
+
+        feats = self.neighborhood_transformer(x)
+
+        out = {}
+        if not is_val:
+            # merge perturbations with batch
+            feat_perturbation_pos = torch.cat([perturb(feats) for perturb in self.perturbations_pos], dim=0)
+            feat_perturbation_neg = torch.cat([perturb(feats) for perturb in self.perturbations_neg], dim=0)
+
+            feat_repr_pos = self.repr(feat_perturbation_pos)
+            feat_repr_neg = self.repr(feat_perturbation_neg)
+            feats_repr = self.repr(feats[-1])
+
+            out['feats_repr'] = feats_repr
+            out['feat_repr_pos'] = feat_repr_pos
+            out['feat_repr_neg'] = feat_repr_neg
+
+        seg_map = self.uper_head(feats)
+        seg_map = F.interpolate(seg_map, (x_h, x_w), mode='bilinear', align_corners=False)
+
+        seg_map_score_1 = torch.sum(torch.softmax(seg_map, dim=1)[:, 1], dim=(1, 2)).unsqueeze(-1) / (x_h * x_w)
+        seg_map_score_2 = torch.sum(torch.softmax(seg_map, dim=1)[:, 2], dim=(1, 2)).unsqueeze(-1) / (x_h * x_w)
+        seg_map_score = torch.cat([seg_map_score_1, seg_map_score_2], dim=1)
+
+        score = self.classifier(feats[-1], seg_map_score)
+
+        out['seg_map'] = seg_map
+        out['score'] = score
+
+        return out

@@ -44,10 +44,10 @@ class TrainerBase:
         if hasattr(self.args, 'model_path'):
             if self.args.model_path != '':
                 if 'imagenet' in self.args.model_path.lower():
-                    self.model.module.load_pretrained_imagenet(self.args.model_path)
+                    self.model.module.load_pretrained_imagenet(self.args.model_path, self.device)
                     print('Model loaded successfully!!! (ImageNet)')
                 else:
-                    self.model.module.load_pretrained(self.args.model_path)    # TODO: define "load_pretrained" abstract method to all models
+                    self.model.load_state_dict(torch.load(self.args.model_path))
                     print('Model loaded successfully!!! (Custom)')
                 self.model.to(self.device)
 
@@ -115,26 +115,28 @@ class TrainerBase:
                                                           pin_memory=self.args.pin_memory,
                                                           mode=mode,
                                                           args=self.args)
-        elif self.args.dataloader == 'Image2Vector':
+        elif dataloader_name == 'Image2Vector':
             loader = dataloader_hub.Image2VectorDataLoader(csv_path=csv_path,
                                                            batch_size=batch_size,
                                                            num_workers=self.args.worker,
                                                            pin_memory=self.args.pin_memory,
                                                            mode=mode,
                                                            args=self.args)
+        elif dataloader_name == 'Image':
+            loader = dataloader_hub.ImageDataLoader(x_path=x_path,
+                                                    batch_size=batch_size,
+                                                    num_workers=self.args.worker,
+                                                    pin_memory=self.args.pin_memory,
+                                                    mode=mode,
+                                                    args=self.args)
         else:
             raise Exception('No dataloader named', dataloader_name)
 
         return loader
 
     def init_model(self, model_name):
-        if model_name == 'Unet':
-            model = model_implements.Unet(n_channels=self.args.input_channel, n_classes=self.args.num_class).to(self.device)
-        elif model_name == 'Swin':
-            model = model_implements.Swin(num_classes=self.args.num_class,
-                                          in_channel=self.args.input_channel).to(self.device)
-        elif model_name == 'ResNet18_multihead':
-            model = model_implements.ResNet18_multihead(num_classes=self.args.num_class, sub_classes=1).to(self.device)
+        if model_name == 'DiNAT_s_T_segMap_score_multi_stem_repr':
+            model = model_implements.DiNAT_s_T_segMap_score_multi_stem_repr(num_classes=self.args.num_class, in_channel=self.args.input_channel).to(self.device)
         else:
             raise Exception('No model named', model_name)
 
@@ -171,6 +173,8 @@ class TrainerBase:
             criterion = loss_hub.JSDivergenceLogit().to(self.device)
         elif criterion_name == 'JSDivergenceLogitBatch':
             criterion = loss_hub.JSDivergenceLogitBatch().to(self.device)
+        elif criterion_name == 'InfoNCE':
+            criterion = loss_hub.InfoNCE().to(self.device)
         else:
             raise Exception('No criterion named', criterion_name)
 

@@ -1,5 +1,9 @@
 from torch.nn import functional as F
 import torch.nn as nn
+import torch
+import torchvision
+
+from models import utils
 
 
 def Upsample(x, size):
@@ -9,32 +13,50 @@ def Upsample(x, size):
     return F.interpolate(x, size=size, mode='bilinear', align_corners=False)
 
 
-class CrossAttentionBlock(nn.Module):
-    def __init__(self, in_channel_1, in_channel_2, inter_channel):
-        super(CrossAttentionBlock, self).__init__()
+class Classifier_map_score_multi_stem(nn.Module):
+    def __init__(self, dims=768, dim_inter=1024):
+        super(Classifier_map_score_multi_stem, self).__init__()
+        self.stem1 = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(start_dim=1),
 
-        self.W_x = nn.Sequential(
-            nn.Conv2d(in_channel_1, inter_channel, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.BatchNorm2d(inter_channel)
+            nn.Linear(dims, dim_inter),
+            nn.BatchNorm1d(dim_inter),
+            nn.ReLU(),
         )
 
-        self.W_g = nn.Sequential(
-            nn.Conv2d(in_channel_2, inter_channel, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.BatchNorm2d(inter_channel)
+        self.stem2 = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(start_dim=1),
+
+            nn.Linear(dims, dim_inter),
+            nn.BatchNorm1d(dim_inter),
+            nn.ReLU(),
         )
 
-        self.psi = nn.Sequential(
-            nn.Conv2d(inter_channel, 1, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.BatchNorm2d(1),
-            nn.Sigmoid()
+        self.classifier1 = nn.Sequential(
+            nn.Linear(dim_inter + 1, dim_inter // 2),
+            nn.BatchNorm1d(dim_inter // 2),
+            nn.ReLU(),
+
+            nn.Linear(dim_inter // 2, 1),
+        )
+        self.classifier2 = nn.Sequential(
+            nn.Linear(dim_inter + 1, dim_inter // 2),
+            nn.BatchNorm1d(dim_inter // 2),
+            nn.ReLU(),
+
+            nn.Linear(dim_inter // 2, 1),
         )
 
-        self.relu = nn.ReLU(inplace=True)
+        self.apply(utils.init_weights)
 
-    def forward(self, x, g):
-        x1 = self.W_x(x)
-        g1 = self.W_g(g)
-        psi = self.relu(g1 + x1)
-        psi = self.psi(psi)
+    def forward(self, feat, score):
+        feat1 = self.stem1(feat)
+        feat2 = self.stem2(feat)
 
-        return x * psi
+        score1 = self.classifier1(torch.cat([feat1, score[..., 0].unsqueeze(-1)], dim=1))
+        score2 = self.classifier2(torch.cat([feat2, score[..., 1].unsqueeze(-1)], dim=1))
+        score = torch.cat([score1, score2], dim=1)
+
+        return score

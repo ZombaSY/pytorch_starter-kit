@@ -660,11 +660,11 @@ class ImageProcessing(object):
 
 
 # https://arxiv.org/abs/1905.04899
-def cut_mix(_input, mask_1, _refer, mask_2) -> (Image.Image, Image.Image):
+def cut_mix(_input, _refer, mask_1=None, mask_2=None) -> (Image.Image, Image.Image):
     """
     :param _input: PIL.Image or ndarray
-    :param mask_1: PIL.Image or ndarray
     :param _refer: PIL.Image or ndarray
+    :param mask_1: PIL.Image or ndarray
     :param mask_2: PIL.Image or ndarray
 
     :returns: cut-mixed image
@@ -674,9 +674,7 @@ def cut_mix(_input, mask_1, _refer, mask_2) -> (Image.Image, Image.Image):
 
     if _is_pil:
         _input = np.array(_input)
-        mask_1 = np.array(mask_1)
         _refer = np.array(_refer)
-        mask_2 = np.array(mask_2)
 
     h1, w1, _ = _input.shape
     h2, w2, _ = _refer.shape
@@ -701,18 +699,27 @@ def cut_mix(_input, mask_1, _refer, mask_2) -> (Image.Image, Image.Image):
     if cx_1 + cw_1 > w1: cw_1 = w1 - cx_1
 
     cutout_img = _refer[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
-    cutout_mask = mask_2[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
-
     cutout_img = cv2.resize(cutout_img, (cw_1, ch_1))
-    cutout_mask = cv2.resize(cutout_mask, (cw_1, ch_1), interpolation=cv2.INTER_NEAREST)
 
     _input[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_img
-    mask_1[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_mask
+
+    if mask_1 is not None and mask_2 is not None:
+        mask_1 = np.array(mask_1)
+        mask_2 = np.array(mask_2)
+
+        cutout_mask = mask_2[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
+        cutout_mask = cv2.resize(cutout_mask, (cw_1, ch_1), interpolation=cv2.INTER_NEAREST)
+        mask_1[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_mask
+
+        if _is_pil:
+            return Image.fromarray(_input.astype(np.uint8)), Image.fromarray(mask_1.astype(np.uint8))
+        else:
+            return _input.astype(np.uint8), mask_1.astype(np.uint8)
 
     if _is_pil:
-        return Image.fromarray(_input.astype(np.uint8)), Image.fromarray(mask_1.astype(np.uint8))
+        return Image.fromarray(_input.astype(np.uint8)), None
     else:
-        return _input.astype(np.uint8), mask_1.astype(np.uint8)
+        return _input.astype(np.uint8), None
 
 
 def grey_to_heatmap(img, is_bgr=True):

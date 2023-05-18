@@ -18,7 +18,7 @@ class TrainerSegmentation(TrainerBase):
                                                   dataloader_name=self.args.dataloader,
                                                   x_path=self.args.train_x_path,
                                                   y_path=self.args.train_y_path)
-        self.loader_val = self.init_data_loader(batch_size=self.args.batch_size // 4,
+        self.loader_val = self.init_data_loader(batch_size=1,
                                                 mode='validation',
                                                 dataloader_name=self.args.dataloader,
                                                 x_path=self.args.val_x_path,
@@ -43,11 +43,6 @@ class TrainerSegmentation(TrainerBase):
                 break   # avoid BN issue
 
             output, _ = self.model(x_in)
-
-            # compute metric
-            output_argmax = torch.argmax(output, dim=1)
-            for b in range(output.shape[0]):
-                self.metric_train.update(target[b][0].cpu().detach().numpy(), output_argmax[b].cpu().detach().numpy())
 
             # compute loss
             loss = self.criterion(output, target)
@@ -81,25 +76,14 @@ class TrainerSegmentation(TrainerBase):
                                                                     self.optimizer.param_groups[0]['lr']))
 
         loss_mean = np.mean(batch_losses)
-        metrics = self.metric_train.get_results()
-        cIoU = [metrics['Class IoU'][i] for i in range(self.args.num_class)]
-        mIoU = sum(cIoU) / self.args.num_class
-
-        print('{}{} epoch / Train Loss {}: {:.4f}, lr {:.7f} \n Train mIoU: {:.4f}{}'.format(utils.Colors.LIGHT_CYAN,
-                                                                                             epoch,
-                                                                                             self.args.criterion,
-                                                                                             loss_mean,
-                                                                                             self.optimizer.param_groups[0]['lr'],
-                                                                                             mIoU, utils.Colors.END))
-        for i in range(self.args.num_class):
-            print(f'{utils.Colors.LIGHT_CYAN}{epoch} epoch / Train Class {i} IoU: {cIoU[i]}{utils.Colors.END}')
-
+        print('{}{} epoch / Train Loss {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
+                                                                       epoch,
+                                                                       self.args.criterion,
+                                                                       loss_mean,
+                                                                       self.optimizer.param_groups[0]['lr'],
+                                                                       utils.Colors.END))
         if self.args.wandb:
-            wandb.log({'Train Loss {}'.format(self.args.criterion): loss_mean,
-                       'Train mIoU': mIoU},
-                      step=epoch)
-            for i in range(self.args.num_class):
-                wandb.log({f'Train Class {i} IoU': cIoU[i]}, step=epoch)
+            wandb.log({'Train Loss {}'.format(self.args.criterion): loss_mean}, step=epoch)
 
         self.metric_train.reset()
 
@@ -122,26 +106,26 @@ class TrainerSegmentation(TrainerBase):
                     self.metric_val.update(target[b][0].cpu().detach().numpy(), output_argmax[b].cpu().detach().numpy())
 
         metrics_out = self.metric_val.get_results()
-        cIoU = [metrics_out['Class IoU'][i] for i in range(self.args.num_class)]
-        mIoU = sum(cIoU) / self.args.num_class
+        c_iou = [metrics_out['Class IoU'][i] for i in range(self.args.num_class)]
+        m_iou = sum(c_iou) / self.args.num_class
 
-        print('{}{} epoch / Val mIoU: {}{}'.format(utils.Colors.LIGHT_GREEN, epoch, mIoU, utils.Colors.END))
+        print('{}{} epoch / Val mIoU: {}{}'.format(utils.Colors.LIGHT_GREEN, epoch, m_iou, utils.Colors.END))
         for i in range(self.args.num_class):
-            print(f'{utils.Colors.LIGHT_GREEN}{epoch} epoch / Val Segmentation Class {i} IoU: {cIoU[i]}{utils.Colors.END}')
+            print(f'{utils.Colors.LIGHT_GREEN}{epoch} epoch / Val Segmentation Class {i} IoU: {c_iou[i]}{utils.Colors.END}')
 
         if self.args.wandb:
-            wandb.log({'Val Segmentation mIoU': mIoU},
+            wandb.log({'Val Segmentation mIoU': m_iou},
                       step=epoch)
             for i in range(self.args.num_class):
-                wandb.log({f'Val Segmentation Class {i} IoU': cIoU[i]},
+                wandb.log({f'Val Segmentation Class {i} IoU': c_iou[i]},
                           step=epoch)
 
         if epoch == 1:  # initialize value
             if hasattr(self, 'metric_best'):
-                self.metric_best['mIoU'] = mIoU
+                self.metric_best['mIoU'] = m_iou
             else:
-                self.metric_best = {'mIoU': mIoU}
-        model_metrics = {'mIoU': mIoU}
+                self.metric_best = {'mIoU': m_iou}
+        model_metrics = {'mIoU': m_iou}
 
         for key in model_metrics.keys():
             if model_metrics[key] > self.metric_best[key] or epoch % self.args.save_interval == 0:
