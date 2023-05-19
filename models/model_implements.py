@@ -110,10 +110,12 @@ class DiNAT_s_T_segMap_score_multi_stem_repr(DiNAT_s_T):
             perturbations.FeatureNoise(),
             perturbations.VATDecoder(16, 768, num_classes),
             perturbations.DropOut(),
+            perturbations.ProjectedGradientDescent(self.uper_head, targeted=True),
         ])
 
         self.perturbations_neg = nn.Sequential(*[
             perturbations.VATDecoderNegative(16, 768, num_classes),
+            perturbations.ProjectedGradientDescent(self.uper_head, targeted=False),
         ])
 
         self.repr = nn.Sequential(

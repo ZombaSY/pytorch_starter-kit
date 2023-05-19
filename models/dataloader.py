@@ -152,7 +152,7 @@ class Image2ImageLoader(Dataset):
 
         if self.mode != 'validation':
             transform = self.transform1(image=_input, mask=_label)
-            _input = transform['image']
+            _input = transform['image'].astype(np.uint8)
             _label = transform['mask']
 
             if random_gen.random() < self.args.transform_cutmix:
@@ -267,7 +267,7 @@ class Image2VectorLoader(Dataset):
 
         if self.mode != 'validation':
             transform = self.transform1(image=_input)
-            _input = transform['image']
+            _input = transform['image'].astype(np.uint8)
 
             # MixUp
             if random_gen.random() < self.args.transform_mixup:
@@ -286,7 +286,7 @@ class Image2VectorLoader(Dataset):
                 _input = _input * lam + _input_2 * (1 - lam)
                 _label = _label * lam + _label_2 * (1 - lam)
 
-                _input = _input.astype(np.float32)
+                _input = _input.astype(np.uint8)
 
             transform = self.transform2(image=_input)
         else:
@@ -380,7 +380,7 @@ class ImageLoader(Dataset):
 
         if self.mode != 'validation':
             transform = self.transform1(image=_input)
-            _input = transform['image']
+            _input = transform['image'].astype(np.uint8)
 
             if random_gen.random() < self.args.transform_cutmix:
                 rand_n = random_gen.randint(0, self.len - 1)

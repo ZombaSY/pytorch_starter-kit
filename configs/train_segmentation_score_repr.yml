@@ -5,12 +5,12 @@
   pin_memory: true,
   wandb: false,
   worker: 8,
-  log_interval: 99999,
+  log_interval: 100,
   save_interval: 99999,
   saved_model_directory: 'model_checkpoints',
   train_fold: 1,  # fold train data and start validate
   project_name: 'lululab_darkcircle_flush_segmentation',
-  CUDA_VISIBLE_DEVICES: '0',
+  CUDA_VISIBLE_DEVICES: '2',
 
   ### Train Parameters
   task: 'segmentation_score_cycle_repr',
@@ -32,7 +32,7 @@
     warmup_epoch: 20,
     weight_decay: 0.05,
     early_stop_epoch: 400,
-  batch_size: 64,
+  batch_size: 32,
   epoch: 10000,
   ema_decay: 0, # set 0 to deactivate
   class_weight: [1.0, 1.0],

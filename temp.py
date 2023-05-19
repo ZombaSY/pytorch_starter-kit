@@ -49,14 +49,17 @@ class ModelMini:
         return torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0).float().to(self.device)
 
     def train_mini(self):
+        self.model.train()
         for epoch in range(self.epochs):
             for step in range(self.steps):
-                out = self.model(self.x, self.y)
+                out = self.model(self.x, is_val=False)
                 self.criterion2(out['feats_repr'], out['feat_repr_pos'][:4], out['feat_repr_neg'])
                 batch_size = self.x.shape[0]
                 perturb_num = out['feat_repr_pos'].shape[0] // batch_size
                 for i in range(perturb_num):
                     self.criterion2(out['feats_repr'], out['feat_repr_pos'][i * batch_size: (i + 1) * batch_size], out['feat_repr_neg'])
+
+                # ----- backward ----- #
                 loss = self.criterion(out['seg_map'], self.y)
                 self.optimizer.zero_grad()
                 loss.backward()

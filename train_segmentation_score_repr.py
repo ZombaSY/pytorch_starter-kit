@@ -309,8 +309,8 @@ class Trainer_segScoreRepr(TrainerBase):
         self.metric_val_score.reset()
 
     def _train(self, epoch):
-        self._train_segmentation(epoch)
-        self._train_score(epoch)
+        # self._train_segmentation(epoch)
+        # self._train_score(epoch)
         self._train_unsup(epoch)
 
     def _validate(self, model, epoch):
