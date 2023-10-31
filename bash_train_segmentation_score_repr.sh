@@ -1,1 +1,0 @@
-python3 main.py --config_path "configs/train_segmentation_score_repr.yml"

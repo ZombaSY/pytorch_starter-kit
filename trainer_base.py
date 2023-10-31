@@ -35,7 +35,7 @@ class TrainerBase:
         use_cuda = self.args.cuda and torch.cuda.is_available()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
 
-        self.model = self.init_model(self.args.model_name)
+        self.model = self.init_model(self.args.model_name, self.args.num_class, self.args.input_channel, self.device)
         self.optimizer = self.init_optimizer(self.args.optimizer, self.model, self.args.lr)
         self.criterion = self.init_criterion(self.args.criterion)
         self.metric_train = self.init_metric(self.args.task, self.args.num_class)
@@ -44,7 +44,7 @@ class TrainerBase:
         if hasattr(self.args, 'model_path'):
             if self.args.model_path != '':
                 if 'imagenet' in self.args.model_path.lower():
-                    self.model.module.load_pretrained_imagenet(self.args.model_path, self.device)
+                    self.model.module.load_pretrained_imagenet(self.args.model_path)
                     print('Model loaded successfully!!! (ImageNet)')
                 else:
                     self.model.load_state_dict(torch.load(self.args.model_path))
@@ -134,9 +134,10 @@ class TrainerBase:
 
         return loader
 
-    def init_model(self, model_name):
-        if model_name == 'DiNAT_s_T_segMap_score_multi_stem_repr':
-            model = model_implements.DiNAT_s_T_segMap_score_multi_stem_repr(num_classes=self.args.num_class, in_channel=self.args.input_channel).to(self.device)
+    @staticmethod
+    def init_model(model_name, num_class, input_channel, device):
+        if model_name == 'Swin_T_SemanticSegmentation':
+            model = model_implements.Swin_T_SemanticSegmentation(num_classes=num_class, in_channel=input_channel).to(device)
         else:
             raise Exception('No model named', model_name)
 

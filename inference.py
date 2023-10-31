@@ -2,13 +2,12 @@ import torch
 import time
 import numpy as np
 import os
-import pandas as pd
 import cv2
 
 from models import metrics
 from models import utils
 from models import dataloader as dataloader_hub
-from models import model_implements
+from trainer_base import TrainerBase
 
 from torch.nn import functional as F
 
@@ -29,7 +28,7 @@ class Inferencer:
                                                 y_path=self.args.val_y_path,
                                                 csv_path=self.args.val_csv_path)
 
-        self.model = self.init_model(self.args.model_name)
+        self.model = TrainerBase.init_model(self.args.model_name, self.args.num_class, self.args.input_channel, self.device)
         self.model.load_state_dict(torch.load(args.model_path))
         self.model.eval()
 
@@ -173,19 +172,6 @@ class Inferencer:
             raise Exception('No dataloader named', dataloader_name)
 
         return loader
-
-    def init_model(self, model_name):
-        if model_name == 'Unet':
-            model = model_implements.Unet(n_channels=self.args.input_channel, n_classes=self.args.num_class).to(self.device)
-        elif model_name == 'Swin':
-            model = model_implements.Swin(num_classes=self.args.num_class,
-                                          in_channel=self.args.input_channel).to(self.device)
-        elif model_name == 'ResNet18_multihead':
-            model = model_implements.ResNet18_multihead(num_classes=self.args.num_class, sub_classes=1).to(self.device)
-        else:
-            raise Exception('No model named', model_name)
-
-        return torch.nn.DataParallel(model)
 
     def init_metric(self, task_name, num_class):
         if task_name == 'segmentation':
