@@ -34,22 +34,22 @@
   class_weight: [1.0, 1.0],
   model_path: '',  # set empty to deactivate
 
-   ### Data Parameters
+  ### Augmentation parameters - probability
   data_cache: true,
   transform_blur: 0.3,
-  transform_clahe: 0.2,
-  transform_rain: 0.0,
-  transform_fog: 0.0,
-  transform_g_noise: 0.0,
-  transform_fancyPCA: 0.0,
-  transform_jitter: 0.2,
+  transform_clahe: 0.1,
+  transform_cutmix: 0.8,
+  transform_fancyPCA: 0.1,
+  transform_fog: 0.01,
+  transform_g_noise: 0.1,
+  transform_jitter: 0.01,
   transform_hflip: 0.5,
   transform_vflip: 0.0,
   transform_jpeg: 0.5,
-  transform_perspective: 0.3,
-  transform_rand_resize: 0.8,
+  transform_perspective: 0.1,
+  transform_rand_resize: 0.7,
   transform_rand_crop: 224,
-  transform_cutmix: 0.8,
+  transform_rain: 0.01,
 
   train_x_path: '/path/to/data/train/label',
   train_y_path: '/path/to/data/train/label',
