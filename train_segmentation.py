@@ -29,7 +29,6 @@ class TrainerSegmentation(TrainerBase):
 
     def _train(self, epoch):
         self.model.train()
-        self.callback.train_callback()
 
         batch_losses = []
         for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
@@ -42,11 +41,10 @@ class TrainerSegmentation(TrainerBase):
             if (x_in.shape[0] / torch.cuda.device_count()) <= torch.cuda.device_count():   # if has 1 batch per GPU
                 break   # avoid BN issue
 
-            output, _ = self.model(x_in)
-
+            output = self.model(x_in)
+            import pdb; pdb.set_trace()
             # compute loss
-            loss = self.criterion(output, target)
-
+            loss = self.criterion(output['seg'], target)
             if not torch.isfinite(loss):
                 raise Exception('Loss is NAN. End training.')
 
@@ -76,16 +74,16 @@ class TrainerSegmentation(TrainerBase):
                                                                     self.optimizer.param_groups[0]['lr']))
 
         loss_mean = np.mean(batch_losses)
+
         print('{}{} epoch / Train Loss {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
                                                                        epoch,
                                                                        self.args.criterion,
                                                                        loss_mean,
                                                                        self.optimizer.param_groups[0]['lr'],
                                                                        utils.Colors.END))
+
         if self.args.wandb:
             wandb.log({'Train Loss {}'.format(self.args.criterion): loss_mean}, step=epoch)
-
-        self.metric_train.reset()
 
     def _validate(self, model, epoch):
         model.eval()
@@ -98,11 +96,11 @@ class TrainerSegmentation(TrainerBase):
                 x_in = x_in.to(self.device)
                 target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
 
-                output, _ = model(x_in)
+                output = model(x_in)
 
                 # compute metric
-                output_argmax = torch.argmax(output, dim=1).cpu()
-                for b in range(output.shape[0]):
+                output_argmax = torch.argmax(output['seg'], dim=1).cpu()
+                for b in range(output['seg'].shape[0]):
                     self.metric_val.update(target[b][0].cpu().detach().numpy(), output_argmax[b].cpu().detach().numpy())
 
         metrics_out = self.metric_val.get_results()

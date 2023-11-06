@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 from models.backbones.Swin import SwinTransformer
 from models.heads.UPerHead import M_UPerHead
+from models.backbones import UNet as UNet_part
 
 from collections import OrderedDict
 
@@ -71,3 +72,20 @@ class Swin_T_SemanticSegmentation(Swin_T):
         out_dict['seg'] = feat
 
         return out_dict
+
+
+class UNet(nn.Module):
+    def __init__(self, num_classes=2, in_channel=3, bilinear=True, kernel_size=3, padding=1, base_c=64):
+        super(UNet, self).__init__()
+        self.u_net = UNet_part.UNet(n_channels=in_channel,
+                                    n_classes=num_classes,
+                                    base_c=base_c,
+                                    bilinear=bilinear,
+                                    kernel_size=kernel_size,
+                                    padding=padding)
+
+    def forward(self, x):
+        out= self.u_net(x)
+
+        return out
+

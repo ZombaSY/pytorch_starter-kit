@@ -182,3 +182,7 @@ class Inferencer:
             raise Exception('No task named', task_name)
 
         return metric
+
+    def inference(self):
+        if self.args.task == 'segmentation':
+            self.start_inference_segmentation()

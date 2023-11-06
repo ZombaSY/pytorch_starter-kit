@@ -138,6 +138,8 @@ class TrainerBase:
     def init_model(model_name, num_class, input_channel, device):
         if model_name == 'Swin_T_SemanticSegmentation':
             model = model_implements.Swin_T_SemanticSegmentation(num_classes=num_class, in_channel=input_channel).to(device)
+        elif model_name == 'UNet':
+            model = model_implements.UNet(num_classes=num_class, in_channel=input_channel).to(device)
         else:
             raise Exception('No model named', model_name)
 
@@ -202,7 +204,7 @@ class TrainerBase:
                                                               cycles=self.args.epoch / self.args.cycles,
                                                               last_epoch=-1)
             elif scheduler_name == 'CosineAnnealingLR':
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.cycles, eta_min=self.args.lr / 100)
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.cycles, eta_min=self.args.lr_min)
             elif scheduler_name == 'ConstantLRSchedule':
                 scheduler = lr_scheduler.ConstantLRSchedule(optimizer, last_epoch=-1)
             elif scheduler_name == 'WarmupConstantSchedule':
