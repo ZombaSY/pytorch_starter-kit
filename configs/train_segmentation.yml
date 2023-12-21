@@ -15,7 +15,7 @@
 
   ### Train Parameters
   task: 'segmentation',
-  model_name: 'Swin_T_dsv',
+  model_name: 'Swin_T_SemanticSegmentation',
     num_class: 20,
     in_channel: 3,
     base_c: 96,

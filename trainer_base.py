@@ -142,40 +142,7 @@ class TrainerBase:
         return torch.nn.DataParallel(model)
 
     def init_criterion(self, criterion_name):
-        if criterion_name == 'CE':
-            criterion = loss_hub.CrossEntropy().to(self.device)
-        elif criterion_name == 'HausdorffDT':
-            criterion = loss_hub.HausdorffDTLoss().to(self.device)
-        elif criterion_name == 'KLDivergence':
-            criterion = loss_hub.KLDivergence().to(self.device)
-        elif criterion_name == 'JSDivergence':
-            criterion = loss_hub.JSDivergence().to(self.device)
-        elif criterion_name == 'MSE':
-            criterion = loss_hub.MSELoss().to(self.device)
-        elif criterion_name == 'MSE_SSL':
-            criterion = loss_hub.MSELoss_SSL().to(self.device)
-        elif criterion_name == 'BCE':
-            criterion = loss_hub.BCELoss().to(self.device)
-        elif criterion_name == 'Dice':
-            criterion = loss_hub.DiceLoss().to(self.device)
-        elif criterion_name == 'DiceBCE':
-            criterion = loss_hub.DiceBCELoss().to(self.device)
-        elif criterion_name == 'FocalBCE':
-            criterion = loss_hub.FocalBCELoss().to(self.device)
-        elif criterion_name == 'Tversky':
-            criterion = loss_hub.TverskyLoss().to(self.device)
-        elif criterion_name == 'FocalTversky':
-            criterion = loss_hub.FocalTverskyLoss().to(self.device)
-        elif criterion_name == 'KLDivergenceLogit':
-            criterion = loss_hub.KLDivergenceLogit().to(self.device)
-        elif criterion_name == 'JSDivergenceLogit':
-            criterion = loss_hub.JSDivergenceLogit().to(self.device)
-        elif criterion_name == 'JSDivergenceLogitBatch':
-            criterion = loss_hub.JSDivergenceLogitBatch().to(self.device)
-        elif criterion_name == 'InfoNCE':
-            criterion = loss_hub.InfoNCE().to(self.device)
-        else:
-            raise Exception('No criterion named', criterion_name)
+        criterion = getattr(loss_hub, criterion_name)().to(self.device)
 
         return criterion
 

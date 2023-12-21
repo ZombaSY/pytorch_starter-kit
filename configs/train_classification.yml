@@ -16,8 +16,8 @@
   task: 'classification',
   model_name: 'ResNet18_multihead',
   dataloader: 'Image2Vector',
-  num_class: 2,
-  criterion: 'MSE',
+  num_class: 100,
+  criterion: 'CrossEntropy',
   input_space: 'RGB',
   input_channel: 3,
   input_size: [512, 512],  # (height, width)
@@ -32,7 +32,7 @@
   epoch: 5000,
   ema_decay: 0,
   class_weight: [1.0, 1.0],
-  model_path: '',  # pretrained/ImageNet/swin_tiny_patch4_window7_224.pth
+  model_path: 'pretrained/swin_tiny_patch4_window7_224.pth',
 
   ### Data Parameters
   data_cache: true,

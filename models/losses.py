@@ -8,7 +8,7 @@ from scipy.ndimage.morphology import distance_transform_edt as edt
 from scipy.ndimage import convolve
 
 
-class CrossEntropy(nn.Module):
+class CrossEntropyLoss(nn.Module):
     def __init__(self):
         super(CrossEntropy, self).__init__()
         self.loss = nn.CrossEntropyLoss()
@@ -42,28 +42,19 @@ class FocalLoss(nn.Module):
         return loss
 
 
-class KLDivergence(nn.Module):
-    def __init__(self, reduction='batchmean'):
+class KLDivergenceLoss(nn.Module):
+    def __init__(self, temperature=1, reduction='batchmean'):
         super(KLDivergence, self).__init__()
         self.loss = nn.KLDivLoss(reduction=reduction)
         self.log_softmax = nn.LogSoftmax(dim=1)
-
-    def forward(self, x, y):
-        x = self.log_softmax(x)
-
-        return self.loss(x, y)
-
-
-class KLDivergenceLogit(nn.Module):
-    def __init__(self, reduction='batchmean'):
-        super(KLDivergenceLogit, self).__init__()
-        self.loss = nn.KLDivLoss(reduction=reduction)
-        self.log_softmax = nn.LogSoftmax(dim=1)
         self.softmax = nn.Softmax(dim=1)
+        self.eps = 1e-16
+        self.temperature = temperature
 
-    def forward(self, x, y):
-        x = self.log_softmax(x)
-        y = self.softmax(y)
+    def forward(self, x, y, alpha=1):
+        x = (1 - alpha) * y + alpha * x
+        x = self.log_softmax(x / self.temperature + self.eps)
+        y = self.softmax(y / self.temperature + self.eps)
 
         return self.loss(x, y)
 
@@ -363,9 +354,56 @@ class FocalBCELoss(nn.Module):
 
         # first compute binary cross-entropy
         targets = targets.float()
-        BCE = F.binary_cross_entropy(inputs, targets, reduction='mean')
-        BCE_EXP = torch.exp(-BCE)
-        focal_loss = alpha * (1 - BCE_EXP) ** gamma * BCE
+        bce = F.binary_cross_entropy(inputs, targets, reduction='mean')
+        bce_exp = torch.exp(-bce)
+        focal_loss = alpha * (1 - bce_exp) ** gamma * bce
+
+        return focal_loss
+
+
+class FocalCELoss(nn.Module):
+    def __init__(self, weight=None, size_average=True):
+        super(FocalCELoss, self).__init__()
+        self.ce = CrossEntropy()
+
+    def forward(self, x, y, alpha=0.8, gamma=2, smooth=1):
+        ce = self.ce(x, y)
+        ce_exp = torch.exp(-ce)
+        focal_loss = alpha * (1 - ce_exp) ** gamma * ce
+
+        return focal_loss
+
+
+class FocalDiceLoss(nn.Module):
+    def __init__(self, weight=None, size_average=True):
+        super().__init__()
+
+    def forward(self, x, y, alpha=0.8, gamma=2, smooth=1):
+        # comment out if your model contains a sigmoid or equivalent activation layer
+        # inputs = F.sigmoid(inputs)
+
+        # flatten label and prediction tensors
+        x = x.view(-1)
+        y = y.view(-1)
+
+        intersection = (x * y).sum()
+        dice = 1 - (2. * intersection + smooth) / (x.sum() + y.sum() + smooth)
+
+        ce_exp = torch.exp(-dice)
+        focal_loss = alpha * (1 - ce_exp) ** gamma * dice
+
+        return focal_loss
+
+
+class FocalMSELoss(nn.Module):
+    def __init__(self, weight=None, size_average=True):
+        super(FocalMSELoss, self).__init__()
+        self.mse = MSELoss()
+
+    def forward(self, x, y, alpha=0.8, gamma=2, smooth=1):
+        mse = self.mse(x, y)
+        mse_exp = torch.exp(-mse)
+        focal_loss = alpha * (1 - mse_exp) ** gamma * mse
 
         return focal_loss
 
@@ -415,7 +453,7 @@ class FocalTverskyLoss(nn.Module):
         return FocalTversky
 
 
-class JSDivergence(nn.Module):
+class JSDivergenceLoss(nn.Module):
     def __init__(self, reduction='batchmean'):
         super(JSDivergence, self).__init__()
         self.kld = KLDivergence(reduction=reduction)
@@ -428,7 +466,7 @@ class JSDivergence(nn.Module):
         return p + q
 
 
-class JSDivergenceLogit(nn.Module):
+class JSDivergenceLogitLoss(nn.Module):
     def __init__(self, reduction='batchmean'):
         super(JSDivergenceLogit, self).__init__()
         self.kld = KLDivergenceLogit(reduction=reduction)
@@ -441,7 +479,7 @@ class JSDivergenceLogit(nn.Module):
         return p + q
 
 
-class JSDivergenceBatch(nn.Module):
+class JSDivergenceBatchLoss(nn.Module):
     def __init__(self, reduction='batchmean'):
         super(JSDivergenceBatch, self).__init__()
         self.jsd = JSDivergence(reduction=reduction)
@@ -455,7 +493,7 @@ class JSDivergenceBatch(nn.Module):
         return self.jsd(x, y)
 
 
-class JSDivergenceLogitBatch(nn.Module):
+class JSDivergenceLogitBatchLoss(nn.Module):
     def __init__(self, reduction='batchmean'):
         super(JSDivergenceLogitBatch, self).__init__()
         self.jsd = JSDivergenceLogit(reduction=reduction)
@@ -494,7 +532,7 @@ class MSELoss_SSL(nn.Module):
         return sum(losses) / x_b
 
 
-class InfoNCE(nn.Module):
+class InfoNCELoss(nn.Module):
     """
     Calculates the InfoNCE loss for self-supervised learning.
     This contrastive loss enforces the embeddings of similar (positive) samples to be close
@@ -611,3 +649,40 @@ class InfoNCE(nn.Module):
 
     def normalize(self, *xs):
         return [None if x is None else F.normalize(x, dim=-1) for x in xs]
+
+
+class CorrelationCoefficientLoss(nn.Module):
+    """
+    Notice: output range is [0, 1]
+            The closer to 0 indicates the higher pearson correlation coefficient.
+    """
+    def __init__(self,):
+        super(CorrelationCoefficientLoss, self).__init__()
+        self.cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+
+    def forward(self, x, y):
+        batch_size = x.shape[0]
+        x = x.view(batch_size, -1)
+        y = y.view(batch_size, -1)
+
+        pearson = self.cos(x - x.mean(dim=1, keepdim=True), y - y.mean(dim=1, keepdim=True))
+
+        return -((pearson.mean() - 1) / 2)
+
+
+class MSECorrelationCoefficientLoss(nn.Module):
+    """
+    Notice: output range is [0, 1]
+            The closer to 0 indicates the higher pearson correlation coefficient.
+    """
+    def __init__(self,):
+        super(MSECorrelationCoefficientLoss, self).__init__()
+        self.mse = MSELoss()
+        self.corr = CorrelationCoefficientLoss()
+
+    def forward(self, x, y):
+        mse = self.mse(x, y)
+        corr = self.corr(x, y)
+
+        return mse + corr
+
