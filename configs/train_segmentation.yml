@@ -1,42 +1,43 @@
 {
- ### Environment Parameters
+  ### Environment Parameters
+  debug: false,
   mode: train,   # train
   cuda: true,
   pin_memory: true,
-  wandb: false,
+  wandb: true,
   worker: 8,
   log_interval: 9999,
   save_interval: 9999,
-  saved_model_directory: 'model_checkpoints',
+  saved_model_directory: 'model_ckpt',
   train_fold: 1,  # fold train data and start validate
-  project_name: 'my_wandb_project',
-  CUDA_VISIBLE_DEVICES: '2',
+  project_name: 'wandb_project',
+  CUDA_VISIBLE_DEVICES: '0',
 
   ### Train Parameters
   task: 'segmentation',
-  model_name: 'UNet',
+  model_name: 'Swin_T_dsv',
+    num_class: 20,
+    in_channel: 3,
+    base_c: 96,
   dataloader: 'Image2Image',
-  num_class: 3,
+    weighted_sampler: false,
   criterion: 'CE',
-  criterion_score: 'MSE', # MSE, MSECorr
-  input_space: 'RGB',
-  input_channel: 3,
-  input_size: [64, 64],  # (height, width)
-  optimizer: 'AdamW', # Lion, AdamW
-    lr: 0.00001,
-    lr_min: 0.000005,
+  input_size: [512, 512],  # (height, width)
+  optimizer: 'AdamW',
+    lr: 0.001,
+    lr_min: 0.00005,
     weight_decay: 0.005,
-    scheduler: 'WarmupCosine',   # WarmupCosine, CosineAnnealingLR
-      cycles: 100,  # 100
+    scheduler: 'WarmupCosine',
+      cycles: 50,  # 100
       warmup_epoch: 20, # 20
   batch_size: 128,
   epoch: 10000,
-  early_stop_epoch: 200,
+  early_stop_epoch: 300,
   ema_decay: 0, # set 0 to deactivate
   class_weight: [1.0, 1.0],
-  model_path: '',
+  model_path: 'pretrained/swin_tiny_patch4_window7_224.pth',
 
-  ### Augmentation parameters - probability
+  ### Augmentation parameters
   data_cache: true,
   transform_blur: 0.3,
   transform_clahe: 0.1,
@@ -53,8 +54,8 @@
   transform_rand_crop: 224,
   transform_rain: 0.01,
 
-  train_x_path: '/path/to/data/train/label',
-  train_y_path: '/path/to/data/train/label',
-  val_x_path:   '/path/to/data/val/input',
-  val_y_path:   '/path/to/data/val/label',
+  train_x_path: '/path/to/train/input',
+  train_y_path: '/path/to/train/label',
+  val_x_path:   '/path/to/val/input',
+  val_y_path:   '/path/to/val/label',
 }

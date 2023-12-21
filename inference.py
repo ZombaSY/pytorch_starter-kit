@@ -27,8 +27,8 @@ class Inferencer:
                                                 x_path=self.args.val_x_path,
                                                 y_path=self.args.val_y_path,
                                                 csv_path=self.args.val_csv_path)
-
-        self.model = TrainerBase.init_model(self.args.model_name, self.args.num_class, self.args.input_channel, self.device)
+        
+        self.model = TrainerBase.init_model(self.args.model_name, self.device, self.args)
         self.model.load_state_dict(torch.load(args.model_path))
         self.model.eval()
 

@@ -1,12 +1,36 @@
 wandb/
+model_ckpt/
 model_checkpoints/
-model_checkpoints_sweep/
+model_ckpt_sweep/
 pretrained/
+test/
 
 .idea/
+.vscode/
 
 *.pt
 *.pyc
 *.pth
 
 **/__pycache__/**
+
+### VisualStudioCode ###
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# Local History for Visual Studio Code
+.history/
+
+# Built Visual Studio Code Extensions
+*.vsix
+
+### VisualStudioCode Patch ###
+# Ignore all local history of files
+.history
+.ionide
+
+# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode

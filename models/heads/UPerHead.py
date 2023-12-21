@@ -15,7 +15,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
     Args:
         in_channels (int|Sequence[int]): Input channels.
         channels (int): Channels after modules, before conv_seg.
-        num_classes (int): Number of classes.
+        num_class (int): Number of classes.
         dropout_ratio (float): Ratio of dropout layer. Default: 0.1.
         conv_cfg (dict|None): Config of conv layers. Default: None.
         norm_cfg (dict|None): Config of norm layers. Default: None.
@@ -45,7 +45,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                  in_channels,
                  channels,
                  *,
-                 num_classes,
+                 num_class,
                  dropout_ratio=0.1,
                  conv_cfg=None,
                  norm_cfg=None,
@@ -62,7 +62,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         super(BaseDecodeHead, self).__init__()
         self._init_inputs(in_channels, in_index, input_transform)
         self.channels = channels
-        self.num_classes = num_classes
+        self.num_class = num_class
         self.dropout_ratio = dropout_ratio
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
@@ -71,7 +71,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         self.ignore_index = ignore_index
         self.align_corners = align_corners
 
-        self.conv_seg = nn.Conv2d(channels, num_classes, kernel_size=1)
+        self.conv_seg = nn.Conv2d(channels, num_class, kernel_size=1)
         if dropout_ratio > 0:
             self.dropout = nn.Dropout2d(dropout_ratio)
         else:

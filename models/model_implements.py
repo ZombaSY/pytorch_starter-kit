@@ -10,8 +10,8 @@ from collections import OrderedDict
 
 
 class Swin_T(nn.Module):
-    def __init__(self, in_channel=3, base_c=96):
-        super(Swin_T, self).__init__()
+    def __init__(self, in_channel=3, base_c=96, **kwargs):
+        super().__init__()
 
         self.swin_transformer = SwinTransformer(in_chans=in_channel,
                                                 embed_dim=base_c,
@@ -50,14 +50,14 @@ class Swin_T(nn.Module):
 
 
 class Swin_T_SemanticSegmentation(Swin_T):
-    def __init__(self, num_classes=2, in_channel=3, base_c=96):
+    def __init__(self, num_class=2, in_channel=3, base_c=96, **kwargs):
         super(Swin_T_SemanticSegmentation, self).__init__(in_channel, base_c)
         self.uper_head = M_UPerHead(in_channels=[base_c, base_c * 2, base_c * 4, base_c * 8],
                                     in_index=[0, 1, 2, 3],
                                     pool_scales=(1, 2, 3, 6),
                                     channels=512,
                                     dropout_ratio=0.1,
-                                    num_classes=num_classes,
+                                    num_class=num_class,
                                     align_corners=False,)
 
     def forward(self, x):
@@ -75,10 +75,10 @@ class Swin_T_SemanticSegmentation(Swin_T):
 
 
 class UNet(nn.Module):
-    def __init__(self, num_classes=2, in_channel=3, bilinear=True, kernel_size=3, padding=1, base_c=64):
+    def __init__(self, num_class=2, in_channel=3, bilinear=True, kernel_size=3, padding=1, base_c=64, **kwargs):
         super(UNet, self).__init__()
         self.u_net = UNet_part.UNet(n_channels=in_channel,
-                                    n_classes=num_classes,
+                                    n_classes=num_class,
                                     base_c=base_c,
                                     bilinear=bilinear,
                                     kernel_size=kernel_size,

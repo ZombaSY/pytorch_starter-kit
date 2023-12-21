@@ -24,18 +24,19 @@ class TrainerBase:
         self.saved_model_directory = self.args.saved_model_directory + '/' + now_time
 
         # save hyper-parameters
-        with open(self.args.config_path, 'r') as f_r:
-            file_path = self.args.saved_model_directory + '/' + now_time
-            if not os.path.exists(file_path):
-                os.makedirs(file_path)
-            with open(os.path.join(file_path, self.args.config_path.split('/')[-1]), 'w') as f_w:
-                f_w.write(f_r.read())
+        if not self.args.debug:
+            with open(self.args.config_path, 'r') as f_r:
+                file_path = self.args.saved_model_directory + '/' + now_time
+                if not os.path.exists(file_path):
+                    os.makedirs(file_path)
+                with open(os.path.join(file_path, self.args.config_path.split('/')[-1]), 'w') as f_w:
+                    f_w.write(f_r.read())
 
         # Check cuda available and assign to device
         use_cuda = self.args.cuda and torch.cuda.is_available()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
 
-        self.model = self.init_model(self.args.model_name, self.args.num_class, self.args.input_channel, self.device)
+        self.model = self.init_model(self.args.model_name, self.device, self.args)
         self.optimizer = self.init_optimizer(self.args.optimizer, self.model, self.args.lr)
         self.criterion = self.init_criterion(self.args.criterion)
         self.metric_train = self.init_metric(self.args.task, self.args.num_class)
@@ -94,7 +95,7 @@ class TrainerBase:
         if self.args.ema_decay != 0:
             torch.save(get_state_dict(model), file_format)
         else:
-            torch.save(model.state_dict(), file_format)
+            torch.save(model.module.state_dict(), file_format)
 
         print(f'{utils.Colors.LIGHT_RED}{file_format} \t model saved!!{utils.Colors.END}')
         self.last_saved_epoch = epoch
@@ -135,14 +136,9 @@ class TrainerBase:
         return loader
 
     @staticmethod
-    def init_model(model_name, num_class, input_channel, device):
-        if model_name == 'Swin_T_SemanticSegmentation':
-            model = model_implements.Swin_T_SemanticSegmentation(num_classes=num_class, in_channel=input_channel).to(device)
-        elif model_name == 'UNet':
-            model = model_implements.UNet(num_classes=num_class, in_channel=input_channel).to(device)
-        else:
-            raise Exception('No model named', model_name)
-
+    def init_model(model_name, device, args):
+        model = getattr(model_implements, model_name)(**vars(args)).to(device)
+        
         return torch.nn.DataParallel(model)
 
     def init_criterion(self, criterion_name):
@@ -210,7 +206,7 @@ class TrainerBase:
             elif scheduler_name == 'WarmupConstantSchedule':
                 scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=steps_per_epoch * self.args.warmup_epoch)
             else:
-                raise Exception('No scheduler named', scheduler_name)
+                print(f'{utils.Colors.LIGHT_PURPLE}No scheduler found --> {scheduler_name}{utils.Colors.END}')
         else:
             pass
 
