@@ -52,8 +52,6 @@ class TrainerSegmentation(TrainerBase):
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
-            if self.args.ema_decay != 0:
-                self.model_ema.update(self.model)
             if self.scheduler is not None:
                 self.scheduler.step()
 
@@ -61,10 +59,7 @@ class TrainerSegmentation(TrainerBase):
 
             if hasattr(self.args, 'train_fold'):
                 if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and not (batch_idx != len(self.loader_train) - 1):
-                    if self.args.ema_decay != 0:
-                        self._validate(self.model_ema.module, epoch)
-                    else:
-                        self._validate(self.model, epoch)
+                    self._validate(self.model, epoch)
 
             if (batch_idx != 0) and (batch_idx % (self.args.log_interval // self.args.batch_size) == 0):
                 loss_mean = np.mean(batch_losses)
@@ -138,10 +133,7 @@ class TrainerSegmentation(TrainerBase):
     def run(self):
         for epoch in range(1, self.args.epoch + 1):
             self._train(epoch)
-            if self.args.ema_decay != 0:
-                self._validate(self.model_ema.module, epoch)
-            else:
-                self._validate(self.model, epoch)
+            self._validate(self.model, epoch)
 
             if (epoch - self.last_saved_epoch) > self.args.early_stop_epoch:
                 print('The model seems to be converged. Early stop training.')

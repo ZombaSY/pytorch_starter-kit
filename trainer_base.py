@@ -12,7 +12,6 @@ from models import utils
 from models import metrics
 
 from datetime import datetime
-from timm.utils import ModelEmaV2, get_state_dict
 
 
 class TrainerBase:
@@ -52,10 +51,6 @@ class TrainerBase:
                     print('Model loaded successfully!!! (Custom)')
                 self.model.to(self.device)
 
-        # Important to create EMA model after cuda(), DP wrapper, and AMP but before SyncBN and DDP wrapper
-        if self.args.ema_decay != 0:
-            self.model_ema = ModelEmaV2(self.model, decay=self.args.ema_decay, device=self.device)
-
         if self.args.wandb:
             wandb.init(project='{}'.format(args.project_name), config=args, name=now_time,
                        settings=wandb.Settings(start_method="fork"))
@@ -92,10 +87,7 @@ class TrainerBase:
                 os.remove(self.model_post_path_dict[metric_name])
             self.model_post_path_dict[metric_name] = file_format
 
-        if self.args.ema_decay != 0:
-            torch.save(get_state_dict(model), file_format)
-        else:
-            torch.save(model.module.state_dict(), file_format)
+        torch.save(model.module.state_dict(), file_format)
 
         print(f'{utils.Colors.LIGHT_RED}{file_format} \t model saved!!{utils.Colors.END}')
         self.last_saved_epoch = epoch

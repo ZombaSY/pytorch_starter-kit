@@ -21,7 +21,7 @@
     base_c: 96,
   dataloader: 'Image2Image',
     weighted_sampler: false,
-  criterion: 'CE',
+  criterion: 'CrossEntropyLoss',
   input_size: [512, 512],  # (height, width)
   optimizer: 'AdamW',
     lr: 0.001,
@@ -33,7 +33,6 @@
   batch_size: 128,
   epoch: 10000,
   early_stop_epoch: 300,
-  ema_decay: 0, # set 0 to deactivate
   class_weight: [1.0, 1.0],
   model_path: 'pretrained/swin_tiny_patch4_window7_224.pth',
 
