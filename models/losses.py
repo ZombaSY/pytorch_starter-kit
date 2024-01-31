@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 import cv2 as cv
-import torch.nn.functional as F
 
 from scipy.ndimage.morphology import distance_transform_edt as edt
 from scipy.ndimage import convolve
@@ -10,7 +10,7 @@ from scipy.ndimage import convolve
 
 class CrossEntropyLoss(nn.Module):
     def __init__(self):
-        super(CrossEntropy, self).__init__()
+        super().__init__()
         self.loss = nn.CrossEntropyLoss()
 
     def forward(self, x, y):
@@ -44,7 +44,7 @@ class FocalLoss(nn.Module):
 
 class KLDivergenceLoss(nn.Module):
     def __init__(self, temperature=1, reduction='batchmean'):
-        super(KLDivergence, self).__init__()
+        super().__init__()
         self.loss = nn.KLDivLoss(reduction=reduction)
         self.log_softmax = nn.LogSoftmax(dim=1)
         self.softmax = nn.Softmax(dim=1)
@@ -686,3 +686,12 @@ class MSECorrelationCoefficientLoss(nn.Module):
 
         return mse + corr
 
+
+class TanHLoss(nn.Module):
+    def __init__(self, temperature=0.5):
+        super().__init__()
+        self.temperature = temperature
+
+    def forward(self, x, y):
+
+        return torch.tanh(F.mse_loss(x, y) ** self.temperature)
