@@ -18,7 +18,7 @@ class TrainerSegmentation(TrainerBase):
                                                   dataloader_name=self.args.dataloader,
                                                   x_path=self.args.train_x_path,
                                                   y_path=self.args.train_y_path)
-        self.loader_val = self.init_data_loader(batch_size=1,
+        self.loader_val = self.init_data_loader(batch_size=batch_size=self.args.batch_size // 4,
                                                 mode='validation',
                                                 dataloader_name=self.args.dataloader,
                                                 x_path=self.args.val_x_path,
@@ -30,7 +30,7 @@ class TrainerSegmentation(TrainerBase):
     def _train(self, epoch):
         self.model.train()
 
-        batch_losses = []
+        batch_losses = 0
         for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
             x_in, _ = x_in
             target, _ = target
@@ -55,20 +55,13 @@ class TrainerSegmentation(TrainerBase):
             if self.scheduler is not None:
                 self.scheduler.step()
 
-            batch_losses.append(loss.item())
+            batch_losses += loss.item()
 
             if hasattr(self.args, 'train_fold'):
                 if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and not (batch_idx != len(self.loader_train) - 1):
                     self._validate(epoch)
-
-            if (batch_idx != 0) and (batch_idx % (self.args.log_interval // self.args.batch_size) == 0):
-                loss_mean = np.mean(batch_losses)
-                print('{} epoch / Train Loss {} : {}, lr {}'.format(epoch,
-                                                                    self.args.criterion,
-                                                                    loss_mean,
-                                                                    self.optimizer.param_groups[0]['lr']))
-
-        loss_mean = np.mean(batch_losses)
+                    
+        loss_mean = batch_losses / self.loader_train.Loader.__len__()
 
         print('{}{} epoch / Train Loss {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
                                                                        epoch,

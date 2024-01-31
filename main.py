@@ -9,7 +9,6 @@ import ast
 from train_segmentation import TrainerSegmentation
 from train_segmentation_score_repr import Trainer_segScoreRepr
 from inference import Inferencer
-from torch.cuda import is_available
 from datetime import datetime
 
 
@@ -65,11 +64,12 @@ def main():
     now_time = datetime.now().strftime("%Y-%m-%d %H%M%S")
     os.environ["CUDA_VISIBLE_DEVICES"] = args.CUDA_VISIBLE_DEVICES
 
-    print('Use CUDA :', args.cuda and is_available())
+    print('Use CUDA :', args.cuda and torch.cuda.is_available())
     
-    if args.debug:
+     if args.debug:
         args.wandb = False
         args.data_cache = False
+        args.transform_mixup = 0
 
     if args.mode == 'train':
         if args.task == 'segmentation':

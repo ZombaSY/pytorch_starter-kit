@@ -4,31 +4,33 @@ import random
 import numpy as np
 import ptflops
 import cv2
+import argparse
 
 from models import losses as loss_hub
-from models import model_implements
 from models import lr_scheduler
+from trainer_base import TrainerBase
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
 
 class ModelMini:
     def __init__(self):
         self.device = 'cuda'
-        self.x = torch.rand([2, 3, 512, 512]).to(self.device)
-        self.y = torch.zeros([2, 512, 512]).to(self.device).long()
+        self.x = torch.rand([4, 3, 512, 512]).to(self.device)
+        self.y = torch.rand([4, 2]).to(self.device).float()
 
-        self.model = model_implements.Swin_T_SemanticSegmentation(3, 3)
+        self.model = TrainerBase.init_model("Swin_T_SemanticSegmentation", self.device,
+                                            argparse.Namespace(num_class=3, in_channel=3, base_c=16))
 
         self.model.to(self.device)
-        self.criterion = loss_hub.CrossEntropy()
+        self.criterion = loss_hub.MSELoss()
 
         self.optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.model.parameters()),
-                                           lr=1e-4, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-3)
+                                           lr=1e-2, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-3)
 
-        self.epochs = 10000
-        self.steps = 100
-        self.t_max = 200
+        self.epochs = 3
+        self.steps = 10
+        self.t_max = 20
         self.cycles = self.epochs / self.t_max
         self.scheduler = lr_scheduler.WarmupCosineSchedule(optimizer=self.optimizer,
                                                            warmup_steps=self.steps * 20,
@@ -37,9 +39,9 @@ class ModelMini:
                                                            last_epoch=-1)
 
         # torch.save(self.model.get_saved_weight(), 'unet.pt')
-        # self.train_mini()
+        self.train_mini()
         self.inference()
-        self.measure_computations()
+        # self.measure_computations()
         # self.measure_inference_time()
         # self.measure_memory_consumption()
         # self.save_jit()
@@ -55,14 +57,15 @@ class ModelMini:
         self.model.train()
         for epoch in range(self.epochs):
             for step in range(self.steps):
-                output_train = self.model(self.x)
+                out = self.model(self.x)
 
-                loss = self.criterion(output_train, self.y.long())
+                loss = self.criterion(out['score'], self.y)  
+                
+                print(loss)
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
-                print('done!!')
 
     def inference(self):
         self.model.eval()
@@ -87,6 +90,7 @@ class ModelMini:
         print(f'{mean_syn}ms')
 
     def measure_computations(self):
+        self.model.eval()
         with torch.cuda.device(0):
             macs, params = ptflops.get_model_complexity_info(self.model, tuple(self.x.shape[1:]), as_strings=True,
                                                              print_per_layer_stat=True, verbose=True)
