@@ -97,53 +97,37 @@ class Inferencer:
         for i in range(self.args.num_class):
             print(f'Val Class {i} IoU: {cIoU[i]}')
 
-    def post_process(self, output, target, x_img, img_id, draw_results=False):
-        # reconstruct original image
-        x_img = x_img.squeeze(0).data.cpu().numpy()
-        x_img = np.transpose(x_img, (1, 2, 0))
-        x_img = x_img * np.array(self.image_std)
-        x_img = x_img + np.array(self.image_mean)
-        x_img = x_img * 255.0
-        x_img = x_img.astype(np.uint8)
+    def __post_process_segmentation(self, x_img, target, output, img_id, post_out, draw_results):
+        # compute metric
+        if self.args.dataloader == 'Image2Image':
+            output_argmax = torch.argmax(output['seg'], dim=1).cpu()
+            self.metric.update(target[0][0].cpu().detach().numpy(), output_argmax[0].cpu().detach().numpy())
+            
+        if draw_results:
+            output_prob = F.softmax(output['seg'][0], dim=0)
+            utils.draw_image(x_img, output_prob, self.img_save_dir, img_id, self.args.num_class)
 
-        if self.args.task == 'segmentation':
-            output_prob = F.softmax(output[0], dim=0)
+        return post_out
+    
+    def __post_process(self, x_img, target, output, img_id, post_out, batch_idx, draw_results=False):
+        post_out_tmp = {}
+        post_out_tmp['img_id'] = img_id
 
-            output_argmax = torch.argmax(output, dim=1).cpu()
-            self.metric.update(target.squeeze(1).cpu().detach().numpy(), output_argmax.numpy())
+        if draw_results:
+            x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std)
 
-            if draw_results:
-                output_grey = (output_prob.cpu().detach().numpy() * 255).astype(np.uint8)
+        if self.args.task == 'regression':
+            self.__post_process_segmentation(x_img, target, output, img_id, post_out_tmp, draw_results)
 
-                # draw heatmap
-                output_heatmap_overlay = []
-                for i in range(1, self.args.num_class):
-                    output_grey_tmp = output_grey[i]
-                    output_heatmap = utils.grey_to_heatmap(output_grey_tmp)
-                    output_grey_tmp = np.repeat(output_grey_tmp[:, :, None] / 255, 3, 2)
-                    output_heatmap_overlay.append((x_img * (1 - output_grey_tmp)) + (output_heatmap * output_grey_tmp))
-                output_heatmap_overlay = np.array(output_heatmap_overlay).astype(np.uint8)
+        for key in post_out_tmp.keys():
+            if key not in post_out.keys():
+                post_out[key] = [post_out_tmp[key]]
+            else:
+                post_out[key].append(post_out_tmp[key])
 
-                if not os.path.exists(self.img_save_dir):
-                    os.mkdir(self.img_save_dir)
+        print(f'batch_idx {batch_idx} -> {img_id} \t Done !!')
 
-                utils.cv2_imwrite(os.path.join(self.img_save_dir, img_id) + '.png', x_img)
-                for i in range(1, self.args.num_class):
-                    utils.cv2_imwrite(os.path.join(self.img_save_dir, img_id) + f'_zargmax_class_{i}.png', output_grey[i])
-
-        if self.args.task == 'classification':
-            output_argmax = torch.argmax(output, dim=1).cpu().numpy()
-
-            self.metric.update(output_argmax.round(0), target.cpu().numpy().round(0))
-
-            if draw_results:
-                if not os.path.exists(self.img_save_dir):
-                    os.mkdir(self.img_save_dir)
-
-                utils.cv2_imwrite(os.path.join(self.img_save_dir, img_id) + '.png', x_img)
-                cv2.putText(x_img, output_argmax[0], (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255))
-
-        return
+        return post_out
 
     def init_data_loader(self,
                          batch_size,

@@ -9,7 +9,7 @@
   log_interval: 9999,
   save_interval: 9999,
   saved_model_directory: 'model_ckpt',
-  train_fold: 1,  # fold train data and start validate
+  train_fold: 1,  # The number of validation while training
   project_name: 'wandb_project',
   CUDA_VISIBLE_DEVICES: '0',
 
