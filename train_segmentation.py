@@ -42,7 +42,7 @@ class TrainerSegmentation(TrainerBase):
                 break   # avoid BN issue
 
             output = self.model(x_in)
-            import pdb; pdb.set_trace()
+            
             # compute loss
             loss = self.criterion(output['seg'], target)
             if not torch.isfinite(loss):
@@ -59,7 +59,7 @@ class TrainerSegmentation(TrainerBase):
 
             if hasattr(self.args, 'train_fold'):
                 if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and not (batch_idx != len(self.loader_train) - 1):
-                    self._validate(self.model, epoch)
+                    self._validate(epoch)
 
             if (batch_idx != 0) and (batch_idx % (self.args.log_interval // self.args.batch_size) == 0):
                 loss_mean = np.mean(batch_losses)
@@ -80,8 +80,8 @@ class TrainerSegmentation(TrainerBase):
         if self.args.wandb:
             wandb.log({'Train Loss {}'.format(self.args.criterion): loss_mean}, step=epoch)
 
-    def _validate(self, model, epoch):
-        model.eval()
+    def _validate(self, epoch):
+        self.model.eval()
 
         for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
             with torch.no_grad():
@@ -91,7 +91,7 @@ class TrainerSegmentation(TrainerBase):
                 x_in = x_in.to(self.device)
                 target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
 
-                output = model(x_in)
+                output = self.model(x_in)
 
                 # compute metric
                 output_argmax = torch.argmax(output['seg'], dim=1).cpu()
@@ -126,14 +126,14 @@ class TrainerSegmentation(TrainerBase):
                 if epoch % self.args.save_interval == 0:
                     best_flag = False
                 self.metric_best[key] = model_metrics[key]
-                self.save_model(model, self.args.model_name, epoch, model_metrics[key], best_flag=best_flag, metric_name=key)
+                self.save_model(self.model, self.args.model_name, epoch, model_metrics[key], best_flag=best_flag, metric_name=key)
 
         self.metric_val.reset()
 
     def run(self):
         for epoch in range(1, self.args.epoch + 1):
             self._train(epoch)
-            self._validate(self.model, epoch)
+            self._validate(epoch)
 
             if (epoch - self.last_saved_epoch) > self.args.early_stop_epoch:
                 print('The model seems to be converged. Early stop training.')
