@@ -740,6 +740,7 @@ def grey_to_heatmap(img, is_bgr=True):
 def cv2_imread(fns_img, color=cv2.IMREAD_UNCHANGED):
     img_array = np.fromfile(fns_img, np.uint8)
     img = cv2.imdecode(img_array, color)
+    img = cv2.cvtColor(img ,cv2.COLOR_BGR2RGB)  # convert color space for albumentaitons
     return img.astype(np.uint8)
 
 

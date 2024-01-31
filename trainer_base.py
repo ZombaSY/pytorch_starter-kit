@@ -135,26 +135,6 @@ class TrainerBase:
 
         return loader
 
-    @staticmethod
-    def init_model(model_name, device, args):
-        model = getattr(model_implements, model_name)(**vars(args)).to(device)
-        
-        return torch.nn.DataParallel(model)
-
-    def init_criterion(self, criterion_name):
-        criterion = getattr(loss_hub, criterion_name)().to(self.device)
-
-        return criterion
-
-    def init_optimizer(self, optimizer_name, model, lr):
-        optimizer = None
-
-        if optimizer_name == 'AdamW':
-            optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
-                                          lr=lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=self.args.weight_decay)
-
-        return optimizer
-
     def set_scheduler(self, optimizer, scheduler_name, data_loader, batch_size):
         scheduler = None
         steps_per_epoch = math.ceil((data_loader.__len__() / batch_size))
@@ -178,6 +158,26 @@ class TrainerBase:
             pass
 
         return scheduler
+    
+    @staticmethod
+    def init_model(model_name, device, args):
+        model = getattr(model_implements, model_name)(**vars(args)).to(device)
+        
+        return torch.nn.DataParallel(model)
+
+    def init_criterion(self, criterion_name):
+        criterion = getattr(loss_hub, criterion_name)().to(self.device)
+
+        return criterion
+
+    def init_optimizer(self, optimizer_name, model, lr):
+        optimizer = None
+
+        if optimizer_name == 'AdamW':
+            optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
+                                          lr=lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=self.args.weight_decay)
+
+        return optimizer
 
     def init_metric(self, task_name, num_class):
         if task_name == 'segmentation':
