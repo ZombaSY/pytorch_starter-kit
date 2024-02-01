@@ -753,6 +753,29 @@ def cv2_imwrite(fns_img, img):
             encoded_img.tofile(f)
 
 
+def denormalize_img(img, mean, std):
+    img = img.squeeze(0).data.cpu().numpy()
+    img = np.transpose(img, (1, 2, 0))
+    img = img * np.array(std)
+    img = img + np.array(mean)
+    img = img * 255.0
+    img = img.astype(np.uint8)
+
+    return img
+
+
+def draw_image(x_img, output_prob, img_save_dir, img_id, n_class):
+    output_prob = output_prob.cpu().detach().numpy()
+    output_grey = (output_prob * 255).astype(np.uint8)
+
+    if not os.path.exists(img_save_dir):
+        os.mkdir(img_save_dir)
+
+    cv2_imwrite(os.path.join(img_save_dir, img_id) + '.png', x_img)
+    for i in range(1, n_class):
+        cv2_imwrite(os.path.join(img_save_dir, img_id) + f'_map_class_{i}.png', output_grey[i])
+
+
 # https://arxiv.org/abs/2210.05775
 def get_mixup_sample_rate(y_list):
 

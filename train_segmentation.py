@@ -49,9 +49,9 @@ class TrainerSegmentation(TrainerBase):
                 raise Exception('Loss is NAN. End training.')
 
             # ----- backward ----- #
+            self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            self.optimizer.zero_grad()
             if self.scheduler is not None:
                 self.scheduler.step()
 

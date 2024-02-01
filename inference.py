@@ -85,7 +85,7 @@ class Inferencer:
                 path, fn = os.path.split(img_id[0])
                 img_id, ext = os.path.splitext(fn)
                 output, _ = self.model(x_in)
-                self.post_process(output, target, x_img, img_id, draw_results=self.args.draw_results)
+                self.post_process(x_img, target, output, img_id, draw_results=self.args.draw_results)
 
                 print(f'batch {batch_idx} -> {img_id} \t Done !!')
 

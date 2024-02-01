@@ -24,7 +24,7 @@ class FocalLoss(nn.Module):
     Multi-class Focal loss implementation
     """
     def __init__(self, gamma=2, weight=None):
-        super(FocalLoss, self).__init__()
+        super().__init__()
         self.gamma = gamma
         self.weight = weight
 
@@ -64,7 +64,7 @@ class DTMSELoss(nn.Module):
     """Binary Hausdorff loss based on distance transform"""
 
     def __init__(self):
-        super(DTMSELoss, self).__init__()
+        super().__init__()
         self.threshold = 0.5
         self.mse = nn.MSELoss()
 
@@ -103,7 +103,7 @@ class HausdorffDTLoss(nn.Module):
     """Binary Hausdorff loss based on distance transform"""
 
     def __init__(self, alpha=2.0, **kwargs):
-        super(HausdorffDTLoss, self).__init__()
+        super().__init__()
         self.alpha = torch.tensor(alpha)
 
     @torch.no_grad()
@@ -165,7 +165,7 @@ class HausdorffERLoss(nn.Module):
     """Binary Hausdorff loss based on morphological erosion"""
 
     def __init__(self, alpha=2.0, erosions=10, **kwargs):
-        super(HausdorffERLoss, self).__init__()
+        super().__init__()
         self.alpha = alpha
         self.erosions = erosions
         self.prepare_kernels()
@@ -257,7 +257,7 @@ class HausdorffERLoss(nn.Module):
 # https://www.kaggle.com/code/bigironsphere/loss-function-library-keras-pytorch/notebook
 class MSELoss(nn.Module):
     def __init__(self):
-        super(MSELoss, self).__init__()
+        super().__init__()
 
         self.loss = nn.MSELoss()
 
@@ -269,7 +269,7 @@ class MSELoss(nn.Module):
 
 class BCELoss(nn.Module):
     def __init__(self):
-        super(BCELoss, self).__init__()
+        super().__init__()
 
     def forward(self, x, y):
         y = y.float()
@@ -280,7 +280,7 @@ class BCELoss(nn.Module):
 
 class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
-        super(DiceLoss, self).__init__()
+        super().__init__()
 
     def forward(self, inputs, targets, smooth=1):
         # comment out if your model contains a sigmoid or equivalent activation layer
@@ -298,7 +298,7 @@ class DiceLoss(nn.Module):
 
 class DiceBCELoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
-        super(DiceBCELoss, self).__init__()
+        super().__init__()
 
     def forward(self, inputs, targets, smooth=1):
         # comment out if your model contains a sigmoid or equivalent activation layer
@@ -319,7 +319,7 @@ class DiceBCELoss(nn.Module):
 
 class JaccardLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
-        super(JaccardLoss, self).__init__()
+        super().__init__()
 
     def forward(self, inputs, targets, smooth=1):
         # comment out if your model contains a sigmoid or equivalent activation layer
@@ -342,7 +342,7 @@ class JaccardLoss(nn.Module):
 
 class FocalBCELoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
-        super(FocalBCELoss, self).__init__()
+        super().__init__()
 
     def forward(self, inputs, targets, alpha=0.8, gamma=2, smooth=1):
         # comment out if your model contains a sigmoid or equivalent activation layer
@@ -363,7 +363,7 @@ class FocalBCELoss(nn.Module):
 
 class FocalCELoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
-        super(FocalCELoss, self).__init__()
+        super().__init__()
         self.ce = CrossEntropy()
 
     def forward(self, x, y, alpha=0.8, gamma=2, smooth=1):
@@ -397,7 +397,7 @@ class FocalDiceLoss(nn.Module):
 
 class FocalMSELoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
-        super(FocalMSELoss, self).__init__()
+        super().__init__()
         self.mse = MSELoss()
 
     def forward(self, x, y, alpha=0.8, gamma=2, smooth=1):
@@ -410,7 +410,7 @@ class FocalMSELoss(nn.Module):
 
 class TverskyLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
-        super(TverskyLoss, self).__init__()
+        super().__init__()
 
     def forward(self, inputs, targets, smooth=1, alpha=0.5, beta=0.5):
         # comment out if your model contains a sigmoid or equivalent activation layer
@@ -432,7 +432,7 @@ class TverskyLoss(nn.Module):
 
 class FocalTverskyLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
-        super(FocalTverskyLoss, self).__init__()
+        super().__init__()
 
     def forward(self, inputs, targets, smooth=1, alpha=0.5, beta=0.5, gamma=1):
         # comment out if your model contains a sigmoid or equivalent activation layer
@@ -455,7 +455,7 @@ class FocalTverskyLoss(nn.Module):
 
 class JSDivergenceLoss(nn.Module):
     def __init__(self, reduction='batchmean'):
-        super(JSDivergence, self).__init__()
+        super().__init__()
         self.kld = KLDivergence(reduction=reduction)
 
     def forward(self, x, y):
@@ -468,7 +468,7 @@ class JSDivergenceLoss(nn.Module):
 
 class JSDivergenceLogitLoss(nn.Module):
     def __init__(self, reduction='batchmean'):
-        super(JSDivergenceLogit, self).__init__()
+        super().__init__()
         self.kld = KLDivergenceLogit(reduction=reduction)
 
     def forward(self, x, y):
@@ -481,7 +481,7 @@ class JSDivergenceLogitLoss(nn.Module):
 
 class JSDivergenceBatchLoss(nn.Module):
     def __init__(self, reduction='batchmean'):
-        super(JSDivergenceBatch, self).__init__()
+        super().__init__()
         self.jsd = JSDivergence(reduction=reduction)
 
     def forward(self, x, y):
@@ -495,7 +495,7 @@ class JSDivergenceBatchLoss(nn.Module):
 
 class JSDivergenceLogitBatchLoss(nn.Module):
     def __init__(self, reduction='batchmean'):
-        super(JSDivergenceLogitBatch, self).__init__()
+        super().__init__()
         self.jsd = JSDivergenceLogit(reduction=reduction)
 
     def forward(self, x, y):
@@ -511,7 +511,7 @@ class JSDivergenceLogitBatchLoss(nn.Module):
 
 class MSELoss_SSL(nn.Module):
     def __init__(self):
-        super(MSELoss_SSL, self).__init__()
+        super().__init__()
         self.mse_loss = nn.MSELoss(reduction='mean')
 
     def softmax_mse_loss(self, inputs, targets):
@@ -657,7 +657,7 @@ class CorrelationCoefficientLoss(nn.Module):
             The closer to 0 indicates the higher pearson correlation coefficient.
     """
     def __init__(self,):
-        super(CorrelationCoefficientLoss, self).__init__()
+        super().__init__()
         self.cos = nn.CosineSimilarity(dim=1, eps=1e-6)
 
     def forward(self, x, y):
@@ -676,7 +676,7 @@ class MSECorrelationCoefficientLoss(nn.Module):
             The closer to 0 indicates the higher pearson correlation coefficient.
     """
     def __init__(self,):
-        super(MSECorrelationCoefficientLoss, self).__init__()
+        super().__init__()
         self.mse = MSELoss()
         self.corr = CorrelationCoefficientLoss()
 

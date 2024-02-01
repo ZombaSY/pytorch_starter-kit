@@ -129,24 +129,26 @@ class Image2ImageLoader(Dataset):
                 self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(self.x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
                 self.memory_data_y = pools.map(mount_data_on_memory_wrapper, zip(self.y_img_path, itertools.repeat(cv2.IMREAD_GRAYSCALE)))
 
+        # initialize albumentation transforms
         self.transform_resize = albumentations.Compose([
             albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
         ])
-        self.transform2 = albumentations.Compose([
-            *augmentations(self.args, self.crop_factor)
-        ])
+        if self.mode == 'train':
+            self.transform2 = albumentations.Compose([
+                *augmentations(self.args, self.crop_factor)
+            ])
         self.transforms_normalize = albumentations.Compose([
             albumentations.Normalize(mean=self.image_mean, std=self.image_std)
         ])
 
     def transform(self, _input, _label):
         random_gen = random.Random()
+        
+        transform = self.transform_resize(image=_input, mask=_label)
+        _input = transform['image']
+        _label = transform['mask']
 
         if self.mode == 'train':
-            transform = self.transform_resize(image=_input, mask=_label)
-            _input = transform['image']
-            _label = transform['mask']
-
             if random_gen.random() < self.args.transform_cutmix:
                 rand_n = random_gen.randint(0, self.len - 1)
                 if self.args.data_cache:
@@ -163,10 +165,9 @@ class Image2ImageLoader(Dataset):
             _input = _input.astype(np.uint8)
             _label = _label.astype(np.uint8)
             transform = self.transform2(image=_input, mask=_label)
-        else:
-            transform = self.transform_resize(image=_input, mask=_label)
+            _input = transform['image']
 
-        norm = self.transforms_normalize(image=transform['image'])
+        norm = self.transforms_normalize(image=_input)
         _input = norm['image']
         _label = transform['mask']
 
