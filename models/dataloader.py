@@ -129,11 +129,21 @@ class Image2ImageLoader(Dataset):
                 self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(self.x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
                 self.memory_data_y = pools.map(mount_data_on_memory_wrapper, zip(self.y_img_path, itertools.repeat(cv2.IMREAD_GRAYSCALE)))
 
-        # initialize albumentation transforms
+        self.update_transform()
+
+    def update_transform(self, scaler=1):
+        excludings = ['transform_rand_crop', 'transform_landmark_rotate', 'transform_landmark_hflip']
+
         self.transform_resize = albumentations.Compose([
             albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
         ])
         if self.mode == 'train':
+            # progressively update augmentation scale
+            for param in vars(self.args):
+                if 'transform_' in param:
+                    if param not in excludings:
+                        setattr(self.args, param, min(getattr(self.args, param) * scaler, 1))
+                    print(f'{utils.Colors.LIGHT_WHITE}{param}: {getattr(self.args, param)}{utils.Colors.END}')
             self.transform2 = albumentations.Compose([
                 *augmentations(self.args, self.crop_factor)
             ])
@@ -143,7 +153,7 @@ class Image2ImageLoader(Dataset):
 
     def transform(self, _input, _label):
         random_gen = random.Random()
-        
+
         transform = self.transform_resize(image=_input, mask=_label)
         _input = transform['image']
         _label = transform['mask']
@@ -249,7 +259,7 @@ class Image2VectorLoader(Dataset):
         self.transforms_normalize = albumentations.Compose([
             albumentations.Normalize(mean=self.image_mean, std=self.image_std)
         ])
-        
+
         if self.mode == 'train' and hasattr(self.args, 'transform_mixup'):
             if self.args.transform_mixup > 0:
                 self.mixup_sample_1 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col1']), -1)))
@@ -294,7 +304,7 @@ class Image2VectorLoader(Dataset):
         return _input, _label.float()
 
     def __getitem__(self, index):
-        if self.args.data_cache: 
+        if self.args.data_cache:
             x_img = self.memory_data_x[index]['data']
             y_vec = self.memory_data_y[index]
             x_path = self.memory_data_x[index]['path']
@@ -340,7 +350,7 @@ class Image2ImageDataLoader:
                                             worker_init_fn=seed_worker,
                                             generator=g,
                                             pin_memory=pin_memory)
-        
+
     def __len__(self):
         return self.image_loader.__len__()
 
@@ -372,7 +382,7 @@ class Image2VectorDataLoader:
                                                 worker_init_fn=seed_worker,
                                                 generator=g,
                                                 pin_memory=pin_memory,
-                                                sampler=sampler)    
+                                                sampler=sampler)
 
         else:
             self.Loader = MultiEpochsDataLoader(self.image_loader,
@@ -385,4 +395,3 @@ class Image2VectorDataLoader:
 
     def __len__(self):
         return self.image_loader.__len__()
-
