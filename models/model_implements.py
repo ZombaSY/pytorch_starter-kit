@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from models.backbones.Swin import SwinTransformer
 from models.heads.UPerHead import M_UPerHead
 from models.backbones import UNet as UNet_part
+from models.backbones.timm_backbone import BackboneLoader
+from models.heads import MLP
 
 from collections import OrderedDict
 
@@ -89,3 +91,20 @@ class UNet(nn.Module):
 
         return out
 
+
+class ConvNextV2_classification(nn.Module):
+    def __init__(self, in_features, hidden_dims, num_class, **kwargs):
+        super().__init__()
+        self.backbone = BackboneLoader('convnext_large_mlp.clip_laion2b_soup_ft_in12k_in1k_384', exportable=True, pretrained=True)
+        self.classifier = MLP.SimpleClassifier(in_features=in_features, hidden_dims=hidden_dims, num_class=num_class, normalization=nn.BatchNorm1d, activation=nn.ReLU)
+
+    def forward(self, x):
+        out_dict = {}
+
+        feat = self.backbone(x)
+        out = self.classifier(feat)
+
+        out_dict['class'] = out
+        out_dict['feat'] = feat
+
+        return out_dict
