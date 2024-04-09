@@ -14,7 +14,7 @@ class SimpleClassifier(nn.Module):
             normalization(hidden_dims),
             activation(),
 
-            nn.Linear(hidden_dims, n_classes),
+            nn.Linear(hidden_dims, num_class),
             nn.Sigmoid()
         )
 
