@@ -7,9 +7,9 @@ from models import utils
 from trainer_base import TrainerBase
 
 
-class TrainerSegmentation(TrainerBase):
+class TrainerClassification(TrainerBase):
     def __init__(self, args, now=None):
-        super(TrainerSegmentation, self).__init__(args, now=now)
+        super(TrainerClassification, self).__init__(args, now=now)
 
         # 'init' means that this variable must be initialized.
         # 'set' means that this variable is available to being set, not must.

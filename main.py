@@ -7,7 +7,7 @@ import random
 import ast
 
 from train_segmentation import TrainerSegmentation
-from train_segmentation_score_repr import Trainer_segScoreRepr
+from train_classification import TrainerClassification
 from inference import Inferencer
 from datetime import datetime
 
@@ -65,8 +65,8 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = args.CUDA_VISIBLE_DEVICES
 
     print('Use CUDA :', args.cuda and torch.cuda.is_available())
-    
-     if args.debug:
+
+    if args.debug:
         args.wandb = False
         args.data_cache = False
         args.transform_mixup = 0
@@ -74,9 +74,9 @@ def main():
     if args.mode == 'train':
         if args.task == 'segmentation':
             trainer = TrainerSegmentation(args, now_time)
-        elif args.task == 'segmentation_score_cycle_repr':
-            args.task = 'segmentation'
-            trainer = Trainer_segScoreRepr(args, now_time)
+        elif args.task == 'classification':
+            args.task = 'classification'
+            trainer = TrainerClassification(args, now_time)
         else:
             raise ValueError('')
 
@@ -86,7 +86,7 @@ def main():
 
         if args.task == 'segmentation':
             inferencer = Inferencer(args)
-        elif args.task == 'segmentation_score_cycle':
+        elif args.task == 'classification':
             inferencer = Inferencer(args)
         else:
             raise ValueError('Please select correct inference_mode !!!')

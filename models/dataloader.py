@@ -245,8 +245,8 @@ class Image2VectorLoader(Dataset):
             x_img_path = []
             self.memory_data_y = []
             for idx in range(self.len):
-                x_img_path.append(os.path.join(*[self.data_root_path, 'input', self.df['col0'][idx]]) + '.jpg')
-                self.memory_data_y.append(torch.tensor([self.df['col1'][idx], self.df['col2'][idx]]))
+                x_img_path.append(os.path.join(*[self.data_root_path, self.df['label'][idx]]) + '.png')
+                self.memory_data_y.append(torch.tensor([self.df['label'][idx]]))
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
                 self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
 
@@ -279,11 +279,11 @@ class Image2VectorLoader(Dataset):
                 idx_2 = np.random.choice(np.arange(self.len), p=self.mixup_sample[idx_1])
 
                 # load the pair of X and Y
-                x_path = os.path.join(*[self.data_root_path, 'input', self.df['col0'][idx_2] + '.jpg'] )
+                x_path = os.path.join(*[self.data_root_path, self.df['label'][idx_2]]) + '.png'
                 x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
                 transform = self.transform_resize(image=x_img)
                 _input_2 = transform['image']
-                _label_2 = torch.tensor([self.df['col1'][idx_2], self.df['col2'][idx_2]])
+                _label_2 =  torch.tensor([self.df['label'][idx_2]])
 
                 lam = np.random.beta(2, 2)
 
@@ -309,10 +309,9 @@ class Image2VectorLoader(Dataset):
             y_vec = self.memory_data_y[index]
             x_path = self.memory_data_x[index]['path']
         else:
-            x_path = os.path.join(*[self.data_root_path, 'input', self.df['col0'][index]]) + '.jpg'
+            x_path = os.path.join(*[self.data_root_path, self.df['label'][index]]) + '.png'
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
-            y_vec = torch.tensor([self.df['col1'][index],
-                                  self.df['col2'][index]])
+            y_vec = torch.tensor([self.df['label'][index]])
 
         x_img_tr, y_vec = self.transform(x_img, y_vec, index)
 
@@ -320,7 +319,6 @@ class Image2VectorLoader(Dataset):
 
     def __len__(self):
         return self.len
-
 
 
 class Image2ImageDataLoader:

@@ -11,17 +11,17 @@
   saved_model_directory: 'model_ckpt',
   train_fold: 1,  # The number of validation while training
   project_name: 'wandb_project',
-  CUDA_VISIBLE_DEVICES: '0',
+  CUDA_VISIBLE_DEVICES: '3',
 
   ### Train Parameters
-  task: 'segmentation',
+  task: 'classification',
   model_name: 'ConvNextV2_classification',
-    num_class: 20,
+    num_class: 25,
     in_channel: 3,
     hidden_dims: 1024,
-  dataloader: 'Image2Image',
+  dataloader: 'Image2Vector',
   criterion: 'CrossEntropyLoss',
-  input_size: [512, 512],  # (height, width)
+  input_size: [256, 256],  # (height, width)
   optimizer: 'AdamW',
     lr: 0.001,
     lr_min: 0.00005,
@@ -39,7 +39,7 @@
   data_cache: true,
   transform_blur: 0.3,
   transform_clahe: 0.1,
-  transform_cutmix: 0.8,
+  transform_cutmix: 0.0,
   transform_fancyPCA: 0.1,
   transform_fog: 0.01,
   transform_g_noise: 0.1,
@@ -49,11 +49,9 @@
   transform_jpeg: 0.5,
   transform_perspective: 0.1,
   transform_rand_resize: 0.7,
-  transform_rand_crop: 224,
+  transform_rand_crop: 256,
   transform_rain: 0.01,
 
-  train_x_path: '/path/to/train/input',
-  train_y_path: '/path/to/train/label',
-  val_x_path:   '/path/to/val/input',
-  val_y_path:   '/path/to/val/label',
+  train_csv_path: '/path/to/val/train.csv',
+  val_csv_path:   '/path/to/val/valid.csv',
 }
