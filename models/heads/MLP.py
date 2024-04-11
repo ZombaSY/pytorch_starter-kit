@@ -15,7 +15,7 @@ class SimpleClassifier(nn.Module):
             activation(),
 
             nn.Linear(hidden_dims, num_class),
-            nn.Sigmoid()
+            # nn.Sigmoid()
         )
 
         self.apply(utils.init_weights)

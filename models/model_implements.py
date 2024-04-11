@@ -31,7 +31,7 @@ class Swin_T(nn.Module):
                                                 out_indices=(0, 1, 2, 3),
                                                 use_checkpoint=False)
 
-    def load_pretrained_imagenet(self, dst, device):
+    def load_pretrained_imagenet(self, dst):
         pretrained_states = torch.load(dst)['model']
         pretrained_states_backbone = OrderedDict()
 
@@ -93,16 +93,33 @@ class UNet(nn.Module):
 
 
 class ConvNextV2_classification(nn.Module):
-    def __init__(self, in_features, hidden_dims, num_class, **kwargs):
+    def __init__(self, hidden_dims, num_class, **kwargs):
         super().__init__()
         self.backbone = BackboneLoader('convnext_large_mlp.clip_laion2b_soup_ft_in12k_in1k_384', exportable=True, pretrained=True)
-        self.classifier = MLP.SimpleClassifier(in_features=in_features, hidden_dims=hidden_dims, num_class=num_class, normalization=nn.BatchNorm1d, activation=nn.ReLU)
+        self.classifier = MLP.SimpleClassifier(in_features=1536, hidden_dims=hidden_dims, num_class=num_class, normalization=nn.BatchNorm1d, activation=nn.ReLU)
 
     def forward(self, x):
         out_dict = {}
 
         feat = self.backbone(x)
         out = self.classifier(feat)
+
+        out_dict['class'] = out
+        out_dict['feat'] = feat
+
+        return out_dict
+
+
+class Swin_t_classification(Swin_T):
+    def __init__(self, hidden_dims, num_class, **kwargs):
+        super().__init__()
+        self.classifier = MLP.SimpleClassifier(in_features=768, hidden_dims=hidden_dims, num_class=num_class, normalization=nn.BatchNorm1d, activation=nn.ReLU)
+
+    def forward(self, x):
+        out_dict = {}
+
+        feat = self.swin_transformer(x)
+        out = self.classifier(feat[-1])
 
         out_dict['class'] = out
         out_dict['feat'] = feat

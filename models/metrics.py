@@ -2,9 +2,10 @@ import torch
 import torch.nn.functional as F
 import math
 import numpy as np
+import itertools
 
 from torch.autograd import Variable
-from sklearn.metrics import cohen_kappa_score, accuracy_score
+from sklearn.metrics import cohen_kappa_score, accuracy_score, f1_score
 from scipy.ndimage.morphology import distance_transform_edt as edt
 from sklearn.metrics import auc, roc_curve, confusion_matrix
 
@@ -207,10 +208,9 @@ class StreamSegMetrics_segmentation(_StreamMetrics):
 
 class StreamSegMetrics_classification:
     def __init__(self, n_classes):
-        self.metric_dict = {'Mean Kappa Score': -1,
-                            'Class Kappa Score': -1,
-                            'Mean Accuracy': -1,
-                            'Class Accuracy': -1}
+        self.metric_dict = {'kappa_score': -1,
+                            'acc': -1,
+                            'f1': -1}
         self.pred_list = []
         self.target_list = []
         self.n_classes = n_classes
@@ -220,17 +220,17 @@ class StreamSegMetrics_classification:
         self.target_list.append(target.transpose())
 
     def get_results(self):
-        pred_np_flatten = np.concatenate([self.pred_list[i] for i in range(len(self.pred_list))], axis=1)
-        target_np_flatten = np.concatenate([self.target_list[i] for i in range(len(self.target_list))], axis=1)
+        pred_np_flatten = np.array([item for item in itertools.chain.from_iterable(self.pred_list)])
+        target_np_flatten = np.array([item for item in itertools.chain.from_iterable(self.target_list)])
 
-        kappa_score_list = [cohen_kappa_score(pred_np_flatten[i], target_np_flatten[i], weights='linear') for i in range(self.n_classes)]
-        acc_score_list = [accuracy_score(pred_np_flatten[i], target_np_flatten[i]) for i in range(self.n_classes)]
-        self.metric_dict['Mean Kappa Score'] = sum(kappa_score_list) / self.n_classes
-        self.metric_dict['Class Kappa Score'] = kappa_score_list
-        self.metric_dict['Mean Accuracy'] = sum(acc_score_list) / self.n_classes
-        self.metric_dict['Class Accuracy'] = acc_score_list
+        self.metric_dict['kappa_score'] = cohen_kappa_score(pred_np_flatten, target_np_flatten)
+        self.metric_dict['acc'] = accuracy_score(pred_np_flatten, target_np_flatten)
+        self.metric_dict['f1'] = f1_score(pred_np_flatten, target_np_flatten, average='macro')
 
         return self.metric_dict
+
+    def get_pred_flatten(self):
+        return np.array([item for item in itertools.chain.from_iterable(self.pred_list)])
 
     def reset(self):
         self.pred_list = []
@@ -248,10 +248,9 @@ def metrics_np(np_res, np_gnd, b_auc=False):
     mccm = []
 
     epsilon = 2.22045e-16
-
     for i in range(np_res.shape[0]):
-        label = np_gnd[i, :, :]
-        pred = np_res[i, :, :]
+        label = np_gnd[i, ...]
+        pred = np_res[i,...]
         label = label.flatten()
         pred = pred.flatten()
         # assert label.max() == 1 and (pred).max() <= 1
@@ -261,7 +260,7 @@ def metrics_np(np_res, np_gnd, b_auc=False):
         y_pred[pred > 0.5] = 1
 
         try:
-            tn, fp, fn, tp = confusion_matrix(y_true=label, y_pred=y_pred).ravel()  # for binary
+            tn, fp, fn, tp = confusion_matrix(y_true=label, y_pred=pred).ravel()  # for binary
         except ValueError as e:
             tn, fp, fn, tp = 0, 0, 0, 0
         accuracy = (tp + tn) / (tp + tn + fp + fn + epsilon)

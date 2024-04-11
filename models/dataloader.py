@@ -154,11 +154,11 @@ class Image2ImageLoader(Dataset):
     def transform(self, _input, _label):
         random_gen = random.Random()
 
-        transform = self.transform_resize(image=_input, mask=_label)
-        _input = transform['image']
-        _label = transform['mask']
-
         if self.mode == 'train':
+            transform = self.transform_resize(image=_input, mask=_label)
+            _input = transform['image']
+            _label = transform['mask']
+
             if random_gen.random() < self.args.transform_cutmix:
                 rand_n = random_gen.randint(0, self.len - 1)
                 if self.args.data_cache:
@@ -174,10 +174,11 @@ class Image2ImageLoader(Dataset):
 
             _input = _input.astype(np.uint8)
             _label = _label.astype(np.uint8)
-            transform = self.transform2(image=_input, mask=_label)
-            _input = transform['image']
+            transform = self.transform_augmentation(image=_input, mask=_label)
+        else:
+            transform = self.transform_resize(image=_input, mask=_label)
 
-        norm = self.transforms_normalize(image=_input)
+        norm = self.transforms_normalize(image=transform['image'])
         _input = norm['image']
         _label = transform['mask']
 
@@ -250,21 +251,33 @@ class Image2VectorLoader(Dataset):
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
                 self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
 
-        self.transform_resize = albumentations.Compose([
-            albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
-        ])
-        self.transform2 = albumentations.Compose([
-            *augmentations(self.args, self.crop_factor)
-        ])
-        self.transforms_normalize = albumentations.Compose([
-            albumentations.Normalize(mean=self.image_mean, std=self.image_std)
-        ])
-
         if self.mode == 'train' and hasattr(self.args, 'transform_mixup'):
             if self.args.transform_mixup > 0:
                 self.mixup_sample_1 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col1']), -1)))
                 self.mixup_sample_2 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col2']), -1)))
                 self.mixup_sample = (self.mixup_sample_1 + self.mixup_sample_2) / 2     # get the average of sample
+
+        self.update_transform()
+
+    def update_transform(self, scaler=1):
+        excludings = ['transform_rand_crop', 'transform_landmark_rotate', 'transform_landmark_hflip']
+
+        self.transform_resize = albumentations.Compose([
+            albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
+        ])
+        if self.mode == 'train':
+            # progressively update augmentation scale
+            for param in vars(self.args):
+                if 'transform_' in param:
+                    if param not in excludings:
+                        setattr(self.args, param, min(getattr(self.args, param) * scaler, 1))
+                    print(f'{utils.Colors.LIGHT_WHITE}{param}: {getattr(self.args, param)}{utils.Colors.END}')
+            self.transform_augmentation = albumentations.Compose([
+                *augmentations(self.args, self.crop_factor)
+            ])
+        self.transforms_normalize = albumentations.Compose([
+            albumentations.Normalize(mean=self.image_mean, std=self.image_std)
+        ])
 
     def transform(self, _input, _label, idx_1):
         random_gen = random.Random()
@@ -276,22 +289,25 @@ class Image2VectorLoader(Dataset):
             # MixUp
             if random_gen.random() < self.args.transform_mixup:
                 # select index from pre-defined sampler
-                idx_2 = np.random.choice(np.arange(self.len), p=self.mixup_sample[idx_1])
+                idx_2 = np.random.choice(np.arange(self.len), p=self.mixup_sample[idx_1]) if self.args.transform_c_mixup == True else np.random.choice(np.arange(self.len))
 
                 # load the pair of X and Y
                 x_path = os.path.join(*[self.data_root_path, self.df['img_path'][idx_2]])
                 x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
                 transform = self.transform_resize(image=x_img)
                 _input_2 = transform['image']
-                _label_2 =  torch.tensor([self.df['label'][idx_2]])
+                _label_2 = torch.tensor([self.df['label'][idx_2]])
 
                 lam = np.random.beta(2, 2)
 
                 _input = _input * lam + _input_2 * (1 - lam)
                 _label = _label * lam + _label_2 * (1 - lam)
 
+                del x_img
+                del x_path
+
             _input = _input.astype(np.uint8)
-            transform = self.transform2(image=_input)
+            transform = self.transform_augmentation(image=_input)
         else:
             transform = self.transform_resize(image=_input)
 

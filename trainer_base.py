@@ -164,7 +164,8 @@ class TrainerBase:
 
         return optimizer
 
-    def init_metric(self, task_name, num_class):
+    @staticmethod
+    def init_metric(task_name, num_class):
         if task_name == 'segmentation':
             metric = metrics.StreamSegMetrics_segmentation(num_class)
         elif task_name == 'classification':

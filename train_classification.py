@@ -29,7 +29,8 @@ class TrainerClassification(TrainerBase):
 
     def _train(self, epoch):
         self.model.train()
-
+        metric_list_mean = {'acc': [],
+                            'f1': []}
         batch_losses = 0
         for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
             x_in, _ = x_in
@@ -61,6 +62,25 @@ class TrainerClassification(TrainerBase):
                 if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and not (batch_idx != len(self.loader_train) - 1):
                     self._validate(epoch)
 
+            # compute metric
+            output_argmax = torch.argmax(output['class'], dim=1).cpu()
+            self.metric_train.update(target.squeeze().detach().cpu().numpy(), output_argmax.detach().cpu().numpy())
+
+        metric_result = self.metric_train.get_results()
+        metric_list_mean['acc'] = metric_result['acc']
+        metric_list_mean['f1'] = metric_result['f1']
+
+        for key in metric_list_mean.keys():
+            metric_list_mean[key] = np.mean(metric_list_mean[key])
+
+        for key in metric_list_mean.keys():
+            log_str = f'train {key}: {metric_list_mean[key]}'
+            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
+
+            if self.args.wandb:
+                wandb.log({f'train {key}': metric_list_mean[key]},
+                          step=epoch)
+
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
 
         print('{}{} epoch / train Loss {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
@@ -75,8 +95,8 @@ class TrainerClassification(TrainerBase):
 
     def _validate(self, epoch):
         self.model.eval()
-        metric_list = {'acc': [],
-                       'f1': []}
+        metric_list_mean = {'acc': [],
+                            'f1': []}
 
         for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
             with torch.no_grad():
@@ -90,14 +110,14 @@ class TrainerClassification(TrainerBase):
 
                 # compute metric
                 output_argmax = torch.argmax(output['class'], dim=1).cpu()
+                self.metric_val.update(output_argmax.detach().cpu().numpy(), target.squeeze().detach().cpu().numpy())
 
-                metric_result = metrics.metrics_np(target.squeeze().detach().cpu().numpy(), output_argmax.detach().cpu().numpy())
-                metric_list['acc'].append(metric_result['acc'])
-                metric_list['f1'].append(metric_result['f1'])
+        metric_result = self.metric_val.get_results()
+        metric_list_mean['acc'] = metric_result['acc']
+        metric_list_mean['f1'] = metric_result['f1']
 
-        metric_list_mean = metric_list
-        for key in metric_list.keys():
-            metric_list_mean[key] = np.mean(metric_list[key])
+        for key in metric_list_mean.keys():
+            metric_list_mean[key] = np.mean(metric_list_mean[key])
 
         for key in metric_list_mean.keys():
             log_str = f'validation {key}: {metric_list_mean[key]}'
@@ -122,13 +142,13 @@ class TrainerClassification(TrainerBase):
                 if epoch % self.args.save_interval == 0:
                     best_flag = False
                 self.metric_best[key] = metric_list_mean[key]
-                self.save_model(self.model, self.args.model_name, epoch, metric_list_mean[key], best_flag=best_flag, metric_name=key)
+                self.save_model(self.model.module, self.args.model_name, epoch, metric_list_mean[key], best_flag=best_flag, metric_name=key)
 
         self.metric_val.reset()
 
     def run(self):
         for epoch in range(1, self.args.epoch + 1):
-            # self._train(epoch)
+            self._train(epoch)
             self._validate(epoch)
 
             if (epoch - self.last_saved_epoch) > self.args.early_stop_epoch:

@@ -10,19 +10,19 @@
   save_interval: 9999,
   saved_model_directory: 'model_ckpt',
   train_fold: 1,  # The number of validation while training
-  project_name: 'wandb_project',
+  project_name: 'dacon_bird',
   CUDA_VISIBLE_DEVICES: '3',
 
   ### Train Parameters
   task: 'classification',
-  model_name: 'ConvNextV2_classification',
+  model_name: 'ConvNextV2_classification',  # ConvNextV2_classification
     num_class: 25,
     in_channel: 3,
     hidden_dims: 1024,
   dataloader: 'Image2Vector',
     weighted_sampler: False,
   criterion: 'CrossEntropyLoss',
-  input_size: [256, 256],  # (height, width)
+  input_size: [64, 64],  # (height, width)
   optimizer: 'AdamW',
     lr: 0.001,
     lr_min: 0.00005,
@@ -30,11 +30,10 @@
     scheduler: 'WarmupCosine',
       cycles: 50,  # 100
       warmup_epoch: 20, # 20
-  batch_size: 128,
+  batch_size: 32,
   epoch: 10000,
   early_stop_epoch: 300,
-  class_weight: [1.0, 1.0],
-  model_path: '', # pretrained/swin_tiny_patch4_window7_224.pth
+  model_path: 'pretrained/imagenet/swin_tiny_patch4_window7_224.pth', # pretrained/swin_tiny_patch4_window7_224.pth
 
   ### Augmentation parameters
   data_cache: true,
@@ -48,11 +47,12 @@
   transform_hflip: 0.5,
   transform_vflip: 0.0,
   transform_jpeg: 0.5,
+  transform_mixup: 0.0,
   transform_perspective: 0.1,
   transform_rand_resize: 0.7,
-  transform_rand_crop: 256,
+  transform_rand_crop: 48,
   transform_rain: 0.01,
 
-  train_csv_path: '/path/to/val/train.csv',
-  val_csv_path:   '/path/to/val/valid.csv',
+  train_csv_path: '/path/to/train.csv',
+  val_csv_path:   '/path/to/valid.csv',
 }
