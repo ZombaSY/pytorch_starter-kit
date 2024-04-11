@@ -98,15 +98,23 @@ class TrainerBase:
                          dataloader_name,
                          x_path=None,
                          y_path=None,
-                         data_path=None):
+                         csv_path=None):
 
         if dataloader_name == 'Image2Image':
-            loader = dataloader_hub.Image2ImageDataLoader(data_path=data_path,
+            loader = dataloader_hub.Image2ImageDataLoader(x_path=x_path,
+                                                          y_path=y_path,
                                                           batch_size=batch_size,
                                                           num_workers=self.args.worker,
                                                           pin_memory=self.args.pin_memory,
                                                           mode=mode,
                                                           args=self.args)
+        elif dataloader_name == 'Image2Vector':
+            loader = dataloader_hub.Image2VectorDataLoader(csv_path=csv_path,
+                                                           batch_size=batch_size,
+                                                           num_workers=self.args.worker,
+                                                           pin_memory=self.args.pin_memory,
+                                                           mode=mode,
+                                                           args=self.args)
         else:
             raise Exception('No dataloader named', dataloader_name)
 
@@ -135,11 +143,11 @@ class TrainerBase:
             pass
 
         return scheduler
-    
+
     @staticmethod
     def init_model(model_name, device, args):
         model = getattr(model_implements, model_name)(**vars(args)).to(device)
-        
+
         return torch.nn.DataParallel(model)
 
     def init_criterion(self, criterion_name):

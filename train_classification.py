@@ -1,9 +1,11 @@
+from sklearn import metrics
 import torch
 import wandb
 import numpy as np
 import sys
 
 from models import utils
+from models import metrics
 from trainer_base import TrainerBase
 
 
@@ -16,13 +18,11 @@ class TrainerClassification(TrainerBase):
         self.loader_train = self.init_data_loader(batch_size=self.args.batch_size,
                                                   mode='train',
                                                   dataloader_name=self.args.dataloader,
-                                                  x_path=self.args.train_x_path,
-                                                  y_path=self.args.train_y_path)
+                                                  csv_path=self.args.train_csv_path)
         self.loader_val = self.init_data_loader(batch_size=self.args.batch_size // 4,
                                                 mode='validation',
                                                 dataloader_name=self.args.dataloader,
-                                                x_path=self.args.val_x_path,
-                                                y_path=self.args.val_y_path)
+                                                csv_path=self.args.val_csv_path)
 
         self.scheduler = self.set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
         self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold
@@ -44,7 +44,7 @@ class TrainerClassification(TrainerBase):
             output = self.model(x_in)
 
             # compute loss
-            loss = self.criterion(output['seg'], target)
+            loss = self.criterion(output['class'], target)
             if not torch.isfinite(loss):
                 raise Exception('Loss is NAN. End training.')
 
@@ -63,7 +63,7 @@ class TrainerClassification(TrainerBase):
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
 
-        print('{}{} epoch / Train Loss {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
+        print('{}{} epoch / train Loss {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
                                                                        epoch,
                                                                        self.args.criterion,
                                                                        loss_mean,
@@ -71,10 +71,12 @@ class TrainerClassification(TrainerBase):
                                                                        utils.Colors.END))
 
         if self.args.wandb:
-            wandb.log({'Train Loss {}'.format(self.args.criterion): loss_mean}, step=epoch)
+            wandb.log({'train Loss {}'.format(self.args.criterion): loss_mean}, step=epoch)
 
     def _validate(self, epoch):
         self.model.eval()
+        metric_list = {'acc': [],
+                       'f1': []}
 
         for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
             with torch.no_grad():
@@ -87,49 +89,50 @@ class TrainerClassification(TrainerBase):
                 output = self.model(x_in)
 
                 # compute metric
-                output_argmax = torch.argmax(output['seg'], dim=1).cpu()
-                for b in range(output['seg'].shape[0]):
-                    self.metric_val.update(target[b][0].cpu().detach().numpy(), output_argmax[b].cpu().detach().numpy())
+                output_argmax = torch.argmax(output['class'], dim=1).cpu()
 
-        metrics_out = self.metric_val.get_results()
-        c_iou = [metrics_out['Class IoU'][i] for i in range(self.args.num_class)]
-        m_iou = sum(c_iou) / self.args.num_class
+                metric_result = metrics.metrics_np(target.squeeze().detach().cpu().numpy(), output_argmax.detach().cpu().numpy())
+                metric_list['acc'].append(metric_result['acc'])
+                metric_list['f1'].append(metric_result['f1'])
 
-        print('{}{} epoch / Val mIoU: {}{}'.format(utils.Colors.LIGHT_GREEN, epoch, m_iou, utils.Colors.END))
-        for i in range(self.args.num_class):
-            print(f'{utils.Colors.LIGHT_GREEN}{epoch} epoch / Val Segmentation Class {i} IoU: {c_iou[i]}{utils.Colors.END}')
+        metric_list_mean = metric_list
+        for key in metric_list.keys():
+            metric_list_mean[key] = np.mean(metric_list[key])
 
-        if self.args.wandb:
-            wandb.log({'Val Segmentation mIoU': m_iou},
-                      step=epoch)
-            for i in range(self.args.num_class):
-                wandb.log({f'Val Segmentation Class {i} IoU': c_iou[i]},
+        for key in metric_list_mean.keys():
+            log_str = f'validation {key}: {metric_list_mean[key]}'
+            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
+
+            if self.args.wandb:
+                wandb.log({f'validation {key}': metric_list_mean[key]},
                           step=epoch)
 
         if epoch == 1:  # initialize value
             if hasattr(self, 'metric_best'):
-                self.metric_best['mIoU'] = m_iou
+                for key in metric_list_mean.keys():
+                    self.metric_best[key] = metric_list_mean[key]
             else:
-                self.metric_best = {'mIoU': m_iou}
-        model_metrics = {'mIoU': m_iou}
+                self.metric_best = {}
+                for key in metric_list_mean.keys():
+                    self.metric_best[key] = metric_list_mean[key]
 
-        for key in model_metrics.keys():
-            if model_metrics[key] > self.metric_best[key] or epoch % self.args.save_interval == 0:
+        for key in metric_list_mean.keys():
+            if metric_list_mean[key] > self.metric_best[key] or epoch % self.args.save_interval == 0:
                 best_flag = True
                 if epoch % self.args.save_interval == 0:
                     best_flag = False
-                self.metric_best[key] = model_metrics[key]
-                self.save_model(self.model, self.args.model_name, epoch, model_metrics[key], best_flag=best_flag, metric_name=key)
+                self.metric_best[key] = metric_list_mean[key]
+                self.save_model(self.model, self.args.model_name, epoch, metric_list_mean[key], best_flag=best_flag, metric_name=key)
 
         self.metric_val.reset()
 
     def run(self):
         for epoch in range(1, self.args.epoch + 1):
-            self._train(epoch)
+            # self._train(epoch)
             self._validate(epoch)
 
             if (epoch - self.last_saved_epoch) > self.args.early_stop_epoch:
                 print('The model seems to be converged. Early stop training.')
-                print(f'Best mIoU -----> {self.metric_best["mIoU"]}')
-                wandb.log({f'Best mIoU': self.metric_best['mIoU']})
+                print(f'Best acc -----> {self.metric_best["acc"]}')
+                wandb.log({f'Best acc': self.metric_best['acc']})
                 sys.exit()  # safe exit

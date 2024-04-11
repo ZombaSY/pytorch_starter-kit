@@ -237,7 +237,7 @@ class Image2VectorLoader(Dataset):
 
         self.data_root_path = os.path.split(csv_path)[0]
         self.df = pd.read_csv(csv_path)
-        self.len = len(self.df['FILENAME'])
+        self.len = len(self.df['img_path'])
 
         # mount_data_on_memory
         if self.args.data_cache:
@@ -245,7 +245,7 @@ class Image2VectorLoader(Dataset):
             x_img_path = []
             self.memory_data_y = []
             for idx in range(self.len):
-                x_img_path.append(os.path.join(*[self.data_root_path, self.df['label'][idx]]) + '.png')
+                x_img_path.append(os.path.join(*[self.data_root_path, self.df['img_path'][idx]]))
                 self.memory_data_y.append(torch.tensor([self.df['label'][idx]]))
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
                 self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
@@ -279,7 +279,7 @@ class Image2VectorLoader(Dataset):
                 idx_2 = np.random.choice(np.arange(self.len), p=self.mixup_sample[idx_1])
 
                 # load the pair of X and Y
-                x_path = os.path.join(*[self.data_root_path, self.df['label'][idx_2]]) + '.png'
+                x_path = os.path.join(*[self.data_root_path, self.df['img_path'][idx_2]])
                 x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
                 transform = self.transform_resize(image=x_img)
                 _input_2 = transform['image']
@@ -309,7 +309,7 @@ class Image2VectorLoader(Dataset):
             y_vec = self.memory_data_y[index]
             x_path = self.memory_data_x[index]['path']
         else:
-            x_path = os.path.join(*[self.data_root_path, self.df['label'][index]]) + '.png'
+            x_path = os.path.join(*[self.data_root_path, self.df['img_path'][index]])
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
             y_vec = torch.tensor([self.df['label'][index]])
 
