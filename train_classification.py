@@ -1,11 +1,9 @@
-from sklearn import metrics
 import torch
 import wandb
 import numpy as np
 import sys
 
 from models import utils
-from models import metrics
 from trainer_base import TrainerBase
 
 
@@ -25,7 +23,7 @@ class TrainerClassification(TrainerBase):
                                                 csv_path=self.args.val_csv_path)
 
         self.scheduler = self.set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
-        self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold
+        self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold // self.args.batch_size
 
     def _train(self, epoch):
         self.model.train()
@@ -59,7 +57,7 @@ class TrainerClassification(TrainerBase):
             batch_losses += loss.item()
 
             if hasattr(self.args, 'train_fold'):
-                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and not (batch_idx != len(self.loader_train) - 1):
+                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx != len(self.loader_train) - 1:
                     self._validate(epoch)
 
             # compute metric
@@ -92,6 +90,8 @@ class TrainerClassification(TrainerBase):
 
         if self.args.wandb:
             wandb.log({'train Loss {}'.format(self.args.criterion): loss_mean}, step=epoch)
+
+        self.metric_train.reset()
 
     def _validate(self, epoch):
         self.model.eval()
@@ -129,8 +129,7 @@ class TrainerClassification(TrainerBase):
 
         if epoch == 1:  # initialize value
             if hasattr(self, 'metric_best'):
-                for key in metric_list_mean.keys():
-                    self.metric_best[key] = metric_list_mean[key]
+                pass
             else:
                 self.metric_best = {}
                 for key in metric_list_mean.keys():

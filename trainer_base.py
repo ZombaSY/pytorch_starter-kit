@@ -87,7 +87,7 @@ class TrainerBase:
                 os.remove(self.model_post_path_dict[metric_name])
             self.model_post_path_dict[metric_name] = file_format
 
-        torch.save(model.module.state_dict(), file_format)
+        torch.save(model.state_dict(), file_format)
 
         print(f'{utils.Colors.LIGHT_RED}{file_format} \t model saved!!{utils.Colors.END}')
         self.last_saved_epoch = epoch

@@ -25,7 +25,7 @@ class TrainerSegmentation(TrainerBase):
                                                 y_path=self.args.val_y_path)
 
         self.scheduler = self.set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
-        self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold
+        self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold // self.args.batch_size
 
     def _train(self, epoch):
         self.model.train()
@@ -58,7 +58,7 @@ class TrainerSegmentation(TrainerBase):
             batch_losses += loss.item()
 
             if hasattr(self.args, 'train_fold'):
-                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and not (batch_idx != len(self.loader_train) - 1):
+                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx != len(self.loader_train) - 1:
                     self._validate(epoch)
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
@@ -95,32 +95,38 @@ class TrainerSegmentation(TrainerBase):
         c_iou = [metrics_out['Class IoU'][i] for i in range(self.args.num_class)]
         m_iou = sum(c_iou) / self.args.num_class
 
-        print('{}{} epoch / Val mIoU: {}{}'.format(utils.Colors.LIGHT_GREEN, epoch, m_iou, utils.Colors.END))
-        for i in range(self.args.num_class):
-            print(f'{utils.Colors.LIGHT_GREEN}{epoch} epoch / Val Segmentation Class {i} IoU: {c_iou[i]}{utils.Colors.END}')
+        metric_list_mean = {}
+        metric_list_mean['mIoU'] = m_iou
+        for i in range(len(c_iou)):
+            metric_list_mean[f'cIoU_{i}'] = c_iou[i]
 
-        if self.args.wandb:
-            wandb.log({'Val Segmentation mIoU': m_iou},
-                      step=epoch)
-            for i in range(self.args.num_class):
-                wandb.log({f'Val Segmentation Class {i} IoU': c_iou[i]},
+
+        for key in metric_list_mean.keys():
+            metric_list_mean[key] = np.mean(metric_list_mean[key])
+
+        for key in metric_list_mean.keys():
+            log_str = f'validation {key}: {metric_list_mean[key]}'
+            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
+
+            if self.args.wandb:
+                wandb.log({f'validation {key}': metric_list_mean[key]},
                           step=epoch)
 
         if epoch == 1:  # initialize value
             if hasattr(self, 'metric_best'):
-                self.metric_best['mIoU'] = m_iou
+                pass
             else:
-                self.metric_best = {'mIoU': m_iou}
-        model_metrics = {'mIoU': m_iou}
+                self.metric_best = {}
+                for key in metric_list_mean.keys():
+                    self.metric_best[key] = metric_list_mean[key]
 
-        for key in model_metrics.keys():
-            if model_metrics[key] > self.metric_best[key] or epoch % self.args.save_interval == 0:
+        for key in metric_list_mean.keys():
+            if metric_list_mean[key] > self.metric_best[key] or epoch % self.args.save_interval == 0:
                 best_flag = True
                 if epoch % self.args.save_interval == 0:
                     best_flag = False
-                self.metric_best[key] = model_metrics[key]
-                self.save_model(self.model, self.args.model_name, epoch, model_metrics[key], best_flag=best_flag, metric_name=key)
-
+                self.metric_best[key] = metric_list_mean[key]
+                self.save_model(self.model.module, self.args.model_name, epoch, metric_list_mean[key], best_flag=best_flag, metric_name=key)
         self.metric_val.reset()
 
     def run(self):
