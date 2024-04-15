@@ -61,8 +61,9 @@ class TrainerClassification(TrainerBase):
                     self._validate(epoch)
 
             # compute metric
-            output_argmax = torch.argmax(output['class'], dim=1).cpu()
-            self.metric_train.update(target.squeeze().detach().cpu().numpy(), output_argmax.detach().cpu().numpy())
+            output_argmax = torch.argmax(output['class'], dim=1).detach().cpu().numpy()
+            target_argmax = torch.argmax(target.squeeze(), dim=1).detach().cpu().numpy()
+            self.metric_train.update(output_argmax, target_argmax)
 
         metric_result = self.metric_train.get_results()
         metric_list_mean['acc'] = metric_result['acc']
