@@ -10,7 +10,7 @@ from models import losses as loss_hub
 from models import lr_scheduler
 from trainer_base import TrainerBase
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '3'
 
 
 class ModelMini:
@@ -19,8 +19,8 @@ class ModelMini:
         self.x = torch.rand([4, 3, 512, 512]).to(self.device)
         self.y = torch.rand([4, 2]).to(self.device).float()
 
-        self.model = TrainerBase.init_model("Swin_T_SemanticSegmentation", self.device,
-                                            argparse.Namespace(num_class=3, in_channel=3, base_c=16))
+        self.model = TrainerBase.init_model("Swin_t_classification", self.device,
+                                            argparse.Namespace(hidden_dims=1024, num_class=20))
 
         self.model.to(self.device)
         self.criterion = loss_hub.MSELoss()
@@ -58,10 +58,8 @@ class ModelMini:
         for epoch in range(self.epochs):
             for step in range(self.steps):
                 out = self.model(self.x)
+                loss = self.criterion(out['score'], self.y)
 
-                loss = self.criterion(out['score'], self.y)  
-                
-                print(loss)
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()

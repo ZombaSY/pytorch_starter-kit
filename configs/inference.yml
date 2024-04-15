@@ -8,18 +8,20 @@
   CUDA_VISIBLE_DEVICES: '3',
 
   task: 'classification', # segmentation, classification
-  model_name: 'Swin_t_classification',  # ConvNextV2_classification
+  model_name: 'ConvNextV2_classification',  # ConvNextV2_classification
     num_class: 25,
     in_channel: 3,
     hidden_dims: 1024,
   criterion: 'CrossEntropyLoss',  # CE, DiceBCE
   dataloader: 'Image2Vector', # Image2Image, Image2Vector
     weighted_sampler: False,
-  input_size: [64, 64],  # (height, width)
+  input_size: [256, 256],  # (height, width)
   mount_data_on_memory: false,
   draw_results: false,
 
   model_path: '/path/to/model.pt',
 
-  val_csv_path:   '/path/to/data/val.csv',
+  val_x_path:   '/path/to/val/input',
+  val_y_path:   '/path/to/val/label',
+  val_csv_path:   '/path/to/valid.csv',
 }

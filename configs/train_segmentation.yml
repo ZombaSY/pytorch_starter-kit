@@ -20,7 +20,6 @@
     in_channel: 3,
     base_c: 96,
   dataloader: 'Image2Image',
-    weighted_sampler: False,
   criterion: 'CrossEntropyLoss',
   input_size: [512, 512],  # (height, width)
   optimizer: 'AdamW',

@@ -47,7 +47,7 @@ class TrainerBase:
                     self.model.module.load_pretrained_imagenet(self.args.model_path)
                     print('Model loaded successfully!!! (ImageNet)')
                 else:
-                    self.model.load_state_dict(torch.load(self.args.model_path))
+                    self.model.module.load_state_dict(torch.load(self.args.model_path))
                     print('Model loaded successfully!!! (Custom)')
                 self.model.to(self.device)
 

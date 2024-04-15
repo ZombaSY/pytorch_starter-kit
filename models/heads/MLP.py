@@ -1,6 +1,7 @@
 import torch.nn as nn
 
 from models import utils
+from timm.models.layers import DropPath
 
 
 class SimpleClassifier(nn.Module):
@@ -9,6 +10,8 @@ class SimpleClassifier(nn.Module):
         self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(start_dim=1),
+
+            DropPath(0.1),
 
             nn.Linear(in_features, hidden_dims),
             normalization(hidden_dims),
