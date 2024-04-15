@@ -9,6 +9,7 @@ import albumentations
 import itertools
 
 from torch.utils.data import Dataset
+from torch.nn import functional as F
 from models import utils
 
 
@@ -248,15 +249,20 @@ class Image2VectorLoader(Dataset):
             self.memory_data_y = []
             for idx in range(self.len):
                 x_img_path.append(os.path.join(*[self.data_root_path, self.df[self.image_col][idx]]))
-                self.memory_data_y.append(torch.tensor([self.df['label'][idx]]))
+                label = F.one_hot(torch.tensor([self.df['label'][idx]]), self.args.num_class) if self.args.task == 'classification' else torch.tensor([self.df['label'][idx]])
+                self.memory_data_y.append(label)
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
                 self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
 
         if self.mode == 'train' and hasattr(self.args, 'transform_mixup'):
             if self.args.transform_mixup > 0:
-                self.mixup_sample_1 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col1']), -1)))
-                self.mixup_sample_2 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col2']), -1)))
-                self.mixup_sample = (self.mixup_sample_1 + self.mixup_sample_2) / 2     # get the average of sample
+                # C-mixup
+                # self.mixup_sample_1 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col1']), -1)))
+                # self.mixup_sample_2 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col2']), -1)))
+                # self.mixup_sample = (self.mixup_sample_1 + self.mixup_sample_2) / 2
+
+                # mix-up
+                self.mixup_sample = np.ones(self.len) / self.len
 
         self.update_transform()
 
@@ -290,7 +296,7 @@ class Image2VectorLoader(Dataset):
             # MixUp
             if random_gen.random() < self.args.transform_mixup:
                 # select index from pre-defined sampler
-                idx_2 = np.random.choice(np.arange(self.len), p=self.mixup_sample[idx_1]) if self.args.transform_c_mixup == True else np.random.choice(np.arange(self.len))
+                idx_2 = np.random.choice(np.arange(self.len), p=self.mixup_sample)
 
                 # load the pair of X and Y
                 x_path = os.path.join(*[self.data_root_path, self.df[self.image_col][idx_2]])
@@ -298,6 +304,9 @@ class Image2VectorLoader(Dataset):
                 transform = self.transform_resize(image=x_img)
                 _input_2 = transform['image']
                 _label_2 = torch.tensor([self.df['label'][idx_2]])
+
+                if self.args.task == 'classification':
+                    _label_2 = F.one_hot(_label_2, num_classes=self.args.num_class)
 
                 lam = np.random.beta(2, 2)
 
@@ -329,6 +338,9 @@ class Image2VectorLoader(Dataset):
             x_path = os.path.join(*[self.data_root_path, self.df['img_path'][index]])
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
             y_vec = torch.tensor([self.df['label'][index]])
+
+            if self.args.task == 'classification' and self.mode != 'test':
+                y_vec = F.one_hot(y_vec, num_classes=self.args.num_class)
 
         x_img_tr, y_vec = self.transform(x_img, y_vec, index)
 

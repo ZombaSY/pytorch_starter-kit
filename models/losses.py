@@ -14,7 +14,7 @@ class CrossEntropyLoss(nn.Module):
         self.loss = nn.CrossEntropyLoss()
 
     def forward(self, x, y):
-        y = y.squeeze(1)
+        y = y.long().squeeze(1)
 
         return self.loss(x, y)
 
@@ -695,3 +695,25 @@ class TanHLoss(nn.Module):
     def forward(self, x, y):
 
         return torch.tanh(F.mse_loss(x, y) ** self.temperature)
+
+
+class LabelSmoothingCrossEntropy(nn.Module):
+    def __init__(self, epsilon: float = 0.1, reduction='mean'):
+        super().__init__()
+        self.epsilon = epsilon
+        self.reduction = reduction
+        self.loss = nn.CrossEntropyLoss()
+
+    def linear_combination(self, x, y):
+        return self.epsilon * x + (1 - self.epsilon) * y
+
+    def reduce_loss(self, loss):
+        return loss.mean() if self.reduction == 'mean' else loss.sum() if self.reduction == 'sum' else loss
+
+    def forward(self, preds, target):
+        n = preds.size()[-1]
+        log_preds = F.log_softmax(preds, dim=-1)
+        log_loss = self.reduce_loss(-log_preds.sum(dim=-1))
+        loss = self.loss(preds, target.squeeze())
+
+        return self.linear_combination(log_loss / n, loss)

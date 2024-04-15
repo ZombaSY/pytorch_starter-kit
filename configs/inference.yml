@@ -1,11 +1,11 @@
 {
  ### Environment Parameters
   debug: true,
-  mode: inference,
+  mode: test, # test, validation
   cuda: true,
   pin_memory: true,
   worker: 4,
-  CUDA_VISIBLE_DEVICES: '3',
+  CUDA_VISIBLE_DEVICES: '1',
 
   task: 'classification', # segmentation, classification
   model_name: 'ConvNextV2_classification',  # ConvNextV2_classification
@@ -15,13 +15,15 @@
   criterion: 'CrossEntropyLoss',  # CE, DiceBCE
   dataloader: 'Image2Vector', # Image2Image, Image2Vector
     weighted_sampler: False,
+    batch_size: 32,
   input_size: [256, 256],  # (height, width)
   mount_data_on_memory: false,
   draw_results: false,
 
-  model_path: '/path/to/model.pt',
+  model_path: 'pretrained/ConvNextV2_classification_Epoch_34_f1_0.9672608239975305.pt',
 
-  val_x_path:   '/path/to/val/input',
-  val_y_path:   '/path/to/val/label',
-  val_csv_path:   '/path/to/valid.csv',
+  val_x_path:   '/path/to/data/val/input',
+  val_y_path:   '/path/to/data/val/label',
+  val_csv_path: '/path/to/data/val/test.csv',
+  image_col: 'img_path',
 }

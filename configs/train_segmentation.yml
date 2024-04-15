@@ -20,6 +20,8 @@
     in_channel: 3,
     base_c: 96,
   dataloader: 'Image2Image',
+    weighted_sampler: False,
+    batch_size: 128,
   criterion: 'CrossEntropyLoss',
   input_size: [512, 512],  # (height, width)
   optimizer: 'AdamW',
@@ -29,7 +31,6 @@
     scheduler: 'WarmupCosine',
       cycles: 50,  # 100
       warmup_epoch: 20, # 20
-  batch_size: 128,
   epoch: 10000,
   early_stop_epoch: 300,
   model_path: 'pretrained/swin_tiny_patch4_window7_224.pth',

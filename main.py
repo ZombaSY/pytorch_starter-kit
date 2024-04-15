@@ -69,7 +69,7 @@ def main():
     if args.debug:
         args.wandb = False
         args.data_cache = False
-        args.transform_mixup = 0
+        # args.transform_mixup = 0
 
     if args.mode == 'train':
         if args.task == 'segmentation':
@@ -82,14 +82,14 @@ def main():
 
         trainer.run()
 
-    elif args.mode in 'inference':
+    elif args.mode in ['inference', 'test']:
 
         if args.task == 'segmentation':
             inferencer = Inferencer(args)
         elif args.task == 'classification':
             inferencer = Inferencer(args)
         else:
-            raise ValueError('Please select correct inference_mode !!!')
+            raise ValueError('Please select correct task!!!')
 
         inferencer.inference()
     else:

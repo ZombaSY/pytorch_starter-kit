@@ -35,7 +35,7 @@ class TrainerClassification(TrainerBase):
             target, _ = target
 
             x_in = x_in.to(self.device)
-            target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
+            target = target.to(self.device)  # (shape: (batch_size, img_h, img_w))
 
             if (x_in.shape[0] / torch.cuda.device_count()) <= torch.cuda.device_count():   # if has 1 batch per GPU
                 break   # avoid BN issue
@@ -104,13 +104,14 @@ class TrainerClassification(TrainerBase):
                 target, _ = target
 
                 x_in = x_in.to(self.device)
-                target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
+                target = target.to(self.device)  # (shape: (batch_size, img_h, img_w))
 
                 output = self.model(x_in)
 
                 # compute metric
-                output_argmax = torch.argmax(output['class'], dim=1).cpu()
-                self.metric_val.update(output_argmax.detach().cpu().numpy(), target.squeeze().detach().cpu().numpy())
+                output_argmax = torch.argmax(output['class'], dim=1).detach().cpu().numpy()
+                target_argmax = torch.argmax(target.squeeze(), dim=1).detach().cpu().numpy()
+                self.metric_val.update(output_argmax, target_argmax)
 
         metric_result = self.metric_val.get_results()
         metric_list_mean['acc'] = metric_result['acc']
