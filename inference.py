@@ -21,7 +21,7 @@ class Inferencer:
         self.device = torch.device('cuda' if use_cuda else 'cpu')
 
         self.loader_val = self.init_data_loader(batch_size=self.args.batch_size,
-                                                mode='test',
+                                                mode=self.args.mode,
                                                 dataloader_name=self.args.dataloader,
                                                 x_path=self.args.val_x_path,
                                                 y_path=self.args.val_y_path,
@@ -55,7 +55,7 @@ class Inferencer:
                 output = self.model(x_in)
 
                 output_argmax = torch.argmax(output['class'], dim=1).detach().cpu().numpy()
-                target_argmax = torch.argmax(target.squeeze(), dim=1).detach().cpu().numpy() if self.args.mode == 'validation' else np.zeros_like(output_argmax)
+                target_argmax = torch.argmax(target.squeeze(), dim=1).detach().cpu().numpy() if self.args.mode == 'inference' else np.zeros_like(output_argmax)
                 self.metric_val.update(output_argmax, target_argmax)
 
         # metric_result = self.metric_val.get_results()

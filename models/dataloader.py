@@ -286,7 +286,7 @@ class Image2VectorLoader(Dataset):
             albumentations.Normalize(mean=self.image_mean, std=self.image_std)
         ])
 
-    def transform(self, _input, _label, idx_1):
+    def transform(self, _input, _label):
         random_gen = random.Random()
 
         if self.mode == 'train':

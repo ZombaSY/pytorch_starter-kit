@@ -14,7 +14,7 @@ class CrossEntropyLoss(nn.Module):
         self.loss = nn.CrossEntropyLoss()
 
     def forward(self, x, y):
-        y = y.long().squeeze(1)
+        y = y.squeeze(1)
 
         return self.loss(x, y)
 
@@ -697,7 +697,7 @@ class TanHLoss(nn.Module):
         return torch.tanh(F.mse_loss(x, y) ** self.temperature)
 
 
-class LabelSmoothingCrossEntropy(nn.Module):
+class LabelSmoothingCrossEntropyLoss(nn.Module):
     def __init__(self, epsilon: float = 0.1, reduction='mean'):
         super().__init__()
         self.epsilon = epsilon

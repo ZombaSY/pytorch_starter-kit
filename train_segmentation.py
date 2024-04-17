@@ -58,7 +58,7 @@ class TrainerSegmentation(TrainerBase):
             batch_losses += loss.item()
 
             if hasattr(self.args, 'train_fold'):
-                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx != len(self.loader_train) - 1:
+                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx != (self.loader_train.__len__() // self.args.batch_size) - 1:
                     self._validate(epoch)
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()

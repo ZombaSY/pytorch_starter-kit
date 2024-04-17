@@ -22,7 +22,7 @@
   dataloader: 'Image2Vector',
     weighted_sampler: False,
     batch_size: 32,
-  criterion: 'LabelSmoothingCrossEntropy',
+  criterion: 'LabelSmoothingCrossEntropyLoss',
   input_size: [256, 256],  # (height, width)
   optimizer: 'AdamW',
     lr: 0.000001,
