@@ -15,10 +15,11 @@
 
   ### Train Parameters
   task: 'segmentation',
-  model_name: 'Swin_T_SemanticSegmentation',
+  model_name: 'Swin_t_SemanticSegmentation',
     num_class: 20,
     in_channel: 3,
     base_c: 96,
+    freeze_backbone: false,
   dataloader: 'Image2Image',
     weighted_sampler: False,
     batch_size: 128,
@@ -33,7 +34,7 @@
       warmup_epoch: 20, # 20
   epoch: 10000,
   early_stop_epoch: 300,
-  model_path: 'pretrained/swin_tiny_patch4_window7_224.pth',
+  model_path: 'pretrained/imagenet/swin_tiny_patch4_window7_224.pth',
 
   ### Augmentation parameters
   data_cache: true,
@@ -52,8 +53,8 @@
   transform_rand_crop: 224,
   transform_rain: 0.01,
 
-  train_x_path: '/path/to/train/input',
-  train_y_path: '/path/to/train/label',
-  val_x_path:   '/path/to/val/input',
-  val_y_path:   '/path/to/val/label',
+  train_x_path: 'path/to/train/input',
+  train_y_path: 'path/to/train/label',
+  val_x_path:   'path/to/val/input',
+  val_y_path:   'path/to/val/label',
 }

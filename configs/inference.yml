@@ -1,11 +1,11 @@
 {
  ### Environment Parameters
   debug: true,
-  mode: test, # test, validation
+  mode: test, # test, inference
   cuda: true,
   pin_memory: true,
   worker: 4,
-  CUDA_VISIBLE_DEVICES: '1',
+  CUDA_VISIBLE_DEVICES: '0',
 
   task: 'classification', # segmentation, classification
   model_name: 'ConvNextV2_classification',  # ConvNextV2_classification
@@ -20,10 +20,10 @@
   mount_data_on_memory: false,
   draw_results: false,
 
-  model_path: 'pretrained/ConvNextV2_classification_Epoch_34_f1_0.9672608239975305.pt',
+  model_path: 'path/to/model.pt',
 
-  val_x_path:   '/path/to/data/val/input',
-  val_y_path:   '/path/to/data/val/label',
-  val_csv_path: '/path/to/data/val/test.csv',
+  val_x_path:   'path/to/data/val/input',
+  val_y_path:   'path/to/data/val/label',
+  val_csv_path: 'path/to/valid.csv',
   image_col: 'img_path',
 }

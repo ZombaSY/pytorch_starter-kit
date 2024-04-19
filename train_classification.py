@@ -57,7 +57,7 @@ class TrainerClassification(TrainerBase):
             batch_losses += loss.item()
 
             if hasattr(self.args, 'train_fold'):
-                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx != (self.loader_train.__len__() // self.args.batch_size) - 1:
+                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx < (self.loader_train.__len__() // self.args.batch_size) - self._validate_interval:
                     self._validate(epoch)
 
             # compute metric
@@ -154,6 +154,6 @@ class TrainerClassification(TrainerBase):
 
             if (epoch - self.last_saved_epoch) > self.args.early_stop_epoch:
                 print('The model seems to be converged. Early stop training.')
-                print(f'Best acc -----> {self.metric_best["acc"]}')
-                wandb.log({f'Best acc': self.metric_best['acc']})
+                print(f'Best acc -----> {self.metric_best["f1"]}')
+                wandb.log({f'Best f1': self.metric_best['f1']})
                 sys.exit()  # safe exit

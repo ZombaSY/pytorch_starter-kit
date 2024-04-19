@@ -6,54 +6,57 @@
   pin_memory: true,
   wandb: true,
   worker: 8,
-  log_interval: 9999,
   save_interval: 9999,
   saved_model_directory: 'model_ckpt',
   train_fold: 5,  # The number of validation while training
   project_name: 'wandb_project',
-  CUDA_VISIBLE_DEVICES: '2',
+  CUDA_VISIBLE_DEVICES: '0,1',
 
   ### Train Parameters
   task: 'classification',
-  model_name: 'ConvNextV2_classification',  # ConvNextV2_classification, Swin_t_classification
+  model_name: 'Swin_l_classification',  # ConvNextV2_classification, Swin_t_classification
     num_class: 25,
     in_channel: 3,
     hidden_dims: 1024,
+    freeze_backbone: false,
+    normalization: 'BatchNorm1d', # BatchNorm1d, InstanceNorm1d, LayerNorm
+    activation: , # ReLU, SiLU
+    dropblock: false,
   dataloader: 'Image2Vector',
     weighted_sampler: False,
     batch_size: 32,
-  criterion: 'LabelSmoothingCrossEntropyLoss',
+  criterion: 'LabelSmoothingCrossEntropyLoss',  # LabelSmoothingCrossEntropyLoss, CrossEntropyLoss
   input_size: [256, 256],  # (height, width)
   optimizer: 'AdamW',
-    lr: 0.000001,
-    lr_min: 0.00000001,
+    lr: 0.0001,
+    lr_min: 0.000005,
     weight_decay: 0.05,
     scheduler: 'WarmupCosine',
       cycles: 5,
       warmup_epoch: 0,
-  epoch: 90,
-  early_stop_epoch: 20,
-  model_path: '', # pretrained/swin_tiny_patch4_window7_224.pt,
+  epoch: 30,
+  early_stop_epoch: 15,
+  model_path: 'path/to/model.pt', # should include "imagenet" marker to load externel weights.
 
   ### Augmentation parameters
   data_cache: true,
-  transform_blur: 0.5,
-  transform_clahe: 0.3,
+  transform_blur: 0.3,
+  transform_clahe: 0.1,
   transform_cutmix: 0.0,
-  transform_fancyPCA: 0.3,
-  transform_fog: 0.1,
+  transform_fancyPCA: 0.1,
+  transform_fog: 0.05,
   transform_g_noise: 0.3,
-  transform_jitter: 0.3,
+  transform_jitter: 0.1,
   transform_hflip: 0.5,
   transform_vflip: 0.0,
-  transform_jpeg: 0.5,
+  transform_jpeg: 0.3,
   transform_mixup: 0.5,
-  transform_perspective: 0.3,
-  transform_rand_resize: 0.9,
-  transform_rand_crop: 228,
-  transform_rain: 0.1,
+  transform_perspective: 0.1,
+  transform_rand_resize: 0.0,
+  transform_rand_crop: 256,
+  transform_rain: 0.05,
 
-  train_csv_path: '/path/to/train/train.csv',
-  val_csv_path:   '/path/to/train/valid.csv',
-  image_col: 'img_path',
+  train_csv_path: 'path/to/train.csv',
+  val_csv_path:   'path/to/valid.csv',
+  image_col: 'img_path',  # upscale_img_path, img_path
 }

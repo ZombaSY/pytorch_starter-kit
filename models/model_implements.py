@@ -11,7 +11,7 @@ from models.heads import MLP
 from collections import OrderedDict
 
 
-class Swin_T(nn.Module):
+class Swin_t(nn.Module):
     def __init__(self, in_channel=3, base_c=96, **kwargs):
         super().__init__()
 
@@ -51,9 +51,9 @@ class Swin_T(nn.Module):
         return out_dict
 
 
-class Swin_T_SemanticSegmentation(Swin_T):
+class Swin_t_SemanticSegmentation(Swin_t):
     def __init__(self, num_class=2, in_channel=3, base_c=96, **kwargs):
-        super(Swin_T_SemanticSegmentation, self).__init__(in_channel, base_c)
+        super(Swin_t_SemanticSegmentation, self).__init__(in_channel, base_c)
         self.uper_head = M_UPerHead(in_channels=[base_c, base_c * 2, base_c * 4, base_c * 8],
                                     in_index=[0, 1, 2, 3],
                                     pool_scales=(1, 2, 3, 6),
@@ -93,10 +93,14 @@ class UNet(nn.Module):
 
 
 class ConvNextV2_classification(nn.Module):
-    def __init__(self, hidden_dims, num_class, **kwargs):
+    def __init__(self, hidden_dims, num_class, freeze_backbone, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
         super().__init__()
         self.backbone = BackboneLoader('convnext_large_mlp.clip_laion2b_soup_ft_in12k_in1k_384', exportable=True, pretrained=True)
-        self.classifier = MLP.SimpleClassifier(in_features=1536, hidden_dims=hidden_dims, num_class=num_class, normalization=nn.BatchNorm1d, activation=nn.ReLU)
+        self.classifier = MLP.SimpleClassifier(in_features=1536, hidden_dims=hidden_dims, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
+
+        if freeze_backbone:
+            for m in self.backbone.parameters():
+                m.requires_grad = False
 
     def forward(self, x):
         out_dict = {}
@@ -110,16 +114,21 @@ class ConvNextV2_classification(nn.Module):
         return out_dict
 
 
-class Swin_t_classification(Swin_T):
-    def __init__(self, hidden_dims, num_class, **kwargs):
+class Swin_l_classification(nn.Module):
+    def __init__(self, hidden_dims, num_class, freeze_backbone, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
         super().__init__()
-        self.classifier = MLP.SimpleClassifier(in_features=768, hidden_dims=hidden_dims, num_class=num_class, normalization=nn.BatchNorm1d, activation=nn.ReLU)
+        self.backbone = BackboneLoader('swinv2_large_window12to16_192to256.ms_in22k_ft_in1k', exportable=True, pretrained=True)
+        self.classifier = MLP.SimpleClassifier(in_features=1536, hidden_dims=hidden_dims, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
+
+        if freeze_backbone:
+            for m in self.backbone.parameters():
+                m.requires_grad = False
 
     def forward(self, x):
         out_dict = {}
 
-        feat = self.swin_transformer(x)
-        out = self.classifier(feat[-1])
+        feat = self.backbone(x)
+        out = self.classifier(feat.permute(0, 3, 1, 2))
 
         out_dict['class'] = out
         out_dict['feat'] = feat

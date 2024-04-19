@@ -342,7 +342,7 @@ class Image2VectorLoader(Dataset):
             if self.args.task == 'classification' and self.mode != 'test':
                 y_vec = F.one_hot(y_vec, num_classes=self.args.num_class)
 
-        x_img_tr, y_vec = self.transform(x_img, y_vec, index)
+        x_img_tr, y_vec = self.transform(x_img, y_vec)
 
         return (x_img_tr, x_path), (y_vec, x_path)
 
