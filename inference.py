@@ -23,9 +23,9 @@ class Inferencer:
         self.loader_val = self.init_data_loader(batch_size=self.args.batch_size,
                                                 mode=self.args.mode,
                                                 dataloader_name=self.args.dataloader,
-                                                x_path=self.args.val_x_path,
-                                                y_path=self.args.val_y_path,
-                                                csv_path=self.args.val_csv_path)
+                                                x_path=self.args.valid_x_path,
+                                                y_path=self.args.valid_y_path,
+                                                csv_path=self.args.valid_csv_path)
 
         self.model = TrainerBase.init_model(self.args.model_name, self.device, self.args)
         self.model.module.load_state_dict(torch.load(args.model_path))

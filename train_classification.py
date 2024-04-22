@@ -8,8 +8,8 @@ from trainer_base import TrainerBase
 
 
 class TrainerClassification(TrainerBase):
-    def __init__(self, args, now=None):
-        super(TrainerClassification, self).__init__(args, now=now)
+    def __init__(self, args, now=None, k_fold=0):
+        super(TrainerClassification, self).__init__(args, now=now, k_fold=k_fold)
 
         # 'init' means that this variable must be initialized.
         # 'set' means that this variable is available to being set, not must.
@@ -17,10 +17,10 @@ class TrainerClassification(TrainerBase):
                                                   mode='train',
                                                   dataloader_name=self.args.dataloader,
                                                   csv_path=self.args.train_csv_path)
-        self.loader_val = self.init_data_loader(batch_size=self.args.batch_size // 4,
+        self.loader_val = self.init_data_loader(batch_size=self.args.batch_size,
                                                 mode='validation',
                                                 dataloader_name=self.args.dataloader,
-                                                csv_path=self.args.val_csv_path)
+                                                csv_path=self.args.valid_csv_path)
 
         self.scheduler = self.set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
         self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold // self.args.batch_size
@@ -111,7 +111,7 @@ class TrainerClassification(TrainerBase):
 
                 # compute metric
                 output_argmax = torch.argmax(output['class'], dim=1).detach().cpu().numpy()
-                target_argmax = torch.argmax(target.squeeze(), dim=1).detach().cpu().numpy()
+                target_argmax = torch.argmax(target.squeeze() if (self.args.batch_size // 4) != 1 else target, dim=1).detach().cpu().numpy()
                 self.metric_val.update(output_argmax, target_argmax)
 
         metric_result = self.metric_val.get_results()
@@ -155,5 +155,5 @@ class TrainerClassification(TrainerBase):
             if (epoch - self.last_saved_epoch) > self.args.early_stop_epoch:
                 print('The model seems to be converged. Early stop training.')
                 print(f'Best acc -----> {self.metric_best["f1"]}')
-                wandb.log({f'Best f1': self.metric_best['f1']})
-                sys.exit()  # safe exit
+                if self.self.args.wandb:
+                    wandb.log({f'Best f1': self.metric_best['f1']})

@@ -5,11 +5,13 @@ import yaml
 import numpy as np
 import random
 import ast
+import sys
 
 from train_segmentation import TrainerSegmentation
 from train_classification import TrainerClassification
 from inference import Inferencer
 from datetime import datetime
+from models import utils
 
 
 # fix seed for reproducibility
@@ -29,6 +31,17 @@ def conf_to_args(args, **kwargs):    # pass in variable numbers of args
 
     for key, value in kwargs.items():
         var[key] = value
+
+
+def init_trainer(args, now_time, k_fold=0):
+    if args.task == 'segmentation':
+        trainer = TrainerSegmentation(args, now_time, k_fold=k_fold)
+    elif args.task == 'classification':
+        trainer = TrainerClassification(args, now_time, k_fold=k_fold)
+    else:
+        raise ValueError('')
+
+    return trainer
 
 
 def main():
@@ -72,15 +85,21 @@ def main():
         # args.transform_mixup = 0
 
     if args.mode == 'train':
-        if args.task == 'segmentation':
-            trainer = TrainerSegmentation(args, now_time)
-        elif args.task == 'classification':
-            args.task = 'classification'
-            trainer = TrainerClassification(args, now_time)
-        else:
-            raise ValueError('')
+        if hasattr(args, 'train_csv_path_folds') and hasattr(args, 'valid_csv_path_folds'):
+            k_fold = len(args.train_csv_path_folds)
 
-        trainer.run()
+            for idx in range(k_fold):
+                print(f'{utils.Colors.BOLD}Running {idx}th fold...{utils.Colors.END}')
+                args.train_csv_path = args.train_csv_path_folds[idx]
+                args.valid_csv_path = args.valid_csv_path_folds[idx]
+
+                trainer = init_trainer(args, now_time, k_fold=idx)
+                trainer.run()
+
+        else:
+            trainer = init_trainer(args, now_time)
+            trainer.run()
+
 
     elif args.mode in ['inference', 'test']:
 
@@ -94,6 +113,8 @@ def main():
         inferencer.inference()
     else:
         print('No mode supported.')
+
+    sys.exit()  # safe exit
 
 
 if __name__ == "__main__":

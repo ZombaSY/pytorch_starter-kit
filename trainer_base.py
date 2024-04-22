@@ -17,10 +17,11 @@ from datetime import datetime
 class TrainerBase:
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, args, now=None):
+    def __init__(self, args, now=None, k_fold=0):
         self.args = args
         now_time = now if now is not None else datetime.now().strftime("%Y%m%d %H%M%S")
         self.saved_model_directory = self.args.saved_model_directory + '/' + now_time
+        self.k_fold = k_fold
 
         # save hyper-parameters
         if not self.args.debug:
@@ -47,7 +48,7 @@ class TrainerBase:
                     self.model.module.load_pretrained_imagenet(self.args.model_path)
                     print('Model loaded successfully!!! (ImageNet)')
                 else:
-                    self.model.module.load_state_dict(torch.load(self.args.model_path))
+                    self.model.module.load_pretrained(self.args.model_path)
                     print('Model loaded successfully!!! (Custom)')
                 self.model.to(self.device)
 
@@ -77,7 +78,7 @@ class TrainerBase:
     def save_model(self, model, model_name, epoch, metric=None, best_flag=False, metric_name='metric'):
         file_path = self.saved_model_directory + '/'
 
-        file_format = file_path + model_name + '_Epoch_' + str(epoch) + '_' + metric_name + '_' + str(metric) + '.pt'
+        file_format = file_path + model_name + '-Epoch_' + str(epoch) + '-' + metric_name + '_' + str(metric)[:6] + '-folds_' + str(self.k_fold) + '.pt'
 
         if not os.path.exists(file_path):
             os.makedirs(file_path)
@@ -89,7 +90,7 @@ class TrainerBase:
 
         torch.save(model.state_dict(), file_format)
 
-        print(f'{utils.Colors.LIGHT_RED}{file_format} \t model saved!!{utils.Colors.END}')
+        print(f'{utils.Colors.LIGHT_RED}{file_format} model saved!!{utils.Colors.END}')
         self.last_saved_epoch = epoch
 
     def init_data_loader(self,

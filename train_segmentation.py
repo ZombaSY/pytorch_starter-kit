@@ -8,8 +8,8 @@ from trainer_base import TrainerBase
 
 
 class TrainerSegmentation(TrainerBase):
-    def __init__(self, args, now=None):
-        super(TrainerSegmentation, self).__init__(args, now=now)
+    def __init__(self, args, now=None, k_fold=0):
+        super(TrainerSegmentation, self).__init__(args, now=now, k_fold=k_fold)
 
         # 'init' means that this variable must be initialized.
         # 'set' means that this variable is available to being set, not must.
@@ -18,11 +18,11 @@ class TrainerSegmentation(TrainerBase):
                                                   dataloader_name=self.args.dataloader,
                                                   x_path=self.args.train_x_path,
                                                   y_path=self.args.train_y_path)
-        self.loader_val = self.init_data_loader(batch_size=self.args.batch_size // 4,
+        self.loader_val = self.init_data_loader(batch_size=self.args.batch_size,
                                                 mode='validation',
                                                 dataloader_name=self.args.dataloader,
-                                                x_path=self.args.val_x_path,
-                                                y_path=self.args.val_y_path)
+                                                x_path=self.args.valid_x_path,
+                                                y_path=self.args.valid_y_path)
 
         self.scheduler = self.set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
         self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold // self.args.batch_size
@@ -137,5 +137,5 @@ class TrainerSegmentation(TrainerBase):
             if (epoch - self.last_saved_epoch) > self.args.early_stop_epoch:
                 print('The model seems to be converged. Early stop training.')
                 print(f'Best mIoU -----> {self.metric_best["mIoU"]}')
-                wandb.log({f'Best mIoU': self.metric_best['mIoU']})
-                sys.exit()  # safe exit
+                if self.self.args.wandb:
+                    wandb.log({f'Best mIoU': self.metric_best['mIoU']})

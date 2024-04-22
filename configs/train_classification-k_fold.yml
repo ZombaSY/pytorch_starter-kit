@@ -8,9 +8,9 @@
   worker: 8,
   save_interval: 9999,
   saved_model_directory: 'model_ckpt',
-  train_fold: 5,  # The number of validation while training
+  train_fold: 5,  # The number of validation in 1 train epoch
   project_name: 'wandb_project',
-  CUDA_VISIBLE_DEVICES: '2',
+  CUDA_VISIBLE_DEVICES: '1',
 
   ### Train Parameters
   task: 'classification',
@@ -60,7 +60,16 @@
   transform_rand_crop: 256,
   transform_rain: 0.05,
 
-  train_csv_path: '/path/to/train.csv',
-  valid_csv_path: '/path/to/valid.csv',
+  train_csv_path_folds: ['/path/to/train_fold_0.csv',
+                         '/path/to/train_fold_1.csv',
+                         '/path/to/train_fold_2.csv',
+                         '/path/to/train_fold_3.csv',
+                         '/path/to/train_fold_4.csv'],
+  valid_csv_path_folds: ['/path/to/valid_fold_0.csv',
+                         '/path/to/valid_fold_0.csv',
+                         '/path/to/valid_fold_0.csv',
+                         '/path/to/valid_fold_0.csv',
+                         '/path/to/valid_fold_0.csv'],
+
   image_col: 'img_path',  # upscale_img_path, img_path
 }
