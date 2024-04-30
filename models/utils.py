@@ -111,7 +111,7 @@ class ImageProcessing(object):
 
         '''
         L_chan: black and white with input range [0, 100]
-        a_chan/b_chan: color channels with input range ~[-110, 110], not exact 
+        a_chan/b_chan: color channels with input range ~[-110, 110], not exact
         [0, 100] => [0, 1],  ~[-110, 110] => [0, 1]
         '''
         img[0, :, :] = img[0, :, :] / 100
@@ -577,7 +577,7 @@ class ImageProcessing(object):
         R3 = torch.exp(R[(int(R.shape[0] / 3) * 2):(int(R.shape[0] / 3) * 3)])
 
         '''
-        Apply the curve to the R channel 
+        Apply the curve to the R channel
         '''
         slope_sqr_diff = Variable(torch.zeros(1) * 0.0).cuda()
 
@@ -585,13 +585,13 @@ class ImageProcessing(object):
             img, R1, slope_sqr_diff, channel_in=0, channel_out=0)
 
         '''
-        Apply the curve to the G channel 
+        Apply the curve to the G channel
         '''
         img_copy, slope_sqr_diff = ImageProcessing.apply_curve(
             img_copy, R2, slope_sqr_diff, channel_in=1, channel_out=1)
 
         '''
-        Apply the curve to the B channel 
+        Apply the curve to the B channel
         '''
         img_copy, slope_sqr_diff = ImageProcessing.apply_curve(
             img_copy, R3, slope_sqr_diff, channel_in=2, channel_out=2)
@@ -631,7 +631,7 @@ class ImageProcessing(object):
         slope_sqr_diff = Variable(torch.zeros(1) * 0.0).cuda()
 
         '''
-        Apply the curve to the L channel 
+        Apply the curve to the L channel
         '''
         img_copy, slope_sqr_diff = ImageProcessing.apply_curve(
             img, L1, slope_sqr_diff, channel_in=0, channel_out=0)
@@ -660,7 +660,7 @@ class ImageProcessing(object):
 
 
 # https://arxiv.org/abs/1905.04899
-def cut_mix(_input, _refer, mask_1=None, mask_2=None) -> (Image.Image, Image.Image):
+def cut_mix(_input, _refer, mask_1=None, mask_2=None):
     """
     :param _input: PIL.Image or ndarray
     :param _refer: PIL.Image or ndarray

@@ -223,9 +223,9 @@ class StreamSegMetrics_classification:
         pred_np_flatten = np.array([item for item in itertools.chain.from_iterable(self.pred_list)])
         target_np_flatten = np.array([item for item in itertools.chain.from_iterable(self.target_list)])
 
-        self.metric_dict['kappa_score'] = cohen_kappa_score(pred_np_flatten, target_np_flatten)
-        self.metric_dict['acc'] = accuracy_score(pred_np_flatten, target_np_flatten)
-        self.metric_dict['f1'] = f1_score(pred_np_flatten, target_np_flatten, average='macro')
+        self.metric_dict['kappa_score'] = cohen_kappa_score(pred_np_flatten, pred_np_flatten)
+        self.metric_dict['acc'] = accuracy_score(target_np_flatten, pred_np_flatten)
+        self.metric_dict['f1'] = f1_score(target_np_flatten, pred_np_flatten, average='macro')
 
         return self.metric_dict
 

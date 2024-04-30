@@ -155,5 +155,6 @@ class TrainerClassification(TrainerBase):
             if (epoch - self.last_saved_epoch) > self.args.early_stop_epoch:
                 print('The model seems to be converged. Early stop training.')
                 print(f'Best acc -----> {self.metric_best["f1"]}')
-                if self.self.args.wandb:
+                if self.args.wandb:
                     wandb.log({f'Best f1': self.metric_best['f1']})
+                break

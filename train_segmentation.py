@@ -139,3 +139,4 @@ class TrainerSegmentation(TrainerBase):
                 print(f'Best mIoU -----> {self.metric_best["mIoU"]}')
                 if self.self.args.wandb:
                     wandb.log({f'Best mIoU': self.metric_best['mIoU']})
+            break

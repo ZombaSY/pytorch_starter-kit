@@ -47,6 +47,7 @@ def augmentations(args, target_size):
             albumentations.GaussNoise(p=args.transform_g_noise),
             albumentations.FancyPCA(p=args.transform_fancyPCA),
             albumentations.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=args.transform_jitter),
+            albumentations.CoarseDropout(max_height=target_size // 2, max_width=target_size // 2, min_height=target_size // 8, min_width=target_size // 8, p=args.transform_coaseDropout),
             albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=args.transform_perspective)]
 
 
@@ -145,12 +146,8 @@ class Image2ImageLoader(Dataset):
                     if param not in excludings:
                         setattr(self.args, param, min(getattr(self.args, param) * scaler, 1))
                     print(f'{utils.Colors.LIGHT_WHITE}{param}: {getattr(self.args, param)}{utils.Colors.END}')
-            self.transform2 = albumentations.Compose([
-                *augmentations(self.args, self.crop_factor)
-            ])
-        self.transforms_normalize = albumentations.Compose([
-            albumentations.Normalize(mean=self.image_mean, std=self.image_std)
-        ])
+            self.transform_augmentation = albumentations.Compose([*augmentations(self.args, self.crop_factor)])
+        self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
     def transform(self, _input, _label):
         random_gen = random.Random()
@@ -189,8 +186,8 @@ class Image2ImageLoader(Dataset):
 
         _input = np.transpose(_input, [2, 0, 1])
 
-        _input = torch.from_numpy(_input.astype(np.float32))  # (3, 640, 480)
-        _label = torch.from_numpy(_label)  # (640, 480)
+        _input = torch.from_numpy(_input.astype(np.float32))
+        _label = torch.from_numpy(_label)
         _label = _label.unsqueeze(0)    # expand 'grey channel' for loss function dependency
 
         return _input, _label
@@ -279,12 +276,8 @@ class Image2VectorLoader(Dataset):
                     if param not in excludings:
                         setattr(self.args, param, min(getattr(self.args, param) * scaler, 1))
                     print(f'{utils.Colors.LIGHT_WHITE}{param}: {getattr(self.args, param)}{utils.Colors.END}')
-            self.transform_augmentation = albumentations.Compose([
-                *augmentations(self.args, self.crop_factor)
-            ])
-        self.transforms_normalize = albumentations.Compose([
-            albumentations.Normalize(mean=self.image_mean, std=self.image_std)
-        ])
+            self.transform_augmentation = albumentations.Compose([*augmentations(self.args, self.crop_factor)])
+        self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
     def transform(self, _input, _label):
         random_gen = random.Random()
@@ -325,7 +318,7 @@ class Image2VectorLoader(Dataset):
         _input = norm['image']
         _input = np.transpose(_input, [2, 0, 1])
 
-        _input = torch.from_numpy(_input.astype(np.float32))  # (3, 640, 480)
+        _input = torch.from_numpy(_input.astype(np.float32))
 
         return _input, _label.float()
 

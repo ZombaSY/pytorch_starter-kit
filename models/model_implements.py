@@ -95,7 +95,7 @@ class UNet(nn.Module):
 class ConvNext_l_classification(nn.Module):
     def __init__(self, hidden_dims, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
         super().__init__()
-        self.backbone = BackboneLoader('convnext_large_mlp.clip_laion2b_soup_ft_in12k_in1k_384', exportable=True, pretrained=True)
+        self.backbone = BackboneLoader('convnext_large_mlp.clip_laion2b_augreg_ft_in1k', exportable=True, pretrained=True)
         self.classifier = MLP.SimpleClassifier(in_features=1536, hidden_dims=hidden_dims, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
 
         if freeze_backbone:

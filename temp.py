@@ -10,23 +10,25 @@ from models import losses as loss_hub
 from models import lr_scheduler
 from trainer_base import TrainerBase
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
 
 class ModelMini:
     def __init__(self):
         self.device = 'cuda'
         self.x = torch.rand([4, 3, 256, 256]).to(self.device)
-        self.y = torch.rand([4, 2]).to(self.device).float()
+        self.y = torch.rand([4, 1, 256, 256]).to(self.device).float()
 
-        self.model = TrainerBase.init_model("MaxViT_s_classification", self.device,
-                                            argparse.Namespace(hidden_dims=1024, num_class=25, normalization='InstanceNorm1d', activation='SiLU', dropblock=False, freeze_backbone=False))
+        self.model = TrainerBase.init_model("Swin_t_SemanticSegmentation", self.device,
+                                            argparse.Namespace(hidden_dims=1024, num_class=2, normalization='InstanceNorm1d', activation='SiLU', dropblock=False, freeze_backbone=False))
 
         self.model.to(self.device)
         self.criterion = loss_hub.MSELoss()
 
-        self.optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.model.parameters()),
-                                           lr=1e-2, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-3)
+        # self.optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.model.parameters()),
+        #                                    lr=1e-2, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-3)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(),
+                                           lr=1e+2)
 
         self.epochs = 3
         self.steps = 10
@@ -58,10 +60,10 @@ class ModelMini:
         for epoch in range(self.epochs):
             for step in range(self.steps):
                 out = self.model(self.x)
-                loss = self.criterion(out['score'], self.y)
+                loss = self.criterion(out['seg'], self.y)
 
-                self.optimizer.zero_grad()
                 loss.backward()
+                self.optimizer.zero_grad()
                 self.optimizer.step()
                 self.scheduler.step()
 

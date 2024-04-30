@@ -58,16 +58,18 @@ class Inferencer:
                 target_argmax = torch.argmax(target.squeeze(), dim=1).detach().cpu().numpy() if self.args.mode == 'inference' else np.zeros_like(output_argmax)
                 self.metric_val.update(output_argmax, target_argmax)
 
-        # metric_result = self.metric_val.get_results()
-        # metric_list_mean['acc'] = metric_result['acc']
-        # metric_list_mean['f1'] = metric_result['f1']
+        if self.args.mode == 'inference':
+            metric_list_mean = {}
+            metric_result = self.metric_val.get_results()
+            metric_list_mean['acc'] = metric_result['acc']
+            metric_list_mean['f1'] = metric_result['f1']
 
-        # for key in metric_list_mean.keys():
-        #     metric_list_mean[key] = np.mean(metric_list_mean[key])
+            for key in metric_list_mean.keys():
+                metric_list_mean[key] = np.mean(metric_list_mean[key])
 
-        # for key in metric_list_mean.keys():
-        #     log_str = f'validation {key}: {metric_list_mean[key]}'
-        #     print(f'{utils.Colors.LIGHT_GREEN} {log_str} {utils.Colors.END}')
+            for key in metric_list_mean.keys():
+                log_str = f'validation {key}: {metric_list_mean[key]}'
+                print(f'{utils.Colors.LIGHT_GREEN} {log_str} {utils.Colors.END}')
 
         df = pd.DataFrame({'fn': self.loader_val.image_loader.df['img_path'],
                            'label': self.metric_val.get_pred_flatten()})
