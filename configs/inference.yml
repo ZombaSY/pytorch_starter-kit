@@ -8,22 +8,27 @@
   CUDA_VISIBLE_DEVICES: '1',
 
   task: 'classification', # segmentation, classification
-  model_name: 'ConvNextV2_classification',  # ConvNextV2_classification
+  model_name: 'ConvNext_b_classification',  # ConvNextV2_classification
     num_class: 25,
     in_channel: 3,
     hidden_dims: 1024,
-  criterion: 'CrossEntropyLoss',  # CE, DiceBCE
+    freeze_backbone: false,
+    normalization: 'InstanceNorm1d', # BatchNorm1d, InstanceNorm1d, LayerNorm
+    activation: 'SiLU', # ReLU, SiLU
+    dropblock: true,
+
   dataloader: 'Image2Vector', # Image2Image, Image2Vector
     weighted_sampler: False,
-    batch_size: 32,
-  input_size: [256, 256],  # (height, width)
-  mount_data_on_memory: false,
+    batch_size: 256,
+    input_size: [256, 256],  # (height, width)
+
+  data_cache: false,
   draw_results: false,
 
-  model_path: 'pretrained/ConvNextV2_classification_Epoch_34_f1_0.9672608239975305.pt',
+  model_path: '/path/to/model.pt',
 
   valid_x_path:   '/path/to/data/val/input',
   valid_y_path:   '/path/to/data/val/label',
-  valid_csv_path: '/path/to/data/valid.csv',
+  valid_csv_path: '/path/to/data/val/test.csv',
   image_col: 'img_path',
 }

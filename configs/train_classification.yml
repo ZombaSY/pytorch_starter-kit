@@ -10,7 +10,7 @@
   saved_model_directory: 'model_ckpt',
   train_fold: 5,  # The number of validation while training
   project_name: 'wandb_project',
-  CUDA_VISIBLE_DEVICES: '2',
+  CUDA_VISIBLE_DEVICES: '0',
 
   ### Train Parameters
   task: 'classification',
@@ -40,7 +40,7 @@
 
   epoch: 30,
   early_stop_epoch: 15,
-  model_path: '/path/to/model.pth',
+  model_path: '/path/to/model.pt', # imagenet/swin_tiny_patch4_window7_224.pth
 
   ### Augmentation parameters
   data_cache: true,

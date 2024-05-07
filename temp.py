@@ -19,7 +19,7 @@ class ModelMini:
         self.x = torch.rand([4, 3, 256, 256]).to(self.device)
         self.y = torch.rand([4, 1, 256, 256]).to(self.device).float()
 
-        self.model = TrainerBase.init_model("Swin_t_SemanticSegmentation", self.device,
+        self.model = TrainerBase.init_model("Swin_s_classification", self.device,
                                             argparse.Namespace(hidden_dims=1024, num_class=2, normalization='InstanceNorm1d', activation='SiLU', dropblock=False, freeze_backbone=False))
 
         self.model.to(self.device)
@@ -62,10 +62,13 @@ class ModelMini:
                 out = self.model(self.x)
                 loss = self.criterion(out['seg'], self.y)
 
+                p = next(self.model.parameters())
+                print(p[0, 0, 0])
+
                 loss.backward()
                 self.optimizer.zero_grad()
                 self.optimizer.step()
-                self.scheduler.step()
+                # self.scheduler.step()
 
     def inference(self):
         self.model.eval()
