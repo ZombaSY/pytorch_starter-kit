@@ -138,12 +138,9 @@ class TrainerClassification(TrainerBase):
                     self.metric_best[key] = metric_list_mean[key]
 
         for key in metric_list_mean.keys():
-            if metric_list_mean[key] > self.metric_best[key] or epoch % self.args.save_interval == 0:
-                best_flag = True
-                if epoch % self.args.save_interval == 0:
-                    best_flag = False
+            if metric_list_mean[key] > self.metric_best[key]:
                 self.metric_best[key] = metric_list_mean[key]
-                self.save_model(self.model.module, self.args.model_name, epoch, metric_list_mean[key], best_flag=best_flag, metric_name=key)
+                self.save_model(self.model.module, self.args.model_name, epoch, metric_list_mean[key], metric_name=key)
 
         self.metric_val.reset()
 

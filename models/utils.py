@@ -825,6 +825,57 @@ def init_weights(m):
         torch.nn.init.constant_(m.bias, 0)
 
 
+def random_hflip(image, target, points_flip):
+    image = cv2.flip(image, 1)  # 1: horizontal
+    target = np.array(target).reshape(-1, 2)
+    target = target[points_flip, :]
+    target[:, 0] = 1 - target[:, 0]
+    target = target.flatten()
+
+    return image, target
+
+
+def random_rotate(image, target, theta):
+    image_center = tuple(np.array(image.shape[1::-1]) / 2)
+    rot_mat = cv2.getRotationMatrix2D(image_center, math.degrees(theta), 1.0)
+    image = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
+
+    center_x = 0.5
+    center_y = 0.5
+    landmark_num = int(len(target) / 2)
+    target_center = np.array(target) - np.array([center_x, center_y]*landmark_num)
+    target_center = target_center.reshape(landmark_num, 2)
+
+    c, s = np.cos(theta), np.sin(theta)
+    rot = np.array(((c, -s), (s, c)))
+    target_center_rot = np.matmul(target_center, rot)
+    target_rot = target_center_rot.reshape(landmark_num * 2) + np.array([center_x, center_y] * landmark_num)
+
+    return image, target_rot
+
+
+def get_landmark_label(root_path, label_file, task_type=None):
+    label_path = os.path.join(root_path, label_file)
+    with open(label_path, 'r') as f:
+        labels = f.readlines()
+    labels = [x.strip().split() for x in labels]
+    if len(labels[0]) == 1:
+        return labels
+
+    labels_new = []
+    labels = sorted(labels)
+    for label in labels:
+        image_name = os.path.join(root_path, label[0])
+        target = label[1:]
+        target = np.array([float(x) for x in target])
+        if task_type is None:
+            labels_new.append([image_name, target])
+        else:
+            labels_new.append([image_name, task_type, target])
+
+    return labels_new
+
+
 class TrainerCallBack:
 
     def train_callback(self):

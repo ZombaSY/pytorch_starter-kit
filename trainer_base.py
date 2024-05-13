@@ -75,18 +75,13 @@ class TrainerBase:
     def run(self):
         pass
 
-    def save_model(self, model, model_name, epoch, metric=None, best_flag=False, metric_name='metric'):
+    def save_model(self, model, model_name, epoch, metric=None, metric_name='metric'):
         file_path = self.saved_model_directory + '/'
 
         file_format = file_path + model_name + '-Epoch_' + str(epoch) + '-' + metric_name + '_' + str(metric)[:6] + '-folds_' + str(self.k_fold) + '.pt'
 
         if not os.path.exists(file_path):
             os.makedirs(file_path)
-
-        if best_flag:
-            if metric_name in self.model_post_path_dict.keys():
-                os.remove(self.model_post_path_dict[metric_name])
-            self.model_post_path_dict[metric_name] = file_format
 
         torch.save(model.state_dict(), file_format)
 
@@ -106,16 +101,20 @@ class TrainerBase:
                                                           y_path=y_path,
                                                           batch_size=batch_size,
                                                           num_workers=self.args.worker,
-                                                          pin_memory=self.args.pin_memory,
                                                           mode=mode,
                                                           args=self.args)
         elif dataloader_name == 'Image2Vector':
             loader = dataloader_hub.Image2VectorDataLoader(csv_path=csv_path,
                                                            batch_size=batch_size,
                                                            num_workers=self.args.worker,
-                                                           pin_memory=self.args.pin_memory,
                                                            mode=mode,
                                                            args=self.args)
+        elif dataloader_name == 'Image2Landmark':
+            loader = dataloader_hub.Image2LandmarkDataLoader(data_path=csv_path,
+                                                             batch_size=batch_size,
+                                                             num_workers=self.args.worker,
+                                                             mode=mode,
+                                                             args=self.args)
         else:
             raise Exception('No dataloader named', dataloader_name)
 

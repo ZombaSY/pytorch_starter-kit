@@ -3,7 +3,6 @@
   debug: true,
   mode: 'test', # test, inference
   cuda: true,
-  pin_memory: true,
   worker: 4,
   CUDA_VISIBLE_DEVICES: '1',
 

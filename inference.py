@@ -147,14 +147,12 @@ class Inferencer:
                                                           y_path=y_path,
                                                           batch_size=batch_size,
                                                           num_workers=self.args.worker,
-                                                          pin_memory=self.args.pin_memory,
                                                           mode=mode,
                                                           args=self.args)
         elif dataloader_name == 'Image2Vector':
             loader = dataloader_hub.Image2VectorDataLoader(csv_path=csv_path,
                                                            batch_size=batch_size,
                                                            num_workers=self.args.worker,
-                                                           pin_memory=self.args.pin_memory,
                                                            mode=mode,
                                                            args=self.args)
         else:

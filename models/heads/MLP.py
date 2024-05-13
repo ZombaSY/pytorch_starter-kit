@@ -5,7 +5,7 @@ from timm.models.layers import DropPath
 
 
 class SimpleClassifier(nn.Module):
-    def __init__(self, in_features, hidden_dims, num_class, normalization='BatchNorm1d', activation='ReLU', dropblock=True):
+    def __init__(self, in_features, num_class, normalization='BatchNorm1d', activation='ReLU', dropblock=True):
         super().__init__()
 
         normalization = getattr(nn, normalization)
@@ -15,13 +15,11 @@ class SimpleClassifier(nn.Module):
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(start_dim=1),
 
-            DropPath(0.1) if dropblock else nn.Identity(),
-
-            nn.Linear(in_features, hidden_dims),
-            normalization(hidden_dims),
             activation(),
+            DropPath(0.1) if dropblock else nn.Identity(),
+            normalization(in_features),
 
-            nn.Linear(hidden_dims, num_class),
+            nn.Linear(in_features, num_class),
         )
 
         self.apply(utils.init_weights)
@@ -29,3 +27,25 @@ class SimpleClassifier(nn.Module):
     def forward(self, feat):
 
         return self.classifier(feat)
+
+
+class SimpleClassifierTransformer(nn.Module):
+    def __init__(self, in_features, num_class, normalization='BatchNorm1d', activation='ReLU', dropblock=True):
+        super().__init__()
+
+        normalization = getattr(nn, normalization)
+        activation = getattr(nn, activation)
+
+        self.classifier = nn.Sequential(
+            activation(),
+            DropPath(0.1) if dropblock else nn.Identity(),
+            normalization(in_features),
+
+            nn.Linear(in_features, num_class),
+        )
+
+        self.apply(utils.init_weights)
+
+    def forward(self, feat):
+
+        return self.classifier(feat[:, 0])  # use class token

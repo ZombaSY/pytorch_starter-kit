@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from models.backbones.Swin import SwinTransformer
 from models.heads.UPerHead import M_UPerHead
 from models.backbones import UNet as UNet_part
+from models.backbones import MobileOne
 from models.backbones.timm_backbone import BackboneLoader
 from models.heads import MLP
 
@@ -93,10 +94,10 @@ class UNet(nn.Module):
 
 
 class ConvNext_l_classification(nn.Module):
-    def __init__(self, hidden_dims, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
+    def __init__(self, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
         super().__init__()
         self.backbone = BackboneLoader('convnext_large_mlp.clip_laion2b_augreg_ft_in1k', exportable=True, pretrained=True)
-        self.classifier = MLP.SimpleClassifier(in_features=1536, hidden_dims=hidden_dims, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
+        self.classifier = MLP.SimpleClassifier(in_features=1536, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
 
         if freeze_backbone:
             for m in self.backbone.parameters():
@@ -124,10 +125,10 @@ class ConvNext_l_classification(nn.Module):
 
 
 class ConvNext_b_classification(nn.Module):
-    def __init__(self, hidden_dims, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
+    def __init__(self, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
         super().__init__()
         self.backbone = BackboneLoader('convnext_base.clip_laion2b_augreg_ft_in12k_in1k', exportable=True, pretrained=True)
-        self.classifier = MLP.SimpleClassifier(in_features=1024, hidden_dims=hidden_dims, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
+        self.classifier = MLP.SimpleClassifier(in_features=1024, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
 
         if freeze_backbone:
             for m in self.backbone.parameters():
@@ -155,10 +156,10 @@ class ConvNext_b_classification(nn.Module):
 
 
 class ConvNext_xxl_classification(nn.Module):
-    def __init__(self, hidden_dims, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
+    def __init__(self, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
         super().__init__()
         self.backbone = BackboneLoader('convnext_xxlarge.clip_laion2b_soup_ft_in1k', exportable=True, pretrained=True)
-        self.classifier = MLP.SimpleClassifier(in_features=3072, hidden_dims=hidden_dims, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
+        self.classifier = MLP.SimpleClassifier(in_features=3072, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
 
         if freeze_backbone:
             for m in self.backbone.parameters():
@@ -186,10 +187,10 @@ class ConvNext_xxl_classification(nn.Module):
 
 
 class Swin_l_classification(nn.Module):
-    def __init__(self, hidden_dims, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
+    def __init__(self, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
         super().__init__()
         self.backbone = BackboneLoader('swinv2_large_window12to16_192to256.ms_in22k_ft_in1k', exportable=True, pretrained=True)
-        self.classifier = MLP.SimpleClassifier(in_features=1536, hidden_dims=hidden_dims, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
+        self.classifier = MLP.SimpleClassifier(in_features=1536, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
 
         if freeze_backbone:
             for m in self.backbone.parameters():
@@ -217,10 +218,10 @@ class Swin_l_classification(nn.Module):
 
 
 class Swin_s_classification(nn.Module):
-    def __init__(self, hidden_dims, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
+    def __init__(self, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
         super().__init__()
         self.backbone = BackboneLoader('swinv2_small_window16_256.ms_in1k', exportable=True, pretrained=True)
-        self.classifier = MLP.SimpleClassifier(in_features=768, hidden_dims=hidden_dims, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
+        self.classifier = MLP.SimpleClassifier(in_features=768, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
 
         if freeze_backbone:
             for m in self.backbone.parameters():
@@ -248,10 +249,10 @@ class Swin_s_classification(nn.Module):
 
 
 class Vit_m_classification(nn.Module):
-    def __init__(self, hidden_dims, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
+    def __init__(self, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
         super().__init__()
         self.backbone = BackboneLoader('vit_medium_patch16_gap_256.sw_in12k_ft_in1k', exportable=True, pretrained=True)
-        self.classifier = MLP.SimpleClassifier(in_features=512, hidden_dims=hidden_dims, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
+        self.classifier = MLP.SimpleClassifierTransformer(in_features=512, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
 
         if freeze_backbone:
             for m in self.backbone.parameters():
@@ -270,9 +271,59 @@ class Vit_m_classification(nn.Module):
         out_dict = {}
 
         feat = self.backbone(x)
-        out = self.classifier(feat.permute(0, 2, 1).view([-1, 512, 16, 16]))
+        out = self.classifier(feat)
 
         out_dict['class'] = out
         out_dict['feat'] = feat
+
+        return out_dict
+
+
+class Mobileone_s0_reg(nn.Module):
+    def __init__(self, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
+        super().__init__()
+        self.backbone = MobileOne.mobileone(variant='s0')
+        self.classifier = MLP.SimpleClassifier(in_features=1024, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
+
+        if freeze_backbone:
+            for m in self.backbone.parameters():
+                m.requires_grad = False
+
+    def forward(self, x):
+        out_dict = {}
+
+        x = self.backbone(x)
+        x_reg = self.classifier(x)
+        out_dict['class'] = x_reg * 0.5 + 0.5
+
+        return out_dict
+
+
+class Deit3_l_reg(nn.Module):
+    def __init__(self, num_class, freeze_backbone=False, normalization='BatchNorm1d', activation='ReLU', dropblock=True, **kwargs):
+        super().__init__()
+        self.backbone = BackboneLoader('deit3_large_patch16_224.fb_in22k_ft_in1k', exportable=True, pretrained=True)
+        self.classifier = MLP.SimpleClassifierTransformer(in_features=1024, num_class=num_class, normalization=normalization, activation=activation, dropblock=dropblock)
+
+        if freeze_backbone:
+            for m in self.backbone.parameters():
+                m.requires_grad = False
+
+    def load_pretrained(self, dst):
+        pretrained_weights = torch.load(dst)
+        taget_weights = OrderedDict()
+        for key in pretrained_weights.keys():
+            if 'backbone.backbone' in key:
+                target_key = key.replace('backbone.backbone', 'backbone')
+                taget_weights[target_key] = pretrained_weights[key]
+        self.backbone.load_state_dict(taget_weights)
+
+    def forward(self, x):
+        out_dict = {}
+
+        feat = self.backbone(x)
+        out = self.classifier(feat)
+
+        out_dict['class'] = out * 0.5 + 0.5
 
         return out_dict

@@ -3,10 +3,8 @@
   debug: false,
   mode: 'train',   # train
   cuda: true,
-  pin_memory: true,
   wandb: true,
   worker: 8,
-  save_interval: 9999,
   saved_model_directory: 'model_ckpt',
   train_fold: 1,  # The number of validation while training
   project_name: 'wandb_project',

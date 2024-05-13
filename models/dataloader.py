@@ -37,6 +37,7 @@ def mount_data_on_memory(img_path, CV_COLOR):
 def augmentations(args, target_size):
     return [albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=args.transform_rand_resize),
             albumentations.RandomCrop(height=target_size, width=target_size, p=1.0),
+            albumentations.CoarseDropout(max_holes=4, max_height=target_size // 4, max_width=target_size // 4, min_height=target_size // 16, min_width=target_size // 16, min_holes=1, p=args.transform_coarse_dropout),
             albumentations.HorizontalFlip(p=args.transform_hflip),
             albumentations.VerticalFlip(p=args.transform_vflip),
             albumentations.ImageCompression(quality_lower=80, quality_upper=100, p=args.transform_jpeg),
@@ -47,8 +48,8 @@ def augmentations(args, target_size):
             albumentations.GaussNoise(p=args.transform_g_noise),
             albumentations.FancyPCA(p=args.transform_fancyPCA),
             albumentations.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=args.transform_jitter),
-            albumentations.CoarseDropout(max_height=target_size // 2, max_width=target_size // 2, min_height=target_size // 8, min_width=target_size // 8, p=args.transform_coaseDropout),
-            albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=args.transform_perspective)]
+            albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=args.transform_perspective),
+            ]
 
 
 # https://github.com/rwightman/pytorch-image-models/blob/d72ac0db259275233877be8c1d4872163954dfbb/timm/data/loader.py
@@ -343,6 +344,124 @@ class Image2VectorLoader(Dataset):
         return self.len
 
 
+class Image2LandmarkLoader(Dataset):
+
+    def __init__(self,
+                 data_path,
+                 mode,
+                 **kwargs):
+
+        self.mode = mode
+        self.args = kwargs['args']
+
+        self.points_flip = [32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0,
+                            42, 41, 40, 39, 38, 37, 36, 35, 34, 33,
+                            43, 44, 45, 46,
+                            51, 50, 49, 48, 47,
+                            61, 60, 59, 58, 63, 62, 55, 54, 53, 52, 57, 56,
+                            71, 70, 69, 68, 67, 66, 65, 64,
+                            75, 76, 77, 72, 73, 74,
+                            79, 78, 81, 80, 83, 82,
+                            90, 89, 88, 87, 86, 85, 84, 95, 94, 93, 92, 91, 100, 99, 98, 97, 96, 103, 102, 101, 105, 104
+                            ]
+        self.points_flip = np.array(self.points_flip).tolist()
+        if 'train' in os.path.split(data_path)[-1]:
+            sub_dir = 'images_train'
+        elif 'valid' in os.path.split(data_path)[-1]:
+            sub_dir = 'images_valid'
+        else:
+            sub_dir = 'images_test'
+        self.root_path = os.path.join(os.path.split(data_path)[0], sub_dir)
+        self.xy = utils.get_landmark_label(self.root_path, data_path)
+
+        if hasattr(self.args, 'input_size'):
+            h, w = self.args.input_size[0], self.args.input_size[1]
+            self.size_1x = [int(h), int(w)]
+
+        if hasattr(self.args, 'transform_rand_crop'):
+            self.crop_factor = int(self.args.transform_rand_crop)
+
+        self.image_mean = [0.5, 0.5, 0.5]
+        self.image_std = [0.25, 0.25, 0.25]
+
+        # mount_data_on_memory
+        if self.args.data_cache:
+            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.mode}{utils.Colors.END}')
+            x_img_path = []
+            self.memory_data_y = []
+            for idx in range(self.len):
+                x_img_path.append(os.path.join(*[self.data_root_path, self.df[self.image_col][idx]]))
+                label = F.one_hot(torch.tensor([self.df['label'][idx]]), self.args.num_class) if self.args.task == 'classification' else torch.tensor([self.df['label'][idx]])
+                self.memory_data_y.append(label)
+            with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
+                self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
+
+        self.update_transform()
+
+    def update_transform(self, scaler=1):
+        excludings = ['transform_rand_crop', 'transform_landmark_rotate', 'transform_landmark_hflip']
+
+        self.transform_resize = albumentations.Compose([
+            albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
+        ])
+        if self.mode == 'train':
+            # progressively update augmentation scale
+            for param in vars(self.args):
+                if 'transform_' in param:
+                    if param not in excludings:
+                        setattr(self.args, param, min(getattr(self.args, param) * scaler, 1))
+                    print(f'{utils.Colors.LIGHT_WHITE}{param}: {getattr(self.args, param)}{utils.Colors.END}')
+            self.transform_augmentation = albumentations.Compose([*augmentations(self.args, self.crop_factor)])
+        self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
+
+    def transform(self, _input, _label):
+        random_gen = random.Random()
+        transform = self.transform_resize(image=_input)
+        _input = transform['image']
+
+        if self.mode == 'train':
+            if random_gen.random() < self.args.transform_landmark_hflip:
+                _input, _label = utils.random_hflip(_input, _label, self.points_flip)
+
+            if random_gen.random() < self.args.transform_landmark_rotate:
+                angle_max = 10
+                theta_max = np.radians(angle_max)
+                theta = random.uniform(-theta_max, theta_max)
+                _input, _label = utils.random_rotate(_input, _label, theta)
+
+            _input = _input.astype(np.uint8)
+            transform = self.transform_augmentation(image=_input)
+            _input = transform['image']
+
+        norm = self.transforms_normalize(image=_input)
+        _input = norm['image']
+        _input = np.transpose(_input, [2, 0, 1])
+        _input = torch.from_numpy(_input.astype(np.float32))
+        _label = torch.from_numpy(_label.astype(np.float32))
+
+        return _input, _label
+
+    def __getitem__(self, index):
+        if self.args.data_cache:
+            x_input = self.memory_data_x[index]['data']
+            y_label = self.memory_data_y[index]['data']
+
+            x_path = self.memory_data_x[index]['path']
+            y_path = self.memory_data_y[index]['path']
+        else:
+            x_path = self.xy[index][0]
+
+            x_input = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
+            y_label = self.xy[index][1]
+
+        x_input, y_label = self.transform(x_input, y_label)
+
+        return (x_input, x_path), (y_label, x_path)
+
+    def __len__(self):
+        return len(self.xy)
+
+
 class Image2ImageDataLoader:
 
     def __init__(self,
@@ -351,7 +470,6 @@ class Image2ImageDataLoader:
                  mode,
                  batch_size=4,
                  num_workers=0,
-                 pin_memory=True,
                  **kwargs):
 
         g = torch.Generator()
@@ -369,7 +487,7 @@ class Image2ImageDataLoader:
                                             shuffle=(mode == 'train'),
                                             worker_init_fn=seed_worker,
                                             generator=g,
-                                            pin_memory=pin_memory)
+                                            pin_memory=True)
 
     def __len__(self):
         return self.image_loader.__len__()
@@ -382,7 +500,6 @@ class Image2VectorDataLoader:
                  mode,
                  batch_size=4,
                  num_workers=0,
-                 pin_memory=True,
                  **kwargs):
 
         g = torch.Generator()
@@ -401,7 +518,7 @@ class Image2VectorDataLoader:
                                                 num_workers=num_workers,
                                                 worker_init_fn=seed_worker,
                                                 generator=g,
-                                                pin_memory=pin_memory,
+                                                pin_memory=True,
                                                 sampler=sampler)
 
         else:
@@ -411,7 +528,36 @@ class Image2VectorDataLoader:
                                                 shuffle=(mode == 'train'),
                                                 worker_init_fn=seed_worker,
                                                 generator=g,
-                                                pin_memory=pin_memory)
+                                                pin_memory=True)
+
+    def __len__(self):
+        return self.image_loader.__len__()
+
+
+class Image2LandmarkDataLoader:
+
+    def __init__(self,
+                 data_path,
+                 mode,
+                 batch_size=4,
+                 num_workers=0,
+                 **kwargs):
+
+        g = torch.Generator()
+        g.manual_seed(3407)
+
+        self.image_loader = Image2LandmarkLoader(data_path=data_path,
+                                                 mode=mode,
+                                                 **kwargs)
+
+        # use your own data loader
+        self.Loader = MultiEpochsDataLoader(self.image_loader,
+                                            batch_size=batch_size,
+                                            num_workers=num_workers,
+                                            shuffle=(mode == 'train'),
+                                            worker_init_fn=seed_worker,
+                                            generator=g,
+                                            pin_memory=True)
 
     def __len__(self):
         return self.image_loader.__len__()

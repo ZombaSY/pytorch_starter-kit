@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import cv2 as cv
+import math
 
 from scipy.ndimage.morphology import distance_transform_edt as edt
 from scipy.ndimage import convolve
@@ -717,3 +718,59 @@ class LabelSmoothingCrossEntropyLoss(nn.Module):
         loss = self.loss(preds, target.squeeze())
 
         return self.linear_combination(log_loss / n, loss)
+
+
+# https://github.com/ZhenglinZhou/STAR/tree/master/lib/loss
+class WingLoss(nn.Module):
+    def __init__(self, omega=0.01, epsilon=2):
+        super(  ).__init__()
+        self.omega = omega
+        self.epsilon = epsilon
+
+    def forward(self, pred, target):
+        y = target
+        y_hat = pred
+        delta_2 = (y - y_hat).pow(2).sum(dim=-1, keepdim=False)
+        delta = delta_2.clamp(min=1e-6).sqrt()
+        C = self.omega - self.omega * math.log(1 + self.omega / self.epsilon)
+        loss = torch.where(
+            delta < self.omega,
+            self.omega * torch.log(1 + delta / self.epsilon),
+            delta - C
+        )
+        return loss.mean()
+
+
+# https://github.com/ZhenglinZhou/STAR/tree/master/lib/loss
+class SmoothL1Loss(nn.Module):
+    def __init__(self, scale=0.01):
+        super(SmoothL1Loss, self).__init__()
+        self.scale = scale
+        self.EPSILON = 1e-10
+
+    def __repr__(self):
+        return "SmoothL1Loss()"
+
+    def forward(self, output: torch.Tensor, groundtruth: torch.Tensor, reduction='mean'):
+        """
+            input:  b x n x 2
+            output: b x n x 1 => 1
+        """
+        if output.dim() == 4:
+            shape = output.shape
+            groundtruth = groundtruth.reshape(shape[0], shape[1], 1, shape[3])
+
+        delta_2 = (output - groundtruth).pow(2).sum(dim=-1, keepdim=False)
+        delta = delta_2.clamp(min=1e-6).sqrt()
+        # delta = torch.sqrt(delta_2 + self.EPSILON)
+        loss = torch.where( \
+            delta_2 < self.scale * self.scale, \
+            0.5 / self.scale * delta_2, \
+            delta - 0.5 * self.scale)
+
+        if reduction == 'mean':
+            loss = loss.mean()
+        elif reduction == 'sum':
+            loss = loss.sum()
+
+        return loss

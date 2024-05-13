@@ -3,10 +3,8 @@
   debug: false,
   mode: 'train',   # train
   cuda: true,
-  pin_memory: true,
   wandb: true,
   worker: 8,
-  save_interval: 9999,
   saved_model_directory: 'model_ckpt',
   train_fold: 5,  # The number of validation while training
   project_name: 'wandb_project',
@@ -15,10 +13,9 @@
   ### Train Parameters
   task: 'classification',
 
-  model_name: 'Swin_l_classification',  # ConvNextV2_classification, Swin_t_classification
+  model_name: 'Deit3_l_reg',  # ConvNextV2_classification, Swin_t_classification
     num_class: 25,
     in_channel: 3,
-    hidden_dims: 1024,
     freeze_backbone: false,
     normalization: 'InstanceNorm1d', # BatchNorm1d, InstanceNorm1d, LayerNorm
     activation: 'ReLU', # ReLU, SiLU
@@ -27,9 +24,9 @@
   dataloader: 'Image2Vector',
     weighted_sampler: False,
     batch_size: 8,
-    input_size: [256, 256],  # (height, width)
+    input_size: [224, 224],  # (height, width)
 
-  criterion: 'LabelSmoothingCrossEntropyLoss',  # LabelSmoothingCrossEntropyLoss, CrossEntropyLoss
+  criterion: 'LabelSmoothingCrossEntropyLoss',  # LabelSmoothingCrossEntropyLoss, WingLoss
   optimizer: 'AdamW',
     lr: 0.0001,
     lr_min: 0.000005,
@@ -40,7 +37,7 @@
 
   epoch: 30,
   early_stop_epoch: 15,
-  model_path: '/path/to/model.pt', # imagenet/swin_tiny_patch4_window7_224.pth
+  model_path: '', # imagenet/swin_tiny_patch4_window7_224.pth
 
   ### Augmentation parameters
   data_cache: true,

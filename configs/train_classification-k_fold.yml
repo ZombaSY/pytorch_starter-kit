@@ -3,10 +3,8 @@
   debug: true,
   mode: 'train',   # train
   cuda: true,
-  pin_memory: true,
   wandb: true,
   worker: 8,
-  save_interval: 9999,
   saved_model_directory: 'model_ckpt',
   train_fold: 4,  # The number of validation in 1 train epoch
   project_name: 'wandb_project',
@@ -18,7 +16,6 @@
   model_name: 'Swin_s_classification',
     num_class: 25,
     in_channel: 3,
-    hidden_dims: 1024,
     freeze_backbone: false,
     normalization: 'InstanceNorm1d', # BatchNorm1d, InstanceNorm1d, LayerNorm
     activation: 'SiLU', # ReLU, SiLU
