@@ -36,9 +36,9 @@ class TrainerBase:
         use_cuda = self.args.cuda and torch.cuda.is_available()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
 
-        self.model = self.init_model(self.args.model_name, self.device, self.args)
-        self.optimizer = self.init_optimizer(self.args.optimizer, self.model, self.args.lr)
-        self.criterion = self.init_criterion(self.args.criterion)
+        self.model = self.init_model(self.args, self.device)
+        self.optimizer = self.init_optimizer(self.args, self.model)
+        self.criterion = self.init_criterion(self.args, self.device)
         self.metric_train = self.init_metric(self.args.task, self.args.num_class)
         self.metric_val = self.init_metric(self.args.task, self.args.num_class)
 
@@ -83,84 +83,89 @@ class TrainerBase:
         if not os.path.exists(file_path):
             os.makedirs(file_path)
 
+        if metric_name in self.model_post_path_dict.keys():
+            os.remove(self.model_post_path_dict[metric_name])
+        self.model_post_path_dict[metric_name] = file_format
+
         torch.save(model.state_dict(), file_format)
 
         print(f'{utils.Colors.LIGHT_RED}{file_format} model saved!!{utils.Colors.END}')
         self.last_saved_epoch = epoch
 
-    def init_data_loader(self,
-                         batch_size,
-                         mode,
-                         dataloader_name,
+    @staticmethod
+    def init_data_loader(args,
                          x_path=None,
                          y_path=None,
                          csv_path=None):
 
-        if dataloader_name == 'Image2Image':
+        if args.dataloader == 'Image2Image':
             loader = dataloader_hub.Image2ImageDataLoader(x_path=x_path,
                                                           y_path=y_path,
-                                                          batch_size=batch_size,
-                                                          num_workers=self.args.worker,
-                                                          mode=mode,
-                                                          args=self.args)
-        elif dataloader_name == 'Image2Vector':
+                                                          batch_size=args.batch_size,
+                                                          num_workers=args.worker,
+                                                          mode=args.mode,
+                                                          args=args)
+        elif args.dataloader == 'Image2Vector':
             loader = dataloader_hub.Image2VectorDataLoader(csv_path=csv_path,
-                                                           batch_size=batch_size,
-                                                           num_workers=self.args.worker,
-                                                           mode=mode,
-                                                           args=self.args)
-        elif dataloader_name == 'Image2Landmark':
+                                                           batch_size=args.batch_size,
+                                                           num_workers=args.worker,
+                                                           mode=args.mode,
+                                                           args=args)
+        elif args.dataloader == 'Image2Landmark':
             loader = dataloader_hub.Image2LandmarkDataLoader(data_path=csv_path,
-                                                             batch_size=batch_size,
-                                                             num_workers=self.args.worker,
-                                                             mode=mode,
-                                                             args=self.args)
+                                                             batch_size=args.batch_size,
+                                                             num_workers=args.worker,
+                                                             mode=args.mode,
+                                                             args=args)
         else:
-            raise Exception('No dataloader named', dataloader_name)
+            raise Exception('No dataloader named', args.dataloader)
 
         return loader
 
-    def set_scheduler(self, optimizer, scheduler_name, data_loader, batch_size):
+    @staticmethod
+    def set_scheduler(args, optimizer, data_loader):
         scheduler = None
-        steps_per_epoch = math.ceil((data_loader.__len__() / batch_size))
+        steps_per_epoch = math.ceil((data_loader.__len__() / args.batch_size))
 
-        if hasattr(self.args, 'scheduler'):
-            if scheduler_name == 'WarmupCosine':
+        if hasattr(args, 'scheduler'):
+            if args.scheduler == 'WarmupCosine':
                 scheduler = lr_scheduler.WarmupCosineSchedule(optimizer=optimizer,
-                                                              warmup_steps=steps_per_epoch * self.args.warmup_epoch,
-                                                              t_total=self.args.epoch * steps_per_epoch,
-                                                              cycles=self.args.epoch / self.args.cycles,
+                                                              warmup_steps=steps_per_epoch * args.warmup_epoch,
+                                                              t_total=args.epoch * steps_per_epoch,
+                                                              cycles=args.epoch / args.cycles,
                                                               last_epoch=-1)
-            elif scheduler_name == 'CosineAnnealing':
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.cycles, eta_min=self.args.lr_min)
-            elif scheduler_name == 'Constant':
+            elif args.scheduler == 'CosineAnnealing':
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.cycles, eta_min=args.lr_min)
+            elif args.scheduler == 'Constant':
                 scheduler = lr_scheduler.ConstantLRSchedule(optimizer, last_epoch=-1)
-            elif scheduler_name == 'WarmupConstant':
-                scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=steps_per_epoch * self.args.warmup_epoch)
+            elif args.scheduler == 'WarmupConstant':
+                scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=steps_per_epoch * args.warmup_epoch)
             else:
-                print(f'{utils.Colors.LIGHT_PURPLE}No scheduler found --> {scheduler_name}{utils.Colors.END}')
+                print(f'{utils.Colors.LIGHT_PURPLE}No scheduler found --> {args.scheduler}{utils.Colors.END}')
         else:
             pass
 
         return scheduler
 
     @staticmethod
-    def init_model(model_name, device, args):
-        model = getattr(model_implements, model_name)(**vars(args)).to(device)
+    def init_model(args, device):
+        model = getattr(model_implements, args.model_name)(**vars(args)).to(device)
 
         return torch.nn.DataParallel(model)
 
-    def init_criterion(self, criterion_name):
-        criterion = getattr(loss_hub, criterion_name)().to(self.device)
+    @staticmethod
+    def init_criterion(args, device):
+        criterion = getattr(loss_hub, args.criterion)().to(device)
 
         return criterion
 
-    def init_optimizer(self, optimizer_name, model, lr):
+    @staticmethod
+    def init_optimizer(args, model):
         optimizer = None
 
-        if optimizer_name == 'AdamW':
+        if args.optimizer == 'AdamW':
             optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
-                                          lr=lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=self.args.weight_decay)
+                                          lr=args.lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=args.weight_decay)
 
         return optimizer
 
@@ -170,7 +175,7 @@ class TrainerBase:
             metric = metrics.StreamSegMetrics_segmentation(num_class)
         elif task_name == 'classification':
             metric = metrics.StreamSegMetrics_classification(num_class)
-        elif task_name == 'regression':
+        elif task_name == 'regression' or 'landmark':
             metric = metrics.StreamSegMetrics_classification(num_class)
         else:
             raise Exception('No task named', task_name)

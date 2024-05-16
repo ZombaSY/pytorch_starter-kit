@@ -754,14 +754,10 @@ def cv2_imwrite(fns_img, img):
 
 
 def denormalize_img(img, mean, std):
-    img = img.squeeze(0).data.cpu().numpy()
-    img = np.transpose(img, (1, 2, 0))
-    img = img * np.array(std)
-    img = img + np.array(mean)
-    img = img * 255.0
-    img = img.astype(np.uint8)
+    img_t = img.permute(0, 2, 3, 1)
+    img_t = ((img_t * std) + mean) * 255
 
-    return img
+    return img_t
 
 
 def draw_image(x_img, output_prob, img_save_dir, img_id, n_class):
@@ -874,6 +870,23 @@ def get_landmark_label(root_path, label_file, task_type=None):
             labels_new.append([image_name, task_type, target])
 
     return labels_new
+
+
+def draw_landmark(img, lmk, save_dir, img_fn):
+    tmp_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    lmk = np.reshape(lmk, (-1, 2))
+    for index in range(lmk.shape[0]):
+        tmp_img = cv2.resize(tmp_img, (512, 512))
+        cv2.circle(tmp_img, (int(lmk[index][0] * tmp_img.shape[0]), int(lmk[index][1] * tmp_img.shape[1])), 2, (0, 255, 0), 1)
+        cv2.putText(tmp_img, str(index).zfill(3), (int(lmk[index][0] * tmp_img.shape[0]) + 1, int(lmk[index][1] * tmp_img.shape[1]) - 1), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+
+    img_fn = os.path.split(img_fn)[-1]
+    fn = os.path.join(save_dir, img_fn)
+    cv2_imwrite(fn, tmp_img)
+
+
+def multiprocessing_wrapper(args):
+    return args[0](*args[1:])
 
 
 class TrainerCallBack:

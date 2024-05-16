@@ -4,26 +4,26 @@
   mode: 'test', # test, inference
   cuda: true,
   worker: 4,
-  CUDA_VISIBLE_DEVICES: '1',
+  CUDA_VISIBLE_DEVICES: '0',
 
-  task: 'classification', # segmentation, classification
-  model_name: 'ConvNext_b_classification',  # ConvNextV2_classification
-    num_class: 25,
+  task: 'landmark', # segmentation, classification, regression, landmark
+  model_name: 'eva_l_reg',
+    num_class: 212,
     in_channel: 3,
-    hidden_dims: 1024,
     freeze_backbone: false,
     normalization: 'InstanceNorm1d', # BatchNorm1d, InstanceNorm1d, LayerNorm
-    activation: 'SiLU', # ReLU, SiLU
+    activation: 'ReLU', # ReLU, SiLU
     dropblock: true,
 
-  dataloader: 'Image2Vector', # Image2Image, Image2Vector
+  criterion: 'WingLoss',
+
+  dataloader: 'Image2Landmark',
     weighted_sampler: False,
-    batch_size: 256,
-    input_size: [256, 256],  # (height, width)
+    batch_size: 32,
+    input_size: [336, 336],  # [h, w]
 
   data_cache: false,
-  draw_results: false,
-
+  draw_results: true,
   model_path: '/path/to/model.pt',
 
   valid_x_path:   '/path/to/data/val/input',

@@ -39,7 +39,7 @@ def init_trainer(args, now_time, k_fold=0):
         trainer = TrainerSegmentation(args, now_time, k_fold=k_fold)
     elif args.task == 'classification':
         trainer = TrainerClassification(args, now_time, k_fold=k_fold)
-    elif args.task == 'regression':
+    elif args.task == 'regression' or 'landmark':
         trainer = TrainerRegression(args, now_time, k_fold=k_fold)
     else:
         raise ValueError('')
@@ -105,14 +105,7 @@ def main():
 
 
     elif args.mode in ['inference', 'test']:
-
-        if args.task == 'segmentation':
-            inferencer = Inferencer(args)
-        elif args.task == 'classification':
-            inferencer = Inferencer(args)
-        else:
-            raise ValueError('Please select correct task!!!')
-
+        inferencer = Inferencer(args)
         inferencer.inference()
     else:
         print('No mode supported.')

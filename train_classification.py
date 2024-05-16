@@ -13,16 +13,12 @@ class TrainerClassification(TrainerBase):
 
         # 'init' means that this variable must be initialized.
         # 'set' means that this variable is available to being set, not must.
-        self.loader_train = self.init_data_loader(batch_size=self.args.batch_size,
-                                                  mode='train',
-                                                  dataloader_name=self.args.dataloader,
+        self.loader_train = self.init_data_loader(args=self.args,
                                                   csv_path=self.args.train_csv_path)
-        self.loader_val = self.init_data_loader(batch_size=self.args.batch_size,
-                                                mode='validation',
-                                                dataloader_name=self.args.dataloader,
+        self.loader_val = self.init_data_loader(args=self.args,
                                                 csv_path=self.args.valid_csv_path)
 
-        self.scheduler = self.set_scheduler(self.optimizer, self.args.scheduler, self.loader_train, self.args.batch_size)
+        self.scheduler = self.set_scheduler(self.args, self.optimizer, self.loader_train)
         self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold // self.args.batch_size
 
     def _train(self, epoch):

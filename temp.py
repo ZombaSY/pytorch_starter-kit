@@ -10,17 +10,17 @@ from models import losses as loss_hub
 from models import lr_scheduler
 from trainer_base import TrainerBase
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
 
 class ModelMini:
     def __init__(self):
         self.device = 'cuda'
-        self.x = torch.rand([4, 3, 224, 224]).to(self.device)
-        self.y = torch.rand([4, 1, 224, 224]).to(self.device).float()
+        self.x = torch.rand([4, 3, 336, 336]).to(self.device)
+        self.y = torch.rand([4, 1, 336, 336]).to(self.device).float()
 
-        self.model = TrainerBase.init_model("Deit3_l_classification", self.device,
-                                            argparse.Namespace(hidden_dims=1024, num_class=2, normalization='InstanceNorm1d', activation='SiLU', dropblock=False, freeze_backbone=False))
+        self.model = TrainerBase.init_model(argparse.Namespace(model_name='eva_l_reg', hidden_dims=1024, num_class=2, normalization='InstanceNorm1d', activation='SiLU', dropblock=False, freeze_backbone=False),
+                                            self.device)
 
         self.model.to(self.device)
         self.criterion = loss_hub.MSELoss()

@@ -3,9 +3,11 @@ import time
 import numpy as np
 import os
 import pandas as pd
+import multiprocessing
+import itertools
+import cv2
 
 from models import utils
-from models import dataloader as dataloader_hub
 from trainer_base import TrainerBase
 
 from torch.nn import functional as F
@@ -20,14 +22,13 @@ class Inferencer:
         use_cuda = self.args.cuda and torch.cuda.is_available()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
 
-        self.loader_val = self.init_data_loader(batch_size=self.args.batch_size,
-                                                mode=self.args.mode,
-                                                dataloader_name=self.args.dataloader,
-                                                x_path=self.args.valid_x_path,
-                                                y_path=self.args.valid_y_path,
-                                                csv_path=self.args.valid_csv_path)
+        self.loader_val = TrainerBase.init_data_loader(args=self.args,
+                                                       x_path=self.args.valid_x_path,
+                                                       y_path=self.args.valid_y_path,
+                                                       csv_path=self.args.valid_csv_path)
+        self.criterion = TrainerBase.init_criterion(self.args, self.device)
 
-        self.model = TrainerBase.init_model(self.args.model_name, self.device, self.args)
+        self.model = TrainerBase.init_model(self.args, self.device)
         self.model.module.load_state_dict(torch.load(args.model_path))
         self.model.eval()
 
@@ -38,10 +39,10 @@ class Inferencer:
         self.num_batches_val = int(len(self.loader_val))
         self.metric_val = TrainerBase.init_metric(self.args.task, self.args.num_class)
 
-        self.image_mean = self.loader_val.image_loader.image_mean
-        self.image_std = self.loader_val.image_loader.image_std
+        self.image_mean = torch.tensor(self.loader_val.image_loader.image_mean).to(self.device)
+        self.image_std = torch.tensor(self.loader_val.image_loader.image_std).to(self.device)
 
-    def start_inference_classification(self):
+    def inference_classification(self, epoch):
         self.model.eval()
 
         for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
@@ -76,7 +77,7 @@ class Inferencer:
         df.to_csv(self.save_dir + '_out.csv', encoding='utf-8-sig', index=False)
         self.metric_val.reset()
 
-    def start_inference_segmentation(self):
+    def inference_segmentation(self, epoch):
         for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
             with torch.no_grad():
                 x_in, img_id = x_in
@@ -102,27 +103,78 @@ class Inferencer:
         for i in range(self.args.num_class):
             print(f'Val Class {i} IoU: {cIoU[i]}')
 
-    def __post_process_segmentation(self, x_img, target, output, img_id, post_out, draw_results):
+    def inference_regression(self, epoch):
+        self.model.eval()
+        post_out = {}
+        metric_list_mean = {'loss': []}
+        batch_losses = 0
+
+        for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
+            with torch.no_grad():
+                x_in, img_id = x_in
+                target, _ = target
+
+                x_in = x_in.to(self.device)
+                target = target.to(self.device)  # (shape: (batch_size, img_h, img_w))
+
+                output = self.model(x_in)
+
+                # compute loss
+                loss = self.criterion(output['class'], target)
+                if not torch.isfinite(loss):
+                    raise Exception('Loss is NAN. End training.')
+
+                batch_losses += loss.item()
+
+                self.__post_process(x_in, target, output, img_id, post_out, batch_idx)
+
+        loss_mean = batch_losses / self.loader_val.Loader.__len__()
+        metric_list_mean['loss'] = loss_mean
+        for key in metric_list_mean.keys():
+            log_str = f'validation {key}: {metric_list_mean[key]}'
+            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
+
+        self.metric_val.reset()
+
+    def __post_process_landmark(self, x_img, target, output, img_id, post_out):
+        if self.args.draw_results:
+
+            if not os.path.exists(self.save_dir):
+                os.mkdir(self.save_dir)
+
+            with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
+                x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std)
+                x_img_np = x_img.detach().cpu().numpy()
+                output_np = output['class'].detach().cpu().numpy()
+
+                pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_landmark), x_img_np, output_np, itertools.repeat(self.save_dir), img_id))
+
+        return post_out
+
+    def __post_process_segmentation(self, x_img, target, output, img_id, post_out):
         # compute metric
         if self.args.dataloader == 'Image2Image':
             output_argmax = torch.argmax(output['seg'], dim=1).cpu()
             self.metric.update(target[0][0].cpu().detach().numpy(), output_argmax[0].cpu().detach().numpy())
 
-        if draw_results:
-            output_prob = F.softmax(output['seg'][0], dim=0)
-            utils.draw_image(x_img, output_prob, self.save_dir, img_id, self.args.num_class)
+        if self.args.draw_results:
+
+            with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
+                x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std)
+                output_prob = F.softmax(output['seg'], dim=1)
+
+                pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_image), x_img, output_prob, itertools.repeat(self.save_dir), img_id), itertools.repeat(self.args.num_class))
 
         return post_out
 
-    def __post_process(self, x_img, target, output, img_id, post_out, batch_idx, draw_results=False):
+    def __post_process(self, x_img, target, output, img_id, post_out, batch_idx):
         post_out_tmp = {}
         post_out_tmp['img_id'] = img_id
 
-        if draw_results:
-            x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std)
-
-        if self.args.task == 'regression':
-            self.__post_process_segmentation(x_img, target, output, img_id, post_out_tmp, draw_results)
+        if self.args.task == 'segmentation':
+            self.__post_process_segmentation(x_img, target, output, img_id, post_out_tmp)
+        elif self.args.task == 'landmark':
+            self.__post_process_landmark(x_img, target, output, img_id, post_out_tmp)
 
         for key in post_out_tmp.keys():
             if key not in post_out.keys():
@@ -130,38 +182,14 @@ class Inferencer:
             else:
                 post_out[key].append(post_out_tmp[key])
 
-        print(f'batch_idx {batch_idx} -> {img_id} \t Done !!')
+        print(f'batch_idx {batch_idx} -> {batch_idx * self.args.batch_size} images \t Done !!')     # TODO: last batch_idx is invalid
 
         return post_out
 
-    def init_data_loader(self,
-                         batch_size,
-                         mode,
-                         dataloader_name,
-                         x_path=None,
-                         y_path=None,
-                         csv_path=None):
-
-        if dataloader_name == 'Image2Image':
-            loader = dataloader_hub.Image2ImageDataLoader(x_path=x_path,
-                                                          y_path=y_path,
-                                                          batch_size=batch_size,
-                                                          num_workers=self.args.worker,
-                                                          mode=mode,
-                                                          args=self.args)
-        elif dataloader_name == 'Image2Vector':
-            loader = dataloader_hub.Image2VectorDataLoader(csv_path=csv_path,
-                                                           batch_size=batch_size,
-                                                           num_workers=self.args.worker,
-                                                           mode=mode,
-                                                           args=self.args)
-        else:
-            raise Exception('No dataloader named', dataloader_name)
-
-        return loader
-
     def inference(self):
         if self.args.task == 'segmentation':
-            self.start_inference_segmentation()
+            self.inference_segmentation(0)
         elif self.args.task == 'classification':
-            self.start_inference_classification()
+            self.inference_classification(0)
+        elif self.args.task == 'regression' or 'landmark':
+            self.inference_regression(0)

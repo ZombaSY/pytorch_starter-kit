@@ -25,11 +25,7 @@ def is_image(src):
     return True if ext.lower() in ['.jpeg', '.jpg', '.png', '.gif'] else False
 
 
-def mount_data_on_memory_wrapper(args):
-    return mount_data_on_memory(*args)
-
-
-def mount_data_on_memory(img_path, CV_COLOR):
+def read_image_data(img_path, CV_COLOR):
     img = utils.cv2_imread(img_path, CV_COLOR)
     return {'data': img, 'path': img_path}
 
@@ -129,8 +125,8 @@ class Image2ImageLoader(Dataset):
         if self.args.data_cache:
             print(f'{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.mode}{utils.Colors.END}')
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(self.x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
-                self.memory_data_y = pools.map(mount_data_on_memory_wrapper, zip(self.y_img_path, itertools.repeat(cv2.IMREAD_GRAYSCALE)))
+                self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
+                self.memory_data_y = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.y_img_path, itertools.repeat(cv2.IMREAD_GRAYSCALE)))
 
         self.update_transform()
 
@@ -250,7 +246,7 @@ class Image2VectorLoader(Dataset):
                 label = F.one_hot(torch.tensor([self.df['label'][idx]]), self.args.num_class) if self.args.task == 'classification' else torch.tensor([self.df['label'][idx]])
                 self.memory_data_y.append(label)
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
+                self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
 
         if self.mode == 'train' and hasattr(self.args, 'transform_mixup'):
             if self.args.transform_mixup > 0:
@@ -394,7 +390,7 @@ class Image2LandmarkLoader(Dataset):
                 label = F.one_hot(torch.tensor([self.df['label'][idx]]), self.args.num_class) if self.args.task == 'classification' else torch.tensor([self.df['label'][idx]])
                 self.memory_data_y.append(label)
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                self.memory_data_x = pools.map(mount_data_on_memory_wrapper, zip(x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
+                self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
 
         self.update_transform()
 
