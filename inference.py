@@ -23,6 +23,7 @@ class Inferencer:
         self.device = torch.device('cuda' if use_cuda else 'cpu')
 
         self.loader_val = TrainerBase.init_data_loader(args=self.args,
+                                                       mode='train',
                                                        x_path=self.args.valid_x_path,
                                                        y_path=self.args.valid_y_path,
                                                        csv_path=self.args.valid_csv_path)

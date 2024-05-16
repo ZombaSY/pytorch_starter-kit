@@ -1,7 +1,6 @@
 import torch
 import wandb
 import numpy as np
-import sys
 
 from models import utils
 from trainer_base import TrainerBase
@@ -14,9 +13,11 @@ class TrainerSegmentation(TrainerBase):
         # 'init' means that this variable must be initialized.
         # 'set' means that this variable is available to being set, not must.
         self.loader_train = self.init_data_loader(args=self.args,
+                                                  mode='train',
                                                   x_path=self.args.train_x_path,
                                                   y_path=self.args.train_y_path)
         self.loader_val = self.init_data_loader(args=self.args,
+                                                mode='inference',
                                                 x_path=self.args.valid_x_path,
                                                 y_path=self.args.valid_y_path)
 

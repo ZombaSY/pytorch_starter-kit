@@ -6,6 +6,7 @@
   worker: 4,
   CUDA_VISIBLE_DEVICES: '0',
 
+  ### Train Parameters
   task: 'landmark', # segmentation, classification, regression, landmark
   model_name: 'eva_l_reg',
     num_class: 212,
@@ -26,6 +27,7 @@
   draw_results: true,
   model_path: '/path/to/model.pt',
 
+  ### Data parameters
   valid_x_path:   '/path/to/data/val/input',
   valid_y_path:   '/path/to/data/val/label',
   valid_csv_path: '/path/to/data/val/test.csv',

@@ -1,7 +1,5 @@
 import torch
 import wandb
-import numpy as np
-import sys
 
 from models import utils
 from trainer_base import TrainerBase
@@ -14,8 +12,10 @@ class TrainerRegression(TrainerBase):
         # 'init' means that this variable must be initialized.
         # 'set' means that this variable is available to being set, not must.
         self.loader_train = self.init_data_loader(args=self.args,
+                                                  mode='train',
                                                   csv_path=self.args.train_csv_path)
         self.loader_val = self.init_data_loader(args=self.args,
+                                                mode='inference',
                                                 csv_path=self.args.valid_csv_path)
 
         self.scheduler = self.set_scheduler(self.args, self.optimizer, self.loader_train)

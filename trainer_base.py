@@ -94,6 +94,7 @@ class TrainerBase:
 
     @staticmethod
     def init_data_loader(args,
+                         mode,
                          x_path=None,
                          y_path=None,
                          csv_path=None):
@@ -103,19 +104,19 @@ class TrainerBase:
                                                           y_path=y_path,
                                                           batch_size=args.batch_size,
                                                           num_workers=args.worker,
-                                                          mode=args.mode,
+                                                          mode=mode,
                                                           args=args)
         elif args.dataloader == 'Image2Vector':
             loader = dataloader_hub.Image2VectorDataLoader(csv_path=csv_path,
                                                            batch_size=args.batch_size,
                                                            num_workers=args.worker,
-                                                           mode=args.mode,
+                                                           mode=mode,
                                                            args=args)
         elif args.dataloader == 'Image2Landmark':
             loader = dataloader_hub.Image2LandmarkDataLoader(data_path=csv_path,
                                                              batch_size=args.batch_size,
                                                              num_workers=args.worker,
-                                                             mode=args.mode,
+                                                             mode=mode,
                                                              args=args)
         else:
             raise Exception('No dataloader named', args.dataloader)
