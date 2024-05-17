@@ -80,6 +80,113 @@ class _RepeatSampler(object):
             yield from iter(self.sampler)
 
 
+class ImageLoader(Dataset):
+
+    def __init__(self,
+                 csv_path,
+                 mode,
+                 **kwargs):
+
+        self.mode = mode
+        self.args = kwargs['args']
+
+        if hasattr(self.args, 'input_size'):
+            h, w = self.args.input_size[0], self.args.input_size[1]
+            self.size_1x = [int(h), int(w)]
+
+        if hasattr(self.args, 'transform_rand_crop'):
+            self.crop_factor = int(self.args.transform_rand_crop)
+
+        self.image_mean = [0.5, 0.5, 0.5]
+        self.image_std = [0.25, 0.25, 0.25]
+
+        self.data_root_path = os.path.split(csv_path)[0]
+        self.df = pd.read_csv(csv_path)
+        self.image_col = self.args.image_col
+        self.len = len(self.df[self.image_col])
+
+        # mount_data_on_memory
+        if self.args.data_cache:
+            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.mode}{utils.Colors.END}')
+            x_img_path = []
+            for idx in range(self.len):
+                x_img_path.append(os.path.join(*[self.data_root_path, self.df[self.image_col][idx]]))
+
+        self.update_transform()
+
+    def update_transform(self, scaler=1):
+        excludings = ['transform_rand_crop', 'transform_landmark_rotate', 'transform_landmark_hflip']
+
+        self.transform_resize = albumentations.Compose([
+            albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
+        ])
+        if self.mode == 'train':
+            # progressively update augmentation scale
+            for param in vars(self.args):
+                if 'transform_' in param:
+                    if param not in excludings:
+                        setattr(self.args, param, min(getattr(self.args, param) * scaler, 1))
+                    print(f'{utils.Colors.LIGHT_WHITE}{param}: {getattr(self.args, param)}{utils.Colors.END}')
+            self.transform_augmentation = albumentations.Compose([*augmentations(self.args, self.crop_factor)])
+        self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
+
+    def transform(self, _input):
+        random_gen = random.Random()
+
+        if self.mode == 'train':
+            transform = self.transform_resize(image=_input)
+            _input = transform['image']
+
+            # MixUp
+            if random_gen.random() < self.args.transform_mixup:
+                # select index from pre-defined sampler
+                idx_2 = np.random.choice(np.arange(self.len), p=self.mixup_sample)
+
+                # load the pair of X and Y
+                x_path = os.path.join(*[self.data_root_path, self.df[self.image_col][idx_2]])
+                x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
+                transform = self.transform_resize(image=x_img)
+                _input_2 = transform['image']
+
+                if self.args.task == 'classification':
+                    _label_2 = F.one_hot(_label_2, num_classes=self.args.num_class)
+
+                lam = np.random.beta(2, 2)
+
+                _input = _input * lam + _input_2 * (1 - lam)
+
+                del x_img
+                del x_path
+
+            _input = _input.astype(np.uint8)
+            transform = self.transform_augmentation(image=_input)
+        else:
+            transform = self.transform_resize(image=_input)
+
+        norm = self.transforms_normalize(image=transform['image'])
+        _input = norm['image']
+        _input = np.transpose(_input, [2, 0, 1])
+
+        _input = torch.from_numpy(_input.astype(np.float32))
+
+        return _input
+
+    def __getitem__(self, index):
+        if self.args.data_cache:
+            x_img = self.memory_data_x[index]['data']
+            x_path = self.memory_data_x[index]['path']
+        else:
+            x_path = os.path.join(*[self.data_root_path, self.df['img_path'][index]])
+            x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
+
+        x_img_tr = self.transform(x_img)
+
+        return (x_img_tr, x_path), (x_img_tr, x_path)
+
+    def __len__(self):
+        return self.len
+
+
 class Image2ImageLoader(Dataset):
 
     def __init__(self,
@@ -456,6 +563,36 @@ class Image2LandmarkLoader(Dataset):
 
     def __len__(self):
         return len(self.xy)
+
+
+class ImageDataLoader:
+
+    def __init__(self,
+                 csv_path,
+                 mode,
+                 batch_size=4,
+                 num_workers=0,
+                 **kwargs):
+
+        g = torch.Generator()
+        g.manual_seed(3407)
+
+        self.image_loader = ImageLoader(csv_path,
+                                        mode=mode,
+                                        **kwargs)
+
+        # use your own data loader
+        self.Loader = MultiEpochsDataLoader(self.image_loader,
+                                            batch_size=batch_size,
+                                            num_workers=num_workers,
+                                            shuffle=(mode == 'train'),
+                                            worker_init_fn=seed_worker,
+                                            generator=g,
+                                            pin_memory=True)
+
+    def __len__(self):
+        return self.image_loader.__len__()
+
 
 
 class Image2ImageDataLoader:

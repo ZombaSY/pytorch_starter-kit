@@ -23,7 +23,7 @@ class Inferencer:
         self.device = torch.device('cuda' if use_cuda else 'cpu')
 
         self.loader_val = TrainerBase.init_data_loader(args=self.args,
-                                                       mode='train',
+                                                       mode=self.args.mode,
                                                        x_path=self.args.valid_x_path,
                                                        y_path=self.args.valid_y_path,
                                                        csv_path=self.args.valid_csv_path)
@@ -121,21 +121,20 @@ class Inferencer:
                 output = self.model(x_in)
 
                 # compute loss
-                loss = self.criterion(output['class'], target)
-                if not torch.isfinite(loss):
-                    raise Exception('Loss is NAN. End training.')
-
-                batch_losses += loss.item()
+                if self.args.mode == 'inference':
+                    loss = self.criterion(output['class'], target)
+                    if not torch.isfinite(loss):
+                        raise Exception('Loss is NAN. End training.')
+                    batch_losses += loss.item()
 
                 self.__post_process(x_in, target, output, img_id, post_out, batch_idx)
 
-        loss_mean = batch_losses / self.loader_val.Loader.__len__()
-        metric_list_mean['loss'] = loss_mean
-        for key in metric_list_mean.keys():
-            log_str = f'validation {key}: {metric_list_mean[key]}'
-            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
-
-        self.metric_val.reset()
+        if self.args.mode == 'inference':
+            loss_mean = batch_losses / self.loader_val.Loader.__len__()
+            metric_list_mean['loss'] = loss_mean
+            for key in metric_list_mean.keys():
+                log_str = f'validation {key}: {metric_list_mean[key]}'
+                print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
 
     def __post_process_landmark(self, x_img, target, output, img_id, post_out):
         if self.args.draw_results:
