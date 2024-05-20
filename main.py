@@ -7,6 +7,7 @@ import random
 import ast
 import sys
 
+from export import Exportor
 from train_regression import TrainerRegression
 from train_segmentation import TrainerSegmentation
 from train_classification import TrainerClassification
@@ -107,6 +108,11 @@ def main():
     elif args.mode in ['inference', 'test']:
         inferencer = Inferencer(args)
         inferencer.inference()
+
+    elif args.mode == 'export':
+        exportor = Exportor(args)
+        exportor.export()
+
     else:
         print('No mode supported.')
 

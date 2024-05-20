@@ -1,0 +1,22 @@
+{
+  debug: true,
+  mode: 'export', # test, inference
+  cuda: true,
+  CUDA_VISIBLE_DEVICES: '0',
+
+  task: 'landmark', # segmentation, classification, regression, landmark
+  model_name: 'ConvNeXT_l_reg',
+    num_class: 212,
+    in_channel: 3,
+    freeze_backbone: false,
+    normalization: 'InstanceNorm1d', # BatchNorm1d, InstanceNorm1d, LayerNorm
+    activation: 'ReLU', # ReLU, SiLU
+    dropblock: true,
+
+  model_path: '/path/to/model.pt',
+
+  ### export parameters
+  export_target: 'onnx',
+    input_shape: [1, 3, 336, 336],
+    opset_version: 12
+}

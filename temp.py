@@ -10,7 +10,7 @@ from models import losses as loss_hub
 from models import lr_scheduler
 from trainer_base import TrainerBase
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
 
 class ModelMini:
