@@ -1,22 +1,20 @@
 {
   ### Environment Parameters
-  debug: false,
-  mode: 'train',   # train
+  debug: true,
+  mode: 'train',
   cuda: true,
   wandb: true,
   worker: 8,
   saved_model_directory: 'model_ckpt',
-  train_fold: 1,  # The number of validation while training
+  train_fold: 2,  # The number of validation while training
   project_name: 'wandb_project',
   CUDA_VISIBLE_DEVICES: '0',
 
   ### Train Parameters
   task: 'segmentation',
 
-  model_name: 'Swin_t_SemanticSegmentation',
-    num_class: 20,
-    in_channel: 3,
-    base_c: 96,
+  model_name: 'Swin_t_semanticSegmentation',
+    num_class: 2,
     freeze_backbone: false,
 
   dataloader: 'Image2Image',
@@ -35,28 +33,26 @@
 
   epoch: 10000,
   early_stop_epoch: 300,
-  model_path: 'pretrained/swin_tiny_patch4_window7_224.pth',
+  model_path: 'pretrained/imagenet/swin_tiny_patch4_window7_224.pth',
 
   ### Augmentation parameters
   data_cache: true,
-  transform_blur: 0.3,
-  transform_clahe: 0.1,
-  transform_cutmix: 0.0,
-  transform_coaseDropout: 0.5,
-  transform_fancyPCA: 0.1,
-  transform_fog: 0.05,
-  transform_g_noise: 0.3,
-  transform_jitter: 0.1,
-  transform_hflip: 0.5,
+  transform_blur: 0.5,
+  transform_clahe: 0.5,
+  transform_cutmix: 0.8,
+  transform_coarse_dropout: 0.5,
+  transform_fancyPCA: 0.5,
+  transform_fog: 0.2,
+  transform_g_noise: 0.5,
+  transform_jitter: 0.5,
+  transform_hflip: 0.0,
   transform_vflip: 0.0,
-  transform_jpeg: 0.3,
-  transform_perspective: 0.1,
-  transform_rand_resize: 0.0,
-  transform_rand_crop: 256,
-  transform_rain: 0.05,
+  transform_jpeg: 0.5,
+  transform_perspective: 0.0,
+  transform_rand_resize: 0.3,
+  transform_rand_crop: 336,
+  transform_rain: 0.2,
 
-  train_x_path: '/path/to/train/input',
-  train_y_path: '/path/to/train/label',
-  valid_x_path: '/path/to/val/input',
-  valid_y_path: '/path/to/val/label',
+  train_csv_path: '/path/to/train.csv',
+  valid_csv_path: '/path/to/valid.csv',
 }

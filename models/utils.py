@@ -676,8 +676,8 @@ def cut_mix(_input, _refer, mask_1=None, mask_2=None):
         _input = np.array(_input)
         _refer = np.array(_refer)
 
-    h1, w1, _ = _input.shape
-    h2, w2, _ = _refer.shape
+    h1, w1 = _input.shape[:2]
+    h2, w2 = _refer.shape[:2]
 
     # cutout positions
     rand_x = random_gen.random() * 0.75
@@ -740,7 +740,8 @@ def grey_to_heatmap(img, is_bgr=True):
 def cv2_imread(fns_img, color=cv2.IMREAD_UNCHANGED):
     img_array = np.fromfile(fns_img, np.uint8)
     img = cv2.imdecode(img_array, color)
-    img = cv2.cvtColor(img ,cv2.COLOR_BGR2RGB)  # convert color space for albumentaitons
+    if img.shape[-1] == 3 and color in [cv2.IMREAD_UNCHANGED, cv2.IMREAD_COLOR]:
+        img = cv2.cvtColor(img ,cv2.COLOR_BGR2RGB)  # convert color space for albumentaitons
     return img.astype(np.uint8)
 
 

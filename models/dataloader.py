@@ -90,10 +90,6 @@ class ImageLoader(Dataset):
         self.mode = mode
         self.args = kwargs['args']
 
-        if hasattr(self.args, 'input_size'):
-            h, w = self.args.input_size[0], self.args.input_size[1]
-            self.size_1x = [int(h), int(w)]
-
         if hasattr(self.args, 'transform_rand_crop'):
             self.crop_factor = int(self.args.transform_rand_crop)
 
@@ -103,7 +99,7 @@ class ImageLoader(Dataset):
         self.data_root_path = os.path.split(csv_path)[0]
         self.df = pd.read_csv(csv_path)
         self.image_col = self.args.image_col
-        self.len = len(self.df[self.image_col])
+        self.len = len(self.df)
 
         # mount_data_on_memory
         if self.args.data_cache:
@@ -117,9 +113,7 @@ class ImageLoader(Dataset):
     def update_transform(self, scaler=1):
         excludings = ['transform_rand_crop', 'transform_landmark_rotate', 'transform_landmark_hflip']
 
-        self.transform_resize = albumentations.Compose([
-            albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
-        ])
+        self.transform_resize = albumentations.Resize(height=self.args.input_size[0], width=self.args.input_size[1], p=1)
         if self.mode == 'train':
             # progressively update augmentation scale
             for param in vars(self.args):
@@ -190,17 +184,12 @@ class ImageLoader(Dataset):
 class Image2ImageLoader(Dataset):
 
     def __init__(self,
-                 x_path,
-                 y_path,
+                 csv_path,
                  mode,
                  **kwargs):
 
         self.mode = mode
         self.args = kwargs['args']
-
-        if hasattr(self.args, 'input_size'):
-            h, w = self.args.input_size[0], self.args.input_size[1]
-            self.size_1x = [int(h), int(w)]
 
         if hasattr(self.args, 'transform_rand_crop'):
             self.crop_factor = int(self.args.transform_rand_crop)
@@ -208,41 +197,33 @@ class Image2ImageLoader(Dataset):
         self.image_mean = [0.5, 0.5, 0.5]
         self.image_std = [0.25, 0.25, 0.25]
 
-        x_img_name = os.listdir(x_path)
-        y_img_name = os.listdir(y_path)
-        x_img_name = filter(is_image, x_img_name)
-        y_img_name = filter(is_image, y_img_name)
-
-        self.x_img_path = []
-        self.y_img_path = []
-
-        x_img_name = sorted(x_img_name)
-        y_img_name = sorted(y_img_name)
-
-        img_paths = zip(x_img_name, y_img_name)
-        for item in img_paths:
-            self.x_img_path.append(x_path + os.sep + item[0])
-            self.y_img_path.append(y_path + os.sep + item[1])
-
-        assert len(self.x_img_path) == len(self.y_img_path), 'Images in directory must have same file indices!!'
-
-        self.len = len(x_img_name)
+        self.data_root_path = os.path.split(csv_path)[0]
+        self.df = pd.read_csv(csv_path)
+        self.len = len(self.df)
 
         # mount_data_on_memory
         if self.args.data_cache:
             print(f'{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.mode}{utils.Colors.END}')
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
-                self.memory_data_y = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.y_img_path, itertools.repeat(cv2.IMREAD_GRAYSCALE)))
+                self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['input'], itertools.repeat(cv2.IMREAD_COLOR)))
+                self.memory_data_y = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['label'], itertools.repeat(cv2.IMREAD_GRAYSCALE)))
+
+        if self.mode == 'train' and hasattr(self.args, 'transform_mixup'):
+            if self.args.transform_mixup > 0:
+                # C-mixup
+                # self.mixup_sample_1 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col1']), -1)))
+                # self.mixup_sample_2 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col2']), -1)))
+                # self.mixup_sample = (self.mixup_sample_1 + self.mixup_sample_2) / 2
+
+                # mix-up
+                self.mixup_sample = np.ones(self.len) / self.len
 
         self.update_transform()
 
     def update_transform(self, scaler=1):
         excludings = ['transform_rand_crop', 'transform_landmark_rotate', 'transform_landmark_hflip']
 
-        self.transform_resize = albumentations.Compose([
-            albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
-        ])
+        self.transform_resize = albumentations.Resize(height=self.args.input_size[0], width=self.args.input_size[1], p=1)
         if self.mode == 'train':
             # progressively update augmentation scale
             for param in vars(self.args):
@@ -267,12 +248,12 @@ class Image2ImageLoader(Dataset):
                     _input_refer = self.memory_data_x[rand_n]['data']
                     _label_refer = self.memory_data_y[rand_n]['data']
                 else:
-                    _input_refer = utils.cv2_imread(self.x_img_path[rand_n], cv2.IMREAD_COLOR)
-                    _label_refer = utils.cv2_imread(self.y_img_path[rand_n], cv2.IMREAD_GRAYSCALE)
+                    _input_refer = utils.cv2_imread(self.df['input'][rand_n], cv2.IMREAD_COLOR)
+                    _label_refer = utils.cv2_imread(self.df['label'][rand_n], cv2.IMREAD_GRAYSCALE)
                 transform_ref = self.transform_resize(image=_input_refer, mask=_label_refer)
                 _input_refer = transform_ref['image']
                 _label_refer = transform_ref['mask']
-                _input, _label = utils.cut_mix(_input, _label, _input_refer, _label_refer)
+                _input, _label = utils.cut_mix(_input, _input_refer, _label, _label_refer)
 
             _input = _input.astype(np.uint8)
             _label = _label.astype(np.uint8)
@@ -304,8 +285,8 @@ class Image2ImageLoader(Dataset):
             y_path = self.memory_data_y[index]['path']
 
         else:
-            x_path = self.x_img_path[index]
-            y_path = self.y_img_path[index]
+            x_path = self.df['input'][index]
+            y_path = self.df['label'][index]
 
             img_x = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
             img_y = utils.cv2_imread(y_path, cv2.IMREAD_GRAYSCALE)
@@ -328,10 +309,6 @@ class Image2VectorLoader(Dataset):
         self.mode = mode
         self.args = kwargs['args']
 
-        if hasattr(self.args, 'input_size'):
-            h, w = self.args.input_size[0], self.args.input_size[1]
-            self.size_1x = [int(h), int(w)]
-
         if hasattr(self.args, 'transform_rand_crop'):
             self.crop_factor = int(self.args.transform_rand_crop)
 
@@ -341,7 +318,7 @@ class Image2VectorLoader(Dataset):
         self.data_root_path = os.path.split(csv_path)[0]
         self.df = pd.read_csv(csv_path)
         self.image_col = self.args.image_col
-        self.len = len(self.df[self.image_col])
+        self.len = len(self.df)
 
         # mount_data_on_memory
         if self.args.data_cache:
@@ -370,9 +347,7 @@ class Image2VectorLoader(Dataset):
     def update_transform(self, scaler=1):
         excludings = ['transform_rand_crop', 'transform_landmark_rotate', 'transform_landmark_hflip']
 
-        self.transform_resize = albumentations.Compose([
-            albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
-        ])
+        self.transform_resize = albumentations.Resize(height=self.args.input_size[0], width=self.args.input_size[1], p=1)
         if self.mode == 'train':
             # progressively update augmentation scale
             for param in vars(self.args):
@@ -477,10 +452,6 @@ class Image2LandmarkLoader(Dataset):
         self.root_path = os.path.join(os.path.split(data_path)[0], sub_dir)
         self.xy = utils.get_landmark_label(self.root_path, data_path)
 
-        if hasattr(self.args, 'input_size'):
-            h, w = self.args.input_size[0], self.args.input_size[1]
-            self.size_1x = [int(h), int(w)]
-
         if hasattr(self.args, 'transform_rand_crop'):
             self.crop_factor = int(self.args.transform_rand_crop)
 
@@ -504,9 +475,7 @@ class Image2LandmarkLoader(Dataset):
     def update_transform(self, scaler=1):
         excludings = ['transform_rand_crop', 'transform_landmark_rotate', 'transform_landmark_hflip']
 
-        self.transform_resize = albumentations.Compose([
-            albumentations.Resize(height=self.size_1x[0], width=self.size_1x[1], p=1),
-        ])
+        self.transform_resize = albumentations.Resize(height=self.args.input_size[0], width=self.args.input_size[1], p=1)
         if self.mode == 'train':
             # progressively update augmentation scale
             for param in vars(self.args):
@@ -594,12 +563,10 @@ class ImageDataLoader:
         return self.image_loader.__len__()
 
 
-
 class Image2ImageDataLoader:
 
     def __init__(self,
-                 x_path,
-                 y_path,
+                 csv_path,
                  mode,
                  batch_size=4,
                  num_workers=0,
@@ -608,8 +575,7 @@ class Image2ImageDataLoader:
         g = torch.Generator()
         g.manual_seed(3407)
 
-        self.image_loader = Image2ImageLoader(x_path,
-                                              y_path,
+        self.image_loader = Image2ImageLoader(csv_path,
                                               mode=mode,
                                               **kwargs)
 

@@ -105,8 +105,7 @@ class TrainerBase:
                                                     mode=mode,
                                                     args=args)
         elif args.dataloader == 'Image2Image':
-            loader = dataloader_hub.Image2ImageDataLoader(x_path=x_path,
-                                                          y_path=y_path,
+            loader = dataloader_hub.Image2ImageDataLoader(csv_path=csv_path,
                                                           batch_size=args.batch_size,
                                                           num_workers=args.worker,
                                                           mode=mode,

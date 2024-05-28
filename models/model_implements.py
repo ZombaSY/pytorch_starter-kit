@@ -52,9 +52,9 @@ class Swin_t(nn.Module):
         return out_dict
 
 
-class Swin_t_SemanticSegmentation(Swin_t):
+class Swin_t_semanticSegmentation(Swin_t):
     def __init__(self, num_class=2, in_channel=3, base_c=96, **kwargs):
-        super(Swin_t_SemanticSegmentation, self).__init__(in_channel, base_c)
+        super().__init__(in_channel, base_c)
         self.uper_head = M_UPerHead(in_channels=[base_c, base_c * 2, base_c * 4, base_c * 8],
                                     in_index=[0, 1, 2, 3],
                                     pool_scales=(1, 2, 3, 6),

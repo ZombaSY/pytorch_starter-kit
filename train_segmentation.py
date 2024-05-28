@@ -14,15 +14,13 @@ class TrainerSegmentation(TrainerBase):
         # 'set' means that this variable is available to being set, not must.
         self.loader_train = self.init_data_loader(args=self.args,
                                                   mode='train',
-                                                  x_path=self.args.train_x_path,
-                                                  y_path=self.args.train_y_path)
+                                                  csv_path=self.args.train_csv_path)
         self.loader_val = self.init_data_loader(args=self.args,
                                                 mode='inference',
-                                                x_path=self.args.valid_x_path,
-                                                y_path=self.args.valid_y_path)
+                                                csv_path=self.args.valid_csv_path)
 
         self.scheduler = self.set_scheduler(self.args, self.optimizer, self.loader_train)
-        self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold // self.args.batch_size
+        self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold // self.args.batch_size) == 0 else self.loader_train.__len__() // self.args.train_fold // self.args.batch_size
 
     def _train(self, epoch):
         self.model.train()
@@ -55,7 +53,7 @@ class TrainerSegmentation(TrainerBase):
             batch_losses += loss.item()
 
             if hasattr(self.args, 'train_fold'):
-                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx != (self.loader_train.__len__() // self.args.batch_size) - 1:
+                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx < (self.loader_train.__len__() // self.args.batch_size) - self._validate_interval:
                     self._validate(epoch)
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
@@ -133,4 +131,4 @@ class TrainerSegmentation(TrainerBase):
                 print(f'Best mIoU -----> {self.metric_best["mIoU"]}')
                 if self.self.args.wandb:
                     wandb.log({f'Best mIoU': self.metric_best['mIoU']})
-            break
+                break
