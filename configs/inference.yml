@@ -1,35 +1,25 @@
 {
- ### Environment Parameters
   debug: true,
   mode: 'test', # test, inference
   cuda: true,
   worker: 4,
   CUDA_VISIBLE_DEVICES: '0',
 
-  ### Train Parameters
-  task: 'landmark', # segmentation, classification, regression, landmark
-  model_name: 'eva_l_reg',
-    num_class: 212,
+  task: 'segmentation', # segmentation, classification, regression, landmark
+  model_name: 'Swin_t_semanticSegmentation',
+    num_class: 2,
     in_channel: 3,
-    freeze_backbone: false,
-    normalization: 'InstanceNorm1d', # BatchNorm1d, InstanceNorm1d, LayerNorm
-    activation: 'ReLU', # ReLU, SiLU
-    dropblock: true,
+    base_c: 96,
 
-  criterion: 'WingLoss',
-
-  dataloader: 'Image2Landmark',
+  dataloader: 'Image',
     weighted_sampler: False,
     batch_size: 32,
-    input_size: [336, 336],  # [h, w]
+    input_size: [512, 512],  # (height, width)
 
-  data_cache: false,
-  draw_results: true,
-  model_path: '/path/to/model.pt',
+  criterion: 'WingLoss',
+  draw_results: True,
+  model_path: 'pretrained/Swin_t_semanticSegmentation-Epoch_475-mIoU_0.9508-folds_0.pt',
 
   ### Data parameters
-  valid_x_path:   '/path/to/data/val/input',
-  valid_y_path:   '/path/to/data/val/label',
-  valid_csv_path: '/path/to/data/val/test.csv',
-  image_col: 'img_path',
+  valid_csv_path: '/path/to/test.csv',
 }

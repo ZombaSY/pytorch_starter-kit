@@ -60,5 +60,4 @@
 
   train_csv_path: '/path/to/train.csv',
   valid_csv_path: '/path/to/valid.csv',
-  image_col: 'img_path',  # upscale_img_path, img_path
 }

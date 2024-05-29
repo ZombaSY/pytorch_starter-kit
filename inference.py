@@ -24,8 +24,6 @@ class Inferencer:
 
         self.loader_val = TrainerBase.init_data_loader(args=self.args,
                                                        mode=self.args.mode,
-                                                       x_path=self.args.valid_x_path,
-                                                       y_path=self.args.valid_y_path,
                                                        csv_path=self.args.valid_csv_path)
         self.criterion = TrainerBase.init_criterion(self.args, self.device)
 
@@ -42,6 +40,8 @@ class Inferencer:
 
         self.image_mean = torch.tensor(self.loader_val.image_loader.image_mean).to(self.device)
         self.image_std = torch.tensor(self.loader_val.image_loader.image_std).to(self.device)
+
+        self.post_out = {}
 
     def inference_classification(self, epoch):
         self.model.eval()
@@ -79,34 +79,30 @@ class Inferencer:
         self.metric_val.reset()
 
     def inference_segmentation(self, epoch):
+        self.model.eval()
+
         for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
             with torch.no_grad():
                 x_in, img_id = x_in
                 target, _ = target
 
-                x_img = x_in
                 x_in = x_in.to(self.device)
                 target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
 
-                target = target.long().to(self.device)
-                path, fn = os.path.split(img_id[0])
-                img_id, ext = os.path.splitext(fn)
-                output, _ = self.model(x_in)
-                self.post_process(x_img, target, output, img_id, draw_results=self.args.draw_results)
+                output = self.model(x_in)
 
-                print(f'batch {batch_idx} -> {img_id} \t Done !!')
+                self.__post_process(x_in, target, output, img_id, batch_idx)
 
-        # get metrics, computed on 'self.post_process'
-        metrics_out = self.metric.get_results()
-        cIoU = [metrics_out['Class IoU'][i] for i in range(self.args.num_class)]
-        mIoU = sum(cIoU) / self.args.num_class
-        print('Val mIoU: {}'.format(mIoU))
-        for i in range(self.args.num_class):
-            print(f'Val Class {i} IoU: {cIoU[i]}')
+        if self.args.mode == 'inference':
+            metrics_out = self.metric.get_results()
+            cIoU = [metrics_out['Class IoU'][i] for i in range(self.args.num_class)]
+            mIoU = sum(cIoU) / self.args.num_class
+            print('Val mIoU: {}'.format(mIoU))
+            for i in range(self.args.num_class):
+                print(f'Val Class {i} IoU: {cIoU[i]}')
 
     def inference_regression(self, epoch):
         self.model.eval()
-        post_out = {}
         metric_list_mean = {'loss': []}
         batch_losses = 0
 
@@ -127,7 +123,7 @@ class Inferencer:
                         raise Exception('Loss is NAN. End training.')
                     batch_losses += loss.item()
 
-                self.__post_process(x_in, target, output, img_id, post_out, batch_idx)
+                self.__post_process(x_in, target, output, img_id, batch_idx)
 
         if self.args.mode == 'inference':
             loss_mean = batch_losses / self.loader_val.Loader.__len__()
@@ -143,11 +139,10 @@ class Inferencer:
                 os.mkdir(self.save_dir)
 
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std)
-                x_img_np = x_img.detach().cpu().numpy()
+                x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std).detach().cpu().numpy()
                 output_np = output['class'].detach().cpu().numpy()
 
-                pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_landmark), x_img_np, output_np, itertools.repeat(self.save_dir), img_id))
+                pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_landmark), x_img, output_np, itertools.repeat(self.save_dir), img_id))
 
         return post_out
 
@@ -160,14 +155,14 @@ class Inferencer:
         if self.args.draw_results:
 
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std)
-                output_prob = F.softmax(output['seg'], dim=1)
+                x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std).detach().cpu().numpy()
+                output_prob = F.softmax(output['seg'], dim=1).detach().cpu().numpy()
 
-                pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_image), x_img, output_prob, itertools.repeat(self.save_dir), img_id), itertools.repeat(self.args.num_class))
+                pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_image), x_img, output_prob, itertools.repeat(self.save_dir), img_id, itertools.repeat(self.args.num_class)))
 
         return post_out
 
-    def __post_process(self, x_img, target, output, img_id, post_out, batch_idx):
+    def __post_process(self, x_img, target, output, img_id, batch_idx):
         post_out_tmp = {}
         post_out_tmp['img_id'] = img_id
 
@@ -177,14 +172,12 @@ class Inferencer:
             self.__post_process_landmark(x_img, target, output, img_id, post_out_tmp)
 
         for key in post_out_tmp.keys():
-            if key not in post_out.keys():
-                post_out[key] = [post_out_tmp[key]]
+            if key not in self.post_out.keys():
+                self.post_out[key] = [post_out_tmp[key]]
             else:
-                post_out[key].append(post_out_tmp[key])
+                self.post_out[key].append(post_out_tmp[key])
 
         print(f'batch_idx {batch_idx} -> {batch_idx * self.args.batch_size} images \t Done !!')     # TODO: last batch_idx is invalid
-
-        return post_out
 
     def inference(self):
         if self.args.task == 'segmentation':

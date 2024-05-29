@@ -68,6 +68,4 @@
                          '/path/to/valid_fold_2.csv',
                          '/path/to/valid_fold_3.csv',
                          '/path/to/valid_fold_4.csv',],
-
-  image_col: 'img_path',  # upscale_img_path, img_path
 }
