@@ -265,8 +265,7 @@ class Image2ImageLoader(Dataset):
         _label = transform['mask']
 
         if self.args.num_class == 2:  # for binary label
-            _label[_label < 128] = 0
-            _label[_label >= 128] = 1
+            _label = np.where(_label >= 128, 1, 0)
 
         _input = np.transpose(_input, [2, 0, 1])
 

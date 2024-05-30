@@ -772,7 +772,7 @@ def draw_image(x_img, output_prob, img_save_dir, img_id, n_class):
     if not os.path.exists(img_save_dir):
         os.mkdir(img_save_dir)
 
-    cv2_imwrite(os.path.join(img_save_dir, img_fn) + '.png', x_img)
+    # cv2_imwrite(os.path.join(img_save_dir, img_fn) + '.png', x_img)
     for i in range(1, n_class):
         cv2_imwrite(os.path.join(img_save_dir, img_fn) + f'_map_class_{i}.png', output_grey[i])
 
