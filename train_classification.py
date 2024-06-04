@@ -24,8 +24,8 @@ class TrainerClassification(TrainerBase):
 
     def _train(self, epoch):
         self.model.train()
-        metric_list_mean = {'acc': [],
-                            'f1': []}
+
+        metric_list_mean = {}
         batch_losses = 0
         for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
             x_in, _ = x_in
@@ -79,15 +79,12 @@ class TrainerClassification(TrainerBase):
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
 
-        print('{}{} epoch / train Loss {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
-                                                                       epoch,
-                                                                       self.args.criterion,
-                                                                       loss_mean,
-                                                                       self.optimizer.param_groups[0]['lr'],
-                                                                       utils.Colors.END))
-
-        if self.args.wandb:
-            wandb.log({'train Loss {}'.format(self.args.criterion): loss_mean}, step=epoch)
+        print('{}{} epoch / train {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
+                                                                  epoch,
+                                                                  self.args.criterion,
+                                                                  loss_mean,
+                                                                  self.optimizer.param_groups[0]['lr'],
+                                                                  utils.Colors.END))
 
         self.metric_train.reset()
 

@@ -25,6 +25,7 @@ class TrainerSegmentation(TrainerBase):
     def _train(self, epoch):
         self.model.train()
 
+        metric_list_mean = {}
         batch_losses = 0
         for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
             x_in, _ = x_in
@@ -60,16 +61,24 @@ class TrainerSegmentation(TrainerBase):
                     self._validate(epoch)
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
+        metric_list_mean['loss'] = loss_mean
 
-        print('{}{} epoch / Train Loss {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
+        print('{}{} epoch / train {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
                                                                        epoch,
                                                                        self.args.criterion,
                                                                        loss_mean,
                                                                        self.optimizer.param_groups[0]['lr'],
                                                                        utils.Colors.END))
 
-        if self.args.wandb:
-            wandb.log({'Train Loss {}'.format(self.args.criterion): loss_mean}, step=epoch)
+        for key in metric_list_mean.keys():
+            log_str = f'train {key}: {metric_list_mean[key]}'
+            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
+
+            if self.args.wandb:
+                wandb.log({f'train {key}': metric_list_mean[key]},
+                          step=epoch)
+
+        self.metric_train.reset()
 
     def _validate(self, epoch):
         self.model.eval()
@@ -122,6 +131,7 @@ class TrainerSegmentation(TrainerBase):
             if metric_list_mean[key] > self.metric_best[key]:
                 self.metric_best[key] = metric_list_mean[key]
                 self.save_model(self.model.module, self.args.model_name, epoch, metric_list_mean[key], metric_name=key)
+
         self.metric_val.reset()
 
     def run(self):
