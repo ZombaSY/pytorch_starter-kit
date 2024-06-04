@@ -146,7 +146,6 @@ class UNet_dsv(nn.Module):
 
         out_dict = {'seg': logits,
                     'feats': [x2, x3, x4, x5],
-                    'seg_aux': [logits_aux1, logits_aux2, logits_aux3]}
+                    'seg_dsv': [logits_aux1, logits_aux2, logits_aux3]}
 
         return out_dict
-

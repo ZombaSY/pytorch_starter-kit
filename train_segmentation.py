@@ -40,6 +40,9 @@ class TrainerSegmentation(TrainerBase):
 
             # compute loss
             loss = self.criterion(output['seg'], target)
+            if 'seg_dsv' in output:
+                for aux in output['seg_dsv']:
+                    loss += self.criterion(aux, target)
             if not torch.isfinite(loss):
                 raise Exception('Loss is NAN. End training.')
 
