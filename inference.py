@@ -103,6 +103,9 @@ class Inferencer:
 
     def inference_regression(self, epoch):
         self.model.eval()
+
+        list_score = []
+        list_target = []
         metric_list_mean = {'loss': []}
         batch_losses = 0
 
@@ -123,11 +126,26 @@ class Inferencer:
                         raise Exception('Loss is NAN. End training.')
                     batch_losses += loss.item()
 
+                # store target and output
+                target_item = target.cpu().numpy()
+                score_item = output['vec'].detach().cpu().numpy()
+                for b in range(output['vec'].shape[0]):
+                    list_score.append(score_item[b].tolist())
+                    list_target.append(target_item[b].tolist())
+
                 self.__post_process(x_in, target, output, img_id, batch_idx)
 
+
         if self.args.mode == 'inference':
+            # Calculate the correlation between the two lists
+            correlation1 = np.corrcoef(np.array(list_score).T[0], np.array(list_target).T[0])[0, 1]
+            correlation2 = np.corrcoef(np.array(list_score).T[1], np.array(list_target).T[1])[0, 1]
+            correlation = (correlation1 + correlation2) / 2
+
             loss_mean = batch_losses / self.loader_val.Loader.__len__()
+
             metric_list_mean['loss'] = loss_mean
+            metric_list_mean['corr'] = correlation
             for key in metric_list_mean.keys():
                 log_str = f'validation {key}: {metric_list_mean[key]}'
                 print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
