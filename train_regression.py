@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import wandb
 
 from models import utils
@@ -24,7 +25,6 @@ class TrainerRegression(TrainerBase):
     def _train(self, epoch):
         self.model.train()
 
-        metric_list_mean = {}
         batch_losses = 0
         for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
             x_in, _ = x_in
@@ -39,7 +39,7 @@ class TrainerRegression(TrainerBase):
             output = self.model(x_in)
 
             # compute loss
-            loss = self.criterion(output['class'], target)
+            loss = self.criterion(output['vec'], target)
             if not torch.isfinite(loss):
                 raise Exception('Loss is NAN. End training.')
 
@@ -57,29 +57,19 @@ class TrainerRegression(TrainerBase):
                     self._validate(epoch)
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
-        metric_list_mean['loss'] = loss_mean
-        for key in metric_list_mean.keys():
-            log_str = f'train {key}: {metric_list_mean[key]}'
-            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
 
-            if self.args.wandb:
-                wandb.log({f'train {key}': metric_list_mean[key]},
-                          step=epoch)
+        metric_dict = {}
+        metric_dict['loss'] = loss_mean
 
-        print('{}{} epoch / train {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
-                                                                       epoch,
-                                                                       self.args.criterion,
-                                                                       loss_mean,
-                                                                       self.optimizer.param_groups[0]['lr'],
-                                                                       utils.Colors.END))
-
+        utils.log_epoch('train', epoch, metric_dict, self.args.wandb)
         self.metric_train.reset()
 
     def _validate(self, epoch):
         self.model.eval()
-        metric_list_mean = {'loss': []}
-        batch_losses = 0
 
+        list_score = []
+        list_target = []
+        batch_losses = 0
         for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
             with torch.no_grad():
                 x_in, _ = x_in
@@ -91,35 +81,31 @@ class TrainerRegression(TrainerBase):
                 output = self.model(x_in)
 
                 # compute loss
-                loss = self.criterion(output['class'], target)
+                loss = self.criterion(output['vec'], target)
                 if not torch.isfinite(loss):
                     raise Exception('Loss is NAN. End training.')
 
                 batch_losses += loss.item()
 
+                target_item = target.cpu().numpy()
+                score_item = output['vec'].detach().cpu().numpy()
+                for b in range(output['vec'].shape[0]):
+                    list_score.append(score_item[b].tolist())
+                    list_target.append(target_item[b].tolist())
+
+        # Calculate the correlation between the two lists
+        correlation1 = np.corrcoef(np.array(list_score).T[0], np.array(list_target).T[0])[0, 1]
+        correlation2 = np.corrcoef(np.array(list_score).T[1], np.array(list_target).T[1])[0, 1]
+        correlation = (correlation1 + correlation2) / 2
+
         loss_mean = batch_losses / self.loader_val.Loader.__len__()
-        metric_list_mean['loss'] = loss_mean
-        for key in metric_list_mean.keys():
-            log_str = f'validation {key}: {metric_list_mean[key]}'
-            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
 
-            if self.args.wandb:
-                wandb.log({f'validation {key}': metric_list_mean[key]},
-                          step=epoch)
+        metric_dict = {}
+        metric_dict['loss'] = loss_mean
+        metric_dict['corr'] = correlation
 
-        if epoch == 1:  # initialize value
-            if hasattr(self, 'metric_best'):
-                pass
-            else:
-                self.metric_best = {}
-                for key in metric_list_mean.keys():
-                    self.metric_best[key] = metric_list_mean[key]
-
-        for key in metric_list_mean.keys():
-            if (key == 'loss' and metric_list_mean[key] < self.metric_best[key]) or (key != 'loss' and metric_list_mean[key] > self.metric_best[key]):
-                self.metric_best[key] = metric_list_mean[key]
-                self.save_model(self.model.module, self.args.model_name, epoch, metric_list_mean[key], metric_name=key)
-
+        utils.log_epoch('validation', epoch, metric_dict, self.args.wandb)
+        self.check_metric(epoch, metric_dict)
         self.metric_val.reset()
 
     def run(self):

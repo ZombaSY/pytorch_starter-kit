@@ -25,7 +25,6 @@ class TrainerSegmentation(TrainerBase):
     def _train(self, epoch):
         self.model.train()
 
-        metric_list_mean = {}
         batch_losses = 0
         for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
             x_in, _ = x_in
@@ -61,23 +60,11 @@ class TrainerSegmentation(TrainerBase):
                     self._validate(epoch)
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
-        metric_list_mean['loss'] = loss_mean
 
-        print('{}{} epoch / train {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
-                                                                       epoch,
-                                                                       self.args.criterion,
-                                                                       loss_mean,
-                                                                       self.optimizer.param_groups[0]['lr'],
-                                                                       utils.Colors.END))
+        metric_dict = {}
+        metric_dict['loss'] = loss_mean
 
-        for key in metric_list_mean.keys():
-            log_str = f'train {key}: {metric_list_mean[key]}'
-            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
-
-            if self.args.wandb:
-                wandb.log({f'train {key}': metric_list_mean[key]},
-                          step=epoch)
-
+        utils.log_epoch('train', epoch, metric_dict, self.args.wandb)
         self.metric_train.reset()
 
     def _validate(self, epoch):
@@ -98,40 +85,18 @@ class TrainerSegmentation(TrainerBase):
                 for b in range(output['seg'].shape[0]):
                     self.metric_val.update(target[b][0].cpu().detach().numpy(), output_argmax[b].cpu().detach().numpy())
 
+
         metrics_out = self.metric_val.get_results()
         c_iou = [metrics_out['Class IoU'][i] for i in range(self.args.num_class)]
         m_iou = sum(c_iou) / self.args.num_class
 
-        metric_list_mean = {}
-        metric_list_mean['mIoU'] = m_iou
+        metric_dict = {}
+        metric_dict['mIoU'] = m_iou
         for i in range(len(c_iou)):
-            metric_list_mean[f'cIoU_{i}'] = c_iou[i]
+            metric_dict[f'cIoU_{i}'] = c_iou[i]
 
-
-        for key in metric_list_mean.keys():
-            metric_list_mean[key] = np.mean(metric_list_mean[key])
-
-        for key in metric_list_mean.keys():
-            log_str = f'validation {key}: {metric_list_mean[key]}'
-            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
-
-            if self.args.wandb:
-                wandb.log({f'validation {key}': metric_list_mean[key]},
-                          step=epoch)
-
-        if epoch == 1:  # initialize value
-            if hasattr(self, 'metric_best'):
-                pass
-            else:
-                self.metric_best = {}
-                for key in metric_list_mean.keys():
-                    self.metric_best[key] = metric_list_mean[key]
-
-        for key in metric_list_mean.keys():
-            if metric_list_mean[key] > self.metric_best[key]:
-                self.metric_best[key] = metric_list_mean[key]
-                self.save_model(self.model.module, self.args.model_name, epoch, metric_list_mean[key], metric_name=key)
-
+        utils.log_epoch('validation', epoch, metric_dict, self.args.wandb)
+        self.check_metric(epoch, metric_dict)
         self.metric_val.reset()
 
     def run(self):
@@ -142,6 +107,6 @@ class TrainerSegmentation(TrainerBase):
             if (epoch - self.last_saved_epoch) > self.args.early_stop_epoch:
                 print('The model seems to be converged. Early stop training.')
                 print(f'Best mIoU -----> {self.metric_best["mIoU"]}')
-                if self.self.args.wandb:
+                if self.args.wandb:
                     wandb.log({f'Best mIoU': self.metric_best['mIoU']})
                 break

@@ -5,6 +5,7 @@ import math
 import random
 import time
 import os
+import wandb
 
 from torch.autograd import Variable
 from timm.models.layers import trunc_normal_
@@ -892,6 +893,23 @@ def draw_landmark(img, lmk, save_dir, img_fn):
 
 def multiprocessing_wrapper(args):
     return args[0](*args[1:])
+
+
+def log_epoch(mode, epoch, metric_dict, use_wandb=False):
+    if mode == 'train':
+        log_color = Colors.LIGHT_GREEN
+    elif mode == 'validation':
+        log_color = Colors.LIGHT_CYAN
+    else:
+        log_color = Colors.BOLD
+
+    for key in metric_dict.keys():
+        log_str = f'{mode} {key}: {metric_dict[key]}'
+        print(f'{log_color} {epoch} epoch / {log_str} {Colors.END}')
+
+        if use_wandb:
+            wandb.log({f'{mode} {key}': metric_dict[key]},
+                        step=epoch)
 
 
 class TrainerCallBack:

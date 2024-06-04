@@ -10,8 +10,6 @@ class TrainerClassification(TrainerBase):
     def __init__(self, args, now=None, k_fold=0):
         super(TrainerClassification, self).__init__(args, now=now, k_fold=k_fold)
 
-        # 'init' means that this variable must be initialized.
-        # 'set' means that this variable is available to being set, not must.
         self.loader_train = self.init_data_loader(args=self.args,
                                                   mode='train',
                                                   csv_path=self.args.train_csv_path)
@@ -25,7 +23,6 @@ class TrainerClassification(TrainerBase):
     def _train(self, epoch):
         self.model.train()
 
-        metric_list_mean = {}
         batch_losses = 0
         for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
             x_in, _ = x_in
@@ -63,35 +60,20 @@ class TrainerClassification(TrainerBase):
             self.metric_train.update(output_argmax, target_argmax)
 
         metric_result = self.metric_train.get_results()
-        metric_list_mean['acc'] = metric_result['acc']
-        metric_list_mean['f1'] = metric_result['f1']
-
-        for key in metric_list_mean.keys():
-            metric_list_mean[key] = np.mean(metric_list_mean[key])
-
-        for key in metric_list_mean.keys():
-            log_str = f'train {key}: {metric_list_mean[key]}'
-            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
-
-            if self.args.wandb:
-                wandb.log({f'train {key}': metric_list_mean[key]},
-                          step=epoch)
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
 
-        print('{}{} epoch / train {}: {:.4f}, lr {:.7f}{}'.format(utils.Colors.LIGHT_CYAN,
-                                                                  epoch,
-                                                                  self.args.criterion,
-                                                                  loss_mean,
-                                                                  self.optimizer.param_groups[0]['lr'],
-                                                                  utils.Colors.END))
+        metric_dict = {}
+        metric_dict['acc'] = metric_result['acc']
+        metric_dict['f1'] = metric_result['f1']
+        metric_dict['loss'] = loss_mean
 
+        utils.log_epoch('train', epoch, metric_dict, self.args.wandb)
         self.metric_train.reset()
 
     def _validate(self, epoch):
         self.model.eval()
-        metric_list_mean = {'acc': [],
-                            'f1': []}
+
 
         for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
             with torch.no_grad():
@@ -109,33 +91,13 @@ class TrainerClassification(TrainerBase):
                 self.metric_val.update(output_argmax, target_argmax)
 
         metric_result = self.metric_val.get_results()
-        metric_list_mean['acc'] = metric_result['acc']
-        metric_list_mean['f1'] = metric_result['f1']
 
-        for key in metric_list_mean.keys():
-            metric_list_mean[key] = np.mean(metric_list_mean[key])
+        metric_dict = {}
+        metric_dict['acc'] = metric_result['acc']
+        metric_dict['f1'] = metric_result['f1']
 
-        for key in metric_list_mean.keys():
-            log_str = f'validation {key}: {metric_list_mean[key]}'
-            print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
-
-            if self.args.wandb:
-                wandb.log({f'validation {key}': metric_list_mean[key]},
-                          step=epoch)
-
-        if epoch == 1:  # initialize value
-            if hasattr(self, 'metric_best'):
-                pass
-            else:
-                self.metric_best = {}
-                for key in metric_list_mean.keys():
-                    self.metric_best[key] = metric_list_mean[key]
-
-        for key in metric_list_mean.keys():
-            if metric_list_mean[key] > self.metric_best[key]:
-                self.metric_best[key] = metric_list_mean[key]
-                self.save_model(self.model.module, self.args.model_name, epoch, metric_list_mean[key], metric_name=key)
-
+        utils.log_epoch('validation', epoch, metric_dict, self.args.wandb)
+        self.check_metric(epoch, metric_dict)
         self.metric_val.reset()
 
     def run(self):

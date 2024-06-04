@@ -38,7 +38,7 @@ class TrainerBase:
 
         self.model = self.init_model(self.args, self.device)
         self.optimizer = self.init_optimizer(self.args, self.model)
-        self.criterion = self.init_criterion(self.args, self.device)
+        self.criterion = self.init_criterion(self.args.criterion, self.device)
         self.metric_train = self.init_metric(self.args.task, self.args.num_class)
         self.metric_val = self.init_metric(self.args.task, self.args.num_class)
 
@@ -75,10 +75,10 @@ class TrainerBase:
     def run(self):
         pass
 
-    def save_model(self, model, model_name, epoch, metric=None, metric_name='metric'):
+    def save_model(self, epoch, metric=None, metric_name='metric'):
         file_path = self.saved_model_directory + '/'
 
-        file_format = file_path + model_name + '-Epoch_' + str(epoch) + '-' + metric_name + '_' + str(metric)[:6] + '-folds_' + str(self.k_fold) + '.pt'
+        file_format = file_path + self.args.model_name + '-folds_' + str(self.k_fold) + '-' + metric_name + '_' + str(metric)[:6] + '-Epoch_' + str(epoch) + '.pt'
 
         if not os.path.exists(file_path):
             os.makedirs(file_path)
@@ -87,16 +87,26 @@ class TrainerBase:
             os.remove(self.model_post_path_dict[metric_name])
         self.model_post_path_dict[metric_name] = file_format
 
-        torch.save(model.state_dict(), file_format)
+        torch.save(self.model.module.state_dict(), file_format)
 
         print(f'{utils.Colors.LIGHT_RED}{file_format} model saved!!{utils.Colors.END}')
         self.last_saved_epoch = epoch
 
+    def check_metric(self, epoch, metric_dict):
+        if not hasattr(self, 'metric_best'):
+            self.metric_best = {}
+            for key in metric_dict.keys():
+                self.metric_best[key] = metric_dict[key]
+                self.save_model(epoch, metric_dict[key], metric_name=key)
+        else:
+            for key in metric_dict.keys():
+                if (key == 'loss' and metric_dict[key] < self.metric_best[key]) or (key != 'loss' and metric_dict[key] > self.metric_best[key]):
+                    self.metric_best[key] = metric_dict[key]
+                    self.save_model(epoch, metric_dict[key], metric_name=key)
+
     @staticmethod
     def init_data_loader(args,
                          mode,
-                         x_path=None,
-                         y_path=None,
                          csv_path=None):
         if args.dataloader == 'Image':
             loader = dataloader_hub.ImageDataLoader(csv_path=csv_path,
@@ -116,6 +126,12 @@ class TrainerBase:
                                                            num_workers=args.worker,
                                                            mode=mode,
                                                            args=args)
+        elif args.dataloader == 'ImageAug2Vector':
+            loader = dataloader_hub.ImageAug2VectorDataLoader(csv_path=csv_path,
+                                                              batch_size=args.batch_size,
+                                                              num_workers=args.worker,
+                                                              mode=mode,
+                                                              args=args)
         elif args.dataloader == 'Image2Landmark':
             loader = dataloader_hub.Image2LandmarkDataLoader(data_path=csv_path,
                                                              batch_size=args.batch_size,
@@ -159,8 +175,8 @@ class TrainerBase:
         return torch.nn.DataParallel(model)
 
     @staticmethod
-    def init_criterion(args, device):
-        criterion = getattr(loss_hub, args.criterion)().to(device)
+    def init_criterion(criterion_name, device):
+        criterion = getattr(loss_hub, criterion_name)().to(device)
 
         return criterion
 

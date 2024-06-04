@@ -95,7 +95,7 @@ class DTMSELoss(nn.Module):
         pred_dt = torch.from_numpy(self.distance_field(pred.cpu().detach().numpy())).float()
         target_dt = torch.from_numpy(self.distance_field(target.cpu().detach().numpy())).float()
 
-        loss = self.mse(pred_dt, target_dt)
+        loss = self.mse(pred_dt.squeeze(), target_dt.squeeze())
 
         return loss
 
@@ -265,7 +265,7 @@ class MSELoss(nn.Module):
     def forward(self, x, y):
         y = y.float()
 
-        return self.loss(x, y)
+        return self.loss(x.squeeze(), y.squeeze())
 
 
 class BCELoss(nn.Module):
@@ -402,7 +402,7 @@ class FocalMSELoss(nn.Module):
         self.mse = MSELoss()
 
     def forward(self, x, y, alpha=0.8, gamma=2, smooth=1):
-        mse = self.mse(x, y)
+        mse = self.mse(x.squeeze(), y.squeeze())
         mse_exp = torch.exp(-mse)
         focal_loss = alpha * (1 - mse_exp) ** gamma * mse
 
@@ -520,7 +520,7 @@ class MSELoss_SSL(nn.Module):
         inputs = F.softmax(inputs, dim=0)
         targets = F.softmax(targets, dim=0)
 
-        return self.mse_loss(inputs, targets)
+        return self.mse_loss(inputs.squeeze(), targets.squeeze())
 
     def forward(self, x, y):
         assert y.shape[0] == 1, 'target batch size should be 1.'
@@ -682,7 +682,7 @@ class MSECorrelationCoefficientLoss(nn.Module):
         self.corr = CorrelationCoefficientLoss()
 
     def forward(self, x, y):
-        mse = self.mse(x, y)
+        mse = self.mse(x.squeeze(), y.squeeze())
         corr = self.corr(x, y)
 
         return mse + corr

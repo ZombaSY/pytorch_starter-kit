@@ -8,8 +8,9 @@ import ast
 import sys
 
 from export import Exportor
-from train_regression import TrainerRegression
 from train_segmentation import TrainerSegmentation
+from train_regression import TrainerRegression
+from train_regression_perturb import TrainerRgressionPerturb
 from train_classification import TrainerClassification
 from inference import Inferencer
 from datetime import datetime
@@ -40,10 +41,10 @@ def init_trainer(args, now_time, k_fold=0):
         trainer = TrainerSegmentation(args, now_time, k_fold=k_fold)
     elif args.task == 'classification':
         trainer = TrainerClassification(args, now_time, k_fold=k_fold)
-    elif args.task == 'regression' or 'landmark':
+    elif args.task == 'regression':
         trainer = TrainerRegression(args, now_time, k_fold=k_fold)
     else:
-        raise ValueError('')
+        raise ValueError('No trainer found.')
 
     return trainer
 
