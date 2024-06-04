@@ -119,7 +119,7 @@ class TrainerRegression(TrainerBase):
                     self.metric_best[key] = metric_list_mean[key]
 
         for key in metric_list_mean.keys():
-            if metric_list_mean[key] < self.metric_best[key]:
+            if (key == 'loss' and metric_list_mean[key] < self.metric_best[key]) or (key != 'loss' and metric_list_mean[key] > self.metric_best[key]):
                 self.metric_best[key] = metric_list_mean[key]
                 self.save_model(self.model.module, self.args.model_name, epoch, metric_list_mean[key], metric_name=key)
 
