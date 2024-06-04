@@ -43,6 +43,8 @@ def init_trainer(args, now_time, k_fold=0):
         trainer = TrainerClassification(args, now_time, k_fold=k_fold)
     elif args.task == 'regression':
         trainer = TrainerRegression(args, now_time, k_fold=k_fold)
+    elif args.task == 'regression_perturb':
+        trainer = TrainerRgressionPerturb(args, now_time, k_fold=k_fold)
     else:
         raise ValueError('No trainer found.')
 

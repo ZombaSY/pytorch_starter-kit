@@ -126,12 +126,12 @@ class TrainerBase:
                                                            num_workers=args.worker,
                                                            mode=mode,
                                                            args=args)
-        elif args.dataloader == 'ImageAug2Vector':
-            loader = dataloader_hub.ImageAug2VectorDataLoader(csv_path=csv_path,
-                                                              batch_size=args.batch_size,
-                                                              num_workers=args.worker,
-                                                              mode=mode,
-                                                              args=args)
+        elif args.dataloader == 'ImageStack2Vector':
+            loader = dataloader_hub.ImageStack2VectorDataLoader(csv_path=csv_path,
+                                                                batch_size=args.batch_size,
+                                                                num_workers=args.worker,
+                                                                mode=mode,
+                                                                args=args)
         elif args.dataloader == 'Image2Landmark':
             loader = dataloader_hub.Image2LandmarkDataLoader(data_path=csv_path,
                                                              batch_size=args.batch_size,

@@ -25,7 +25,7 @@ class Inferencer:
         self.loader_val = TrainerBase.init_data_loader(args=self.args,
                                                        mode=self.args.mode,
                                                        csv_path=self.args.valid_csv_path)
-        self.criterion = TrainerBase.init_criterion(self.args, self.device)
+        self.criterion = TrainerBase.init_criterion(self.args.criterion, self.device)
 
         self.model = TrainerBase.init_model(self.args, self.device)
         self.model.module.load_state_dict(torch.load(args.model_path))
@@ -61,16 +61,16 @@ class Inferencer:
                 self.metric_val.update(output_argmax, target_argmax)
 
         if self.args.mode == 'inference':
-            metric_list_mean = {}
+            metric_dict = {}
             metric_result = self.metric_val.get_results()
-            metric_list_mean['acc'] = metric_result['acc']
-            metric_list_mean['f1'] = metric_result['f1']
+            metric_dict['acc'] = metric_result['acc']
+            metric_dict['f1'] = metric_result['f1']
 
-            for key in metric_list_mean.keys():
-                metric_list_mean[key] = np.mean(metric_list_mean[key])
+            for key in metric_dict.keys():
+                metric_dict[key] = np.mean(metric_dict[key])
 
-            for key in metric_list_mean.keys():
-                log_str = f'validation {key}: {metric_list_mean[key]}'
+            for key in metric_dict.keys():
+                log_str = f'validation {key}: {metric_dict[key]}'
                 print(f'{utils.Colors.LIGHT_GREEN} {log_str} {utils.Colors.END}')
 
         df = pd.DataFrame({'fn': self.loader_val.image_loader.df['img_path'],
@@ -94,7 +94,7 @@ class Inferencer:
                 self.__post_process(x_in, target, output, img_id, batch_idx)
 
         if self.args.mode == 'inference':
-            metrics_out = self.metric.get_results()
+            metrics_out = self.metric_val.get_results()
             cIoU = [metrics_out['Class IoU'][i] for i in range(self.args.num_class)]
             mIoU = sum(cIoU) / self.args.num_class
             print('Val mIoU: {}'.format(mIoU))
@@ -103,10 +103,7 @@ class Inferencer:
 
     def inference_regression(self, epoch):
         self.model.eval()
-
-        list_score = []
-        list_target = []
-        metric_list_mean = {'loss': []}
+        metric_dict = {'loss': []}
         batch_losses = 0
 
         for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
@@ -126,28 +123,13 @@ class Inferencer:
                         raise Exception('Loss is NAN. End training.')
                     batch_losses += loss.item()
 
-                # store target and output
-                target_item = target.cpu().numpy()
-                score_item = output['vec'].detach().cpu().numpy()
-                for b in range(output['vec'].shape[0]):
-                    list_score.append(score_item[b].tolist())
-                    list_target.append(target_item[b].tolist())
-
                 self.__post_process(x_in, target, output, img_id, batch_idx)
 
-
         if self.args.mode == 'inference':
-            # Calculate the correlation between the two lists
-            correlation1 = np.corrcoef(np.array(list_score).T[0], np.array(list_target).T[0])[0, 1]
-            correlation2 = np.corrcoef(np.array(list_score).T[1], np.array(list_target).T[1])[0, 1]
-            correlation = (correlation1 + correlation2) / 2
-
             loss_mean = batch_losses / self.loader_val.Loader.__len__()
-
-            metric_list_mean['loss'] = loss_mean
-            metric_list_mean['corr'] = correlation
-            for key in metric_list_mean.keys():
-                log_str = f'validation {key}: {metric_list_mean[key]}'
+            metric_dict['loss'] = loss_mean
+            for key in metric_dict.keys():
+                log_str = f'validation {key}: {metric_dict[key]}'
                 print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
 
     def __post_process_landmark(self, x_img, target, output, img_id, post_out):
@@ -168,7 +150,7 @@ class Inferencer:
         # compute metric
         if self.args.dataloader == 'Image2Image':
             output_argmax = torch.argmax(output['seg'], dim=1).cpu()
-            self.metric.update(target[0][0].cpu().detach().numpy(), output_argmax[0].cpu().detach().numpy())
+            self.metric_val.update(target[0][0].cpu().detach().numpy(), output_argmax[0].cpu().detach().numpy())
 
         if self.args.draw_results:
 

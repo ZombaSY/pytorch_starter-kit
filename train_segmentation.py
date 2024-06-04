@@ -1,6 +1,5 @@
 import torch
 import wandb
-import numpy as np
 
 from models import utils
 from trainer_base import TrainerBase
@@ -10,8 +9,6 @@ class TrainerSegmentation(TrainerBase):
     def __init__(self, args, now=None, k_fold=0):
         super(TrainerSegmentation, self).__init__(args, now=now, k_fold=k_fold)
 
-        # 'init' means that this variable must be initialized.
-        # 'set' means that this variable is available to being set, not must.
         self.loader_train = self.init_data_loader(args=self.args,
                                                   mode='train',
                                                   csv_path=self.args.train_csv_path)

@@ -419,103 +419,10 @@ class Image2VectorLoader(Dataset):
         return self.len
 
 
-class ImageAug2VectorLoader(Dataset):
+class ImageStack2VectorLoader(Image2VectorLoader):
 
     def __init__(self, csv_path, mode, **kwargs):
-
-        self.mode = mode
-        self.args = kwargs['args']
-
-        if hasattr(self.args, 'transform_rand_crop'):
-            self.crop_factor = int(self.args.transform_rand_crop)
-
-        self.image_mean = [0.5, 0.5, 0.5]
-        self.image_std = [0.25, 0.25, 0.25]
-
-        self.data_root_path = os.path.split(csv_path)[0]
-        self.df = pd.read_csv(csv_path)
-        self.len = len(self.df)
-
-        # mount_data_on_memory
-        if self.args.data_cache:
-            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.mode}{utils.Colors.END}')
-            x_img_path = []
-            self.memory_data_y = []
-            for idx in range(self.len):
-                x_img_path.append(os.path.join(*[self.data_root_path, self.df['FILENAME'][idx]]))
-                label = F.one_hot(torch.tensor(self.df[['DARKCIRCLE_AVG', 'FLUSH']].values[idx]), self.args.num_class) if self.args.task == 'classification' else torch.tensor(self.df[['DARKCIRCLE_AVG', 'FLUSH']].values[idx])
-                self.memory_data_y.append(label)
-            with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
-
-        if self.mode == 'train' and hasattr(self.args, 'transform_mixup'):
-            if self.args.transform_mixup > 0:
-                # C-mixup
-                # self.mixup_sample_1 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col1']), -1)))
-                # self.mixup_sample_2 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col2']), -1)))
-                # self.mixup_sample = (self.mixup_sample_1 + self.mixup_sample_2) / 2
-
-                # mix-up
-                self.mixup_sample = np.ones(self.len) / self.len
-
-        self.update_transform()
-
-    def update_transform(self, scaler=1):
-        excludings = ['transform_rand_crop', 'transform_landmark_rotate', 'transform_landmark_hflip']
-
-        self.transform_resize = albumentations.Resize(height=self.args.input_size[0], width=self.args.input_size[1], p=1)
-        if self.mode == 'train':
-            # progressively update augmentation scale
-            for param in vars(self.args):
-                if 'transform_' in param:
-                    if param not in excludings:
-                        setattr(self.args, param, min(getattr(self.args, param) * scaler, 1))
-                    print(f'{utils.Colors.LIGHT_WHITE}{param}: {getattr(self.args, param)}{utils.Colors.END}')
-            self.transform_augmentation = albumentations.Compose([*augmentations(self.args, self.crop_factor)])
-        self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
-
-    def transform(self, _input, _label):
-        random_gen = random.Random()
-
-        if self.mode == 'train':
-            transform = self.transform_resize(image=_input)
-            _input = transform['image']
-
-            # MixUp
-            if random_gen.random() < self.args.transform_mixup:
-                # select index from pre-defined sampler
-                idx_2 = np.random.choice(np.arange(self.len), p=self.mixup_sample)
-
-                # load the pair of X and Y
-                x_path = os.path.join(*[self.data_root_path, self.df['FILENAME'][idx_2]])
-                x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
-                transform = self.transform_resize(image=x_img)
-                _input_2 = transform['image']
-                _label_2 = torch.tensor(self.df[['DARKCIRCLE_AVG', 'FLUSH']].values[idx_2])
-
-                if self.args.task == 'classification':
-                    _label_2 = F.one_hot(_label_2, num_classes=self.args.num_class)
-
-                lam = np.random.beta(2, 2)
-
-                _input = _input * lam + _input_2 * (1 - lam)
-                _label = _label * lam + _label_2 * (1 - lam)
-
-                del x_img
-                del x_path
-
-            _input = _input.astype(np.uint8)
-            transform = self.transform_augmentation(image=_input)
-        else:
-            transform = self.transform_resize(image=_input)
-
-        norm = self.transforms_normalize(image=transform['image'])
-        _input = norm['image']
-        _input = np.transpose(_input, [2, 0, 1])
-
-        _input = torch.from_numpy(_input.astype(np.float32))
-
-        return _input, _label.float()
+        super().__init__(csv_path, mode, **kwargs)
 
     def __getitem__(self, index):
         if self.args.data_cache:
@@ -523,9 +430,9 @@ class ImageAug2VectorLoader(Dataset):
             y_vec = self.memory_data_y[index]
             x_path = self.memory_data_x[index]['path']
         else:
-            x_path = os.path.join(*[self.data_root_path, 'input', self.df['FILENAME'][index]]) + '.jpg'
+            x_path = os.path.join(*[self.data_root_path, 'input', self.df['input'][index]])
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
-            y_vec = torch.tensor(self.df[['DARKCIRCLE_AVG', 'FLUSH']].values[index])
+            y_vec = torch.tensor(self.df[self.args.label_cols].values[index])
 
         if self.mode == 'train':
             for i in range(self.args.perturbation_nums):
@@ -540,9 +447,6 @@ class ImageAug2VectorLoader(Dataset):
             x_img_tr, y_vec_tr = self.transform(x_img, y_vec, index)
 
         return (x_img_tr, x_path), (y_vec_tr, x_path)
-
-    def __len__(self):
-        return self.len
 
 
 class Image2LandmarkLoader(Dataset):
@@ -642,7 +546,6 @@ class Image2LandmarkLoader(Dataset):
             y_label = self.memory_data_y[index]['data']
 
             x_path = self.memory_data_x[index]['path']
-            y_path = self.memory_data_y[index]['path']
         else:
             x_path = self.xy[index][0]
 
@@ -756,7 +659,7 @@ class Image2VectorDataLoader:
         return self.image_loader.__len__()
 
 
-class ImageAug2VectorDataLoader:
+class ImageStack2VectorDataLoader:
 
     def __init__(self,
                  csv_path,
@@ -769,9 +672,9 @@ class ImageAug2VectorDataLoader:
         g = torch.Generator()
         g.manual_seed(3407)
 
-        self.image_loader = ImageAug2VectorLoader(csv_path,
-                                                  mode=mode,
-                                                  **kwargs)
+        self.image_loader = ImageStack2VectorLoader(csv_path,
+                                                    mode=mode,
+                                                    **kwargs)
 
         if kwargs['args'].weighted_sampler == True and mode == 'train':
             sampler1 = utils.get_frequency_in_list(np.array(self.image_loader.df['FLUSH']).tolist(), reciprocal=True)
