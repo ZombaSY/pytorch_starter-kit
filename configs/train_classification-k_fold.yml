@@ -44,7 +44,7 @@
   transform_blur: 0.5,
   transform_clahe: 0.5,
   transform_cutmix: 0.0,
-  transform_coaseDropout: 0.7,
+  transform_coarse_dropout: 0.7,
   transform_fancyPCA: 0.5,
   transform_fog: 0.3,
   transform_g_noise: 0.5,
