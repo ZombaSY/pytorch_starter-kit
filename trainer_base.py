@@ -46,10 +46,10 @@ class TrainerBase:
             if self.args.model_path != '':
                 if 'imagenet' in self.args.model_path.lower():
                     self.model.module.load_pretrained_imagenet(self.args.model_path)
-                    print('Model loaded successfully!!! (ImageNet)')
+                    print(f'{utils.Colors.RED}Model loaded successfully!!! (ImageNet){utils.Colors.END}')
                 else:
                     self.model.module.load_pretrained(self.args.model_path)
-                    print('Model loaded successfully!!! (Custom)')
+                    print(f'{utils.Colors.RED}Model loaded successfully!!! (Custom){utils.Colors.END}')
                 self.model.to(self.device)
 
         if self.args.wandb:

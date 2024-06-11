@@ -41,7 +41,7 @@ class Inferencer:
         self.image_mean = torch.tensor(self.loader_val.image_loader.image_mean).to(self.device)
         self.image_std = torch.tensor(self.loader_val.image_loader.image_std).to(self.device)
 
-        self.post_out = {}
+        self.data_stat = {}
 
     def inference_classification(self, epoch):
         self.model.eval()
@@ -132,7 +132,7 @@ class Inferencer:
                 log_str = f'validation {key}: {metric_dict[key]}'
                 print(f'{utils.Colors.LIGHT_GREEN} {epoch} epoch / {log_str} {utils.Colors.END}')
 
-    def __post_process_landmark(self, x_img, target, output, img_id, post_out):
+    def __post_process_landmark(self, x_img, target, output, img_id, data_stat):
         if self.args.draw_results:
 
             if not os.path.exists(self.save_dir):
@@ -144,9 +144,9 @@ class Inferencer:
 
                 pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_landmark), x_img, output_np, itertools.repeat(self.save_dir), img_id))
 
-        return post_out
+        return data_stat
 
-    def __post_process_segmentation(self, x_img, target, output, img_id, post_out):
+    def __post_process_segmentation(self, x_img, target, output, img_id, data_stat):
         # compute metric
         if self.args.dataloader == 'Image2Image':
             output_argmax = torch.argmax(output['seg'], dim=1).cpu()
@@ -160,22 +160,22 @@ class Inferencer:
 
                 pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_image), x_img, output_prob, itertools.repeat(self.save_dir), img_id, itertools.repeat(self.args.num_class)))
 
-        return post_out
+        return data_stat
 
     def __post_process(self, x_img, target, output, img_id, batch_idx):
-        post_out_tmp = {}
-        post_out_tmp['img_id'] = img_id
+        data_stat = {}
+        data_stat['img_id'] = img_id
 
         if self.args.task == 'segmentation':
-            self.__post_process_segmentation(x_img, target, output, img_id, post_out_tmp)
+            self.__post_process_segmentation(x_img, target, output, img_id, data_stat)
         elif self.args.task == 'landmark':
-            self.__post_process_landmark(x_img, target, output, img_id, post_out_tmp)
+            self.__post_process_landmark(x_img, target, output, img_id, data_stat)
 
-        for key in post_out_tmp.keys():
-            if key not in self.post_out.keys():
-                self.post_out[key] = [post_out_tmp[key]]
+        for key in data_stat.keys():
+            if key not in self.data_stat.keys():
+                self.data_stat[key] = [data_stat[key]]
             else:
-                self.post_out[key].append(post_out_tmp[key])
+                self.data_stat[key].append(data_stat[key])
 
         print(f'batch_idx {batch_idx} -> {batch_idx * self.args.batch_size} images \t Done !!')     # TODO: last batch_idx is invalid
 
@@ -186,3 +186,7 @@ class Inferencer:
             self.inference_classification(0)
         elif self.args.task == 'regression' or 'landmark':
             self.inference_regression(0)
+
+        # save meta data
+        df = pd.DataFrame(self.data_stat)
+        df.to_csv(self.save_dir + '_out.csv', encoding='utf-8-sig', index=False)
