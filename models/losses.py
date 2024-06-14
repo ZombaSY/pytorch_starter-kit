@@ -103,7 +103,7 @@ class DTMSELoss(nn.Module):
 class HausdorffDTLoss(nn.Module):
     """Binary Hausdorff loss based on distance transform"""
 
-    def __init__(self, alpha=2.0, **kwargs):
+    def __init__(self, alpha=2.0, **kwconf):
         super().__init__()
         self.alpha = torch.tensor(alpha)
 
@@ -165,7 +165,7 @@ class HausdorffDTLoss(nn.Module):
 class HausdorffERLoss(nn.Module):
     """Binary Hausdorff loss based on morphological erosion"""
 
-    def __init__(self, alpha=2.0, erosions=10, **kwargs):
+    def __init__(self, alpha=2.0, erosions=10, **kwconf):
         super().__init__()
         self.alpha = alpha
         self.erosions = erosions
@@ -545,7 +545,7 @@ class InfoNCELoss(nn.Module):
         https://arxiv.org/abs/1807.03748v2
         https://arxiv.org/abs/2010.05113
 
-    Args:
+    conf:
         temperature: Logits are divided by temperature before calculating the cross entropy.
         reduction: Reduction method applied to the output.
             Value must be one of ['none', 'sum', 'mean'].

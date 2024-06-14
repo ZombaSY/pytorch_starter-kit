@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 from models import utils
@@ -47,5 +48,4 @@ class SimpleClassifierTransformer(nn.Module):
         self.apply(utils.init_weights)
 
     def forward(self, feat):
-
-        return self.classifier(feat[:, 0])  # use class token
+        return self.classifier(feat[:, 0])  # use class token as input

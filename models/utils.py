@@ -46,9 +46,9 @@ class FunctionTimer:
     def __init__(self, _func):
         self.__func = _func
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *conf, **kwconf):
         tt = time.time()
-        self.__func(*args, **kwargs)
+        self.__func(*conf, **kwconf)
         print(f'\"{self.__func.__name__}\" play time: {time.time() - tt}')
 
     def __enter__(self):
@@ -773,7 +773,7 @@ def draw_image(x_img, output_prob, img_save_dir, img_id, n_class):
     if not os.path.exists(img_save_dir):
         os.mkdir(img_save_dir)
 
-    # cv2_imwrite(os.path.join(img_save_dir, img_fn) + '.png', x_img)
+    cv2_imwrite(os.path.join(img_save_dir, img_fn) + '.png', cv2.cvtColor(x_img, cv2.COLOR_RGB2BGR))
     for i in range(1, n_class):
         cv2_imwrite(os.path.join(img_save_dir, img_fn) + f'_map_class_{i}.png', output_grey[i])
 
@@ -891,8 +891,8 @@ def draw_landmark(img, lmk, save_dir, img_fn):
     cv2_imwrite(fn, tmp_img)
 
 
-def multiprocessing_wrapper(args):
-    return args[0](*args[1:])
+def multiprocessing_wrapper(conf):
+    return conf[0](*conf[1:])
 
 
 def log_epoch(mode, epoch, metric_dict, use_wandb=False):

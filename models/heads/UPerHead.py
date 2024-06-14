@@ -12,7 +12,7 @@ from abc import ABCMeta, abstractmethod
 class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
     """Base class for BaseDecodeHead.
 
-    Args:
+    conf:
         in_channels (int|Sequence[int]): Input channels.
         channels (int): Channels after modules, before conv_seg.
         num_class (int): Number of classes.
@@ -93,7 +93,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         will be selected. So in_channels and in_index must be of type int.
         When input_transform
 
-        Args:
+        conf:
             in_channels (int|Sequence[int]): Input channels.
             in_index (int|Sequence[int]): Input feature index.
             input_transform (str|None): Transformation type of input features.
@@ -127,7 +127,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         inputs = [inputs[i] for i in self.in_index]
         """Transform inputs for decoder.
 
-        Args:
+        conf:
             inputs (list[Tensor]): List of multi-level img features.
 
         Returns:
@@ -143,7 +143,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
     def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg):
         """Forward function for training.
-        Args:
+        conf:
             inputs (list[Tensor]): List of multi-level img features.
             img_metas (list[dict]): List of image info dict where each dict
                 has: 'img_shape', 'scale_factor', 'flip', and may also contain
@@ -164,7 +164,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
     def forward_test(self, inputs, img_metas, test_cfg):
         """Forward function for testing.
 
-        Args:
+        conf:
             inputs (list[Tensor]): List of multi-level img features.
             img_metas (list[dict]): List of image info dict where each dict
                 has: 'img_shape', 'scale_factor', 'flip', and may also contain
@@ -189,7 +189,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 class M_PPM(nn.ModuleList):
     """Pooling Pyramid Module used in PSPNet.
 
-    Args:
+    conf:
         pool_scales (tuple[int]): Pooling scales used in Pooling Pyramid
             Module.
         in_channels (int): Input channels.
@@ -235,14 +235,14 @@ class M_UPerHead(BaseDecodeHead):
     This head is the implementation of `UPerNet
     <https://arxiv.org/abs/1807.10221>`_.
 
-    Args:
+    conf:
         pool_scales (tuple[int]): Pooling scales used in Pooling Pyramid
             Module applied on the last feature. Default: (1, 2, 3, 6).
     """
 
-    def __init__(self, pool_scales=(1, 2, 3, 6), **kwargs):
+    def __init__(self, pool_scales=(1, 2, 3, 6), **kwconf):
         super(M_UPerHead, self).__init__(
-            input_transform='multiple_select', **kwargs)
+            input_transform='multiple_select', **kwconf)
         # PSP Module
         self.psp_modules = M_PPM(
             pool_scales,
@@ -332,107 +332,3 @@ class M_UPerHead(BaseDecodeHead):
         output = self.cls_seg(output)
 
         return output
-
-
-class M_UPerHead_no_seg(BaseDecodeHead):
-    """Unified Perceptual Parsing for Scene Understanding.
-
-    This head is the implementation of `UPerNet
-    <https://arxiv.org/abs/1807.10221>`_.
-
-    Args:
-        pool_scales (tuple[int]): Pooling scales used in Pooling Pyramid
-            Module applied on the last feature. Default: (1, 2, 3, 6).
-    """
-
-    def __init__(self, pool_scales=(1, 2, 3, 6), **kwargs):
-        super(M_UPerHead_no_seg, self).__init__(
-            input_transform='multiple_select', **kwargs)
-        # PSP Module
-        self.psp_modules = M_PPM(
-            pool_scales,
-            self.in_channels[-1],
-            self.channels,
-            conv_cfg=self.conv_cfg,
-            norm_cfg=self.norm_cfg,
-            act_cfg=self.act_cfg,
-            align_corners=self.align_corners)
-
-        self.bottleneck = nn.Conv2d(self.in_channels[-1] + len(pool_scales) * self.channels,
-                                    self.channels,
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1)
-
-        # FPN Module
-        self.lateral_convs = nn.ModuleList()
-        self.fpn_convs = nn.ModuleList()
-        for in_channels in self.in_channels[:-1]:  # skip the top layer
-            l_conv = nn.Conv2d(in_channels,
-                               self.channels,
-                               kernel_size=1,
-                               stride=1,
-                               padding=0,
-                               dilation=1,
-                               groups=1)
-
-            fpn_conv = nn.Conv2d(self.channels,
-                                 self.channels,
-                                 kernel_size=3,
-                                 stride=1,
-                                 padding=1,
-                                 dilation=1,
-                                 groups=1)
-
-            self.lateral_convs.append(l_conv)
-            self.fpn_convs.append(fpn_conv)
-
-        self.fpn_bottleneck = nn.Conv2d(
-            len(self.in_channels) * self.channels,
-            self.channels,
-            kernel_size=3,
-            padding=1)
-
-    def psp_forward(self, inputs):
-        """Forward function of PSP module."""
-        x = inputs[-1]
-        psp_outs = [x]
-        psp_outs.extend(self.psp_modules(x))
-        psp_outs = torch.cat(psp_outs, dim=1)
-        output = self.bottleneck(psp_outs)
-
-        return output
-
-    def forward(self, inputs):
-        """Forward function."""
-        inputs = self._transform_inputs(inputs)
-
-        # build laterals
-        laterals = [    # ERROR POINT!!!
-            lateral_conv(inputs[i])
-            for i, lateral_conv in enumerate(self.lateral_convs)
-        ]
-
-        laterals.append(self.psp_forward(inputs))
-
-        # build top-down path
-        used_backbone_levels = len(laterals)
-        for i in range(used_backbone_levels - 1, 0, -1):
-            prev_shape = laterals[i - 1].shape[2:]
-            laterals[i - 1] += F.interpolate(laterals[i], size=prev_shape, mode='bilinear', align_corners=False)
-
-        # build outputs
-        fpn_outs = [
-            self.fpn_convs[i](laterals[i])
-            for i in range(used_backbone_levels - 1)
-        ]
-        # append psp feature
-        fpn_outs.append(laterals[-1])
-        for i in range(used_backbone_levels - 1, 0, -1):
-            fpn_outs[i] = F.interpolate(fpn_outs[i], size=fpn_outs[0].shape[2:], mode='bilinear', align_corners=False)
-
-        fpn_outs = torch.cat(fpn_outs, dim=1)
-        output = self.fpn_bottleneck(fpn_outs)
-
-        return output
-

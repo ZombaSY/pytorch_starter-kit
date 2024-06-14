@@ -17,43 +17,58 @@ from datetime import datetime
 class TrainerBase:
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, args, now=None, k_fold=0):
-        self.args = args
+    def __init__(self, conf, now=None, k_fold=0):
+        self.conf = conf
         now_time = now if now is not None else datetime.now().strftime("%Y%m%d %H%M%S")
-        self.saved_model_directory = self.args.saved_model_directory + '/' + now_time
+        self.saved_model_directory = self.conf['env']['saved_model_directory'] + '/' + now_time
         self.k_fold = k_fold
 
         # save hyper-parameters
-        if not self.args.debug:
-            with open(self.args.config_path, 'r') as f_r:
-                file_path = self.args.saved_model_directory + '/' + now_time
+        if not self.conf['env']['debug']:
+            with open(self.conf['env']['config_path'], 'r') as f_r:
+                file_path = self.conf['env']['saved_model_directory'] + '/' + now_time
                 if not os.path.exists(file_path):
                     os.makedirs(file_path)
-                with open(os.path.join(file_path, self.args.config_path.split('/')[-1]), 'w') as f_w:
+                with open(os.path.join(file_path, self.conf['env']['config_path'].split('/')[-1]), 'w') as f_w:
                     f_w.write(f_r.read())
 
         # Check cuda available and assign to device
-        use_cuda = self.args.cuda and torch.cuda.is_available()
+        use_cuda = self.conf['env']['cuda'] and torch.cuda.is_available()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
 
-        self.model = self.init_model(self.args, self.device)
-        self.optimizer = self.init_optimizer(self.args, self.model)
-        self.criterion = self.init_criterion(self.args.criterion, self.device)
-        self.metric_train = self.init_metric(self.args.task, self.args.num_class)
-        self.metric_val = self.init_metric(self.args.task, self.args.num_class)
-
-        if hasattr(self.args, 'model_path'):
-            if self.args.model_path != '':
-                if 'imagenet' in self.args.model_path.lower():
-                    self.model.module.load_pretrained_imagenet(self.args.model_path)
-                    print(f'{utils.Colors.RED}Model loaded successfully!!! (ImageNet){utils.Colors.END}')
+        # init model
+        self.model = self.init_model(self.conf, self.device)
+        if hasattr(self.conf, 'saved_ckpt'):
+            if self.conf['model']['saved_ckpt'] != '':
+                if 'imagenet' in self.conf['model']['saved_ckpt'].lower():
+                    self.model.module.load_pretrained_imagenet(self.conf['model']['saved_ckpt'])
+                    print('Model loaded successfully!!! (ImageNet)')
                 else:
-                    self.model.module.load_pretrained(self.args.model_path)
-                    print(f'{utils.Colors.RED}Model loaded successfully!!! (Custom){utils.Colors.END}')
+                    self.model.module.load_pretrained(self.conf['model']['saved_ckpt'])
+                    print('Model loaded successfully!!! (Custom)')
                 self.model.to(self.device)
 
-        if self.args.wandb:
-            wandb.init(project='{}'.format(args.project_name), config=args, name=now_time,
+        # init dataloader
+        self.loader_train = self.init_data_loader(conf=self.conf,
+                                                  conf_dataloader=self.conf['dataloader_train'])
+        self.loader_valid = self.init_data_loader(conf=self.conf,
+                                                  conf_dataloader=self.conf['dataloader_valid'])
+
+        # init optimizer
+        self.optimizer = self.init_optimizer(self.conf, self.model)
+
+        # init scheduler
+        self.scheduler = self.set_scheduler(self.conf, self.conf['dataloader_train'], self.optimizer, self.loader_train)
+
+        # init criterion
+        self.criterion = self.init_criterion(self.conf['criterion']['name'], self.device)
+
+        # init metrics
+        self.metric_train = self.init_metric(self.conf['env']['task'], self.conf['model']['num_class'])
+        self.metric_val = self.init_metric(self.conf['env']['task'], self.conf['model']['num_class'])
+
+        if self.conf['env']['wandb']:
+            wandb.init(project='{}'.format(self.conf['env']['project_name']), config=conf, name=now_time,
                        settings=wandb.Settings(start_method="fork"))
             wandb.watch(self.model)
 
@@ -62,6 +77,9 @@ class TrainerBase:
         self.callback = utils.TrainerCallBack()
         if hasattr(self.model.module, 'train_callback'):
             self.callback.train_callback = self.model.module.train_callback
+
+        self._validate_interval = 1 if (self.loader_train.__len__() // self.conf['env']['train_fold'] // self.conf['dataloader_train']['batch_size']) == 0 else self.loader_train.__len__() // self.conf['env']['train_fold'] // self.conf['dataloader_train']['batch_size']
+
 
     @abc.abstractmethod
     def _train(self, epoch):
@@ -78,7 +96,7 @@ class TrainerBase:
     def save_model(self, epoch, metric=None, metric_name='metric'):
         file_path = self.saved_model_directory + '/'
 
-        file_format = file_path + self.args.model_name + '-folds_' + str(self.k_fold) + '-' + metric_name + '_' + str(metric)[:6] + '-Epoch_' + str(epoch) + '.pt'
+        file_format = file_path + self.conf['model']['name'] + '-folds_' + str(self.k_fold) + '-' + metric_name + '_' + str(metric)[:6] + '-Epoch_' + str(epoch) + '.pt'
 
         if not os.path.exists(file_path):
             os.makedirs(file_path)
@@ -105,72 +123,59 @@ class TrainerBase:
                     self.save_model(epoch, metric_dict[key], metric_name=key)
 
     @staticmethod
-    def init_data_loader(args,
-                         mode,
-                         csv_path=None):
-        if args.dataloader == 'Image':
-            loader = dataloader_hub.ImageDataLoader(csv_path=csv_path,
-                                                    batch_size=args.batch_size,
-                                                    num_workers=args.worker,
-                                                    mode=mode,
-                                                    args=args)
-        elif args.dataloader == 'Image2Image':
-            loader = dataloader_hub.Image2ImageDataLoader(csv_path=csv_path,
-                                                          batch_size=args.batch_size,
-                                                          num_workers=args.worker,
-                                                          mode=mode,
-                                                          args=args)
-        elif args.dataloader == 'Image2Vector':
-            loader = dataloader_hub.Image2VectorDataLoader(csv_path=csv_path,
-                                                           batch_size=args.batch_size,
-                                                           num_workers=args.worker,
-                                                           mode=mode,
-                                                           args=args)
-        elif args.dataloader == 'ImageStack2Vector':
-            loader = dataloader_hub.ImageStack2VectorDataLoader(csv_path=csv_path,
-                                                                batch_size=args.batch_size,
-                                                                num_workers=args.worker,
-                                                                mode=mode,
-                                                                args=args)
-        elif args.dataloader == 'Image2Landmark':
-            loader = dataloader_hub.Image2LandmarkDataLoader(data_path=csv_path,
-                                                             batch_size=args.batch_size,
-                                                             num_workers=args.worker,
-                                                             mode=mode,
-                                                             args=args)
+    def init_data_loader(conf,
+                         conf_dataloader):
+        if conf_dataloader['name'] == 'Image':
+            loader = dataloader_hub.ImageDataLoader(conf=conf,
+                                                    conf_dataloader=conf_dataloader)
+        elif conf_dataloader['name'] == 'ImageSSL':
+            loader = dataloader_hub.ImageSSLDataLoader(conf=conf,
+                                                       conf_dataloader=conf_dataloader)
+        elif conf_dataloader['name'] == 'Image2Image':
+            loader = dataloader_hub.Image2ImageDataLoader(conf=conf,
+                                                          conf_dataloader=conf_dataloader)
+        elif conf_dataloader['name'] == 'Image2Vector':
+            loader = dataloader_hub.Image2VectorDataLoader(conf=conf,
+                                                           conf_dataloader=conf_dataloader)
+        elif conf_dataloader['name'] == 'ImageStack2Vector':
+            loader = dataloader_hub.ImageStack2VectorDataLoader(conf=conf,
+                                                                conf_dataloader=conf_dataloader)
+        elif conf_dataloader['name'] == 'Image2Landmark':
+            loader = dataloader_hub.Image2LandmarkDataLoader(conf=conf,
+                                                             conf_dataloader=conf_dataloader)
         else:
-            raise Exception('No dataloader named', args.dataloader)
+            raise Exception('No dataloader named', conf_dataloader['name'])
 
         return loader
 
     @staticmethod
-    def set_scheduler(args, optimizer, data_loader):
+    def set_scheduler(conf, conf_dataloader, optimizer, data_loader):
         scheduler = None
-        steps_per_epoch = math.ceil((data_loader.__len__() / args.batch_size))
+        steps_per_epoch = math.ceil((data_loader.__len__() / conf_dataloader['batch_size']))
 
-        if hasattr(args, 'scheduler'):
-            if args.scheduler == 'WarmupCosine':
+        if hasattr(conf, 'scheduler'):
+            if conf['scheduler']['name'] == 'WarmupCosine':
                 scheduler = lr_scheduler.WarmupCosineSchedule(optimizer=optimizer,
-                                                              warmup_steps=steps_per_epoch * args.warmup_epoch,
-                                                              t_total=args.epoch * steps_per_epoch,
-                                                              cycles=args.epoch / args.cycles,
+                                                              warmup_steps=steps_per_epoch * conf['scheduler']['warmup_epoch'],
+                                                              t_total=conf['env']['epoch'] * steps_per_epoch,
+                                                              cycles=conf['env']['epoch'] / conf['scheduler']['cycles'],
                                                               last_epoch=-1)
-            elif args.scheduler == 'CosineAnnealing':
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.cycles, eta_min=args.lr_min)
-            elif args.scheduler == 'Constant':
+            elif conf['scheduler']['name'] == 'CosineAnnealing':
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=conf['scheduler']['cycles'], eta_min=conf['scheduler']['lr_min'])
+            elif conf['scheduler']['name'] == 'Constant':
                 scheduler = lr_scheduler.ConstantLRSchedule(optimizer, last_epoch=-1)
-            elif args.scheduler == 'WarmupConstant':
-                scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=steps_per_epoch * args.warmup_epoch)
+            elif conf['scheduler']['name'] == 'WarmupConstant':
+                scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=steps_per_epoch * conf['scheduler']['warmup_epoch'])
             else:
-                print(f'{utils.Colors.LIGHT_PURPLE}No scheduler found --> {args.scheduler}{utils.Colors.END}')
+                print(f"{utils.Colors.LIGHT_PURPLE}No scheduler found --> {conf['scheduler']['name']}{utils.Colors.END}")
         else:
             pass
 
         return scheduler
 
     @staticmethod
-    def init_model(args, device):
-        model = getattr(model_implements, args.model_name)(**vars(args)).to(device)
+    def init_model(conf, device):
+        model = getattr(model_implements, conf['model']['name'])(conf['model']).to(device)
 
         return torch.nn.DataParallel(model)
 
@@ -181,12 +186,12 @@ class TrainerBase:
         return criterion
 
     @staticmethod
-    def init_optimizer(args, model):
+    def init_optimizer(conf, model):
         optimizer = None
 
-        if args.optimizer == 'AdamW':
+        if conf['optimizer']['name'] == 'AdamW':
             optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
-                                          lr=args.lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=args.weight_decay)
+                                          lr=conf['optimizer']['lr'], betas=(0.9, 0.999), eps=1e-8, weight_decay=conf['optimizer']['weight_decay'])
 
         return optimizer
 

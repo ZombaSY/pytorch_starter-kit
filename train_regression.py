@@ -7,18 +7,8 @@ from trainer_base import TrainerBase
 
 
 class TrainerRegression(TrainerBase):
-    def __init__(self, args, now=None, k_fold=0):
-        super(TrainerRegression, self).__init__(args, now=now, k_fold=k_fold)
-
-        self.loader_train = self.init_data_loader(args=self.args,
-                                                  mode='train',
-                                                  csv_path=self.args.train_csv_path)
-        self.loader_val = self.init_data_loader(args=self.args,
-                                                mode='inference',
-                                                csv_path=self.args.valid_csv_path)
-
-        self.scheduler = self.set_scheduler(self.args, self.optimizer, self.loader_train)
-        self._validate_interval = 1 if (self.loader_train.__len__() // self.args.train_fold) == 0 else self.loader_train.__len__() // self.args.train_fold // self.args.batch_size
+    def __init__(self, conf, now=None, k_fold=0):
+        super(TrainerRegression, self).__init__(conf, now=now, k_fold=k_fold)
 
     def _train(self, epoch):
         self.model.train()
@@ -50,8 +40,8 @@ class TrainerRegression(TrainerBase):
 
             batch_losses += loss.item()
 
-            if hasattr(self.args, 'train_fold'):
-                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx < (self.loader_train.__len__() // self.args.batch_size) - self._validate_interval:
+            if hasattr(self.conf, 'train_fold'):
+                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx < (self.loader_train.__len__() // self.conf['dataloader']['batch_size']) - self._validate_interval:
                     self._validate(epoch)
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
@@ -59,7 +49,7 @@ class TrainerRegression(TrainerBase):
         metric_dict = {}
         metric_dict['loss'] = loss_mean
 
-        utils.log_epoch('train', epoch, metric_dict, self.args.wandb)
+        utils.log_epoch('train', epoch, metric_dict, self.conf['env']['wandb'])
         self.metric_train.reset()
 
     def _validate(self, epoch):
@@ -68,7 +58,7 @@ class TrainerRegression(TrainerBase):
         list_score = []
         list_target = []
         batch_losses = 0
-        for batch_idx, (x_in, target) in enumerate(self.loader_val.Loader):
+        for batch_idx, (x_in, target) in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
                 x_in, _ = x_in
                 target, _ = target
@@ -96,24 +86,24 @@ class TrainerRegression(TrainerBase):
         correlation2 = np.corrcoef(np.array(list_score).T[1], np.array(list_target).T[1])[0, 1]
         correlation = (correlation1 + correlation2) / 2
 
-        loss_mean = batch_losses / self.loader_val.Loader.__len__()
+        loss_mean = batch_losses / self.loader_valid.Loader.__len__()
 
         metric_dict = {}
         metric_dict['loss'] = loss_mean
         metric_dict['corr'] = correlation
 
-        utils.log_epoch('validation', epoch, metric_dict, self.args.wandb)
+        utils.log_epoch('validation', epoch, metric_dict, self.conf['env']['wandb'])
         self.check_metric(epoch, metric_dict)
         self.metric_val.reset()
 
     def run(self):
-        for epoch in range(1, self.args.epoch + 1):
+        for epoch in range(1, self.conf['env']['epoch'] + 1):
             self._train(epoch)
             self._validate(epoch)
 
-            if (epoch - self.last_saved_epoch) > self.args.early_stop_epoch:
+            if (epoch - self.last_saved_epoch) > self.conf['env']['early_stop_epoch']:
                 print('The model seems to be converged. Early stop training.')
                 print(f'Best loss -----> {self.metric_best["loss"]}')
-                if self.args.wandb:
+                if self.conf['env']['wandb']:
                     wandb.log({f'Best f1': self.metric_best['loss']})
                 break

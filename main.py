@@ -1,16 +1,15 @@
 import torch
 import os
 import argparse
-import yaml
 import numpy as np
 import random
 import ast
 import sys
+import importlib
 
 from export import Exportor
 from train_segmentation import TrainerSegmentation
 from train_regression import TrainerRegression
-from train_regression_perturb import TrainerRgressionPerturb
 from train_classification import TrainerClassification
 from inference import Inferencer
 from datetime import datetime
@@ -29,22 +28,20 @@ random.seed(seed)
 os.environ['PYTHONHASHSEED'] = str(seed)
 
 
-def conf_to_args(args, **kwargs):    # pass in variable numbers of args
-    var = vars(args)
+def conf_to_conf(conf, **kwconf):    # pass in variable numbers of conf
+    var = vars(conf)
 
-    for key, value in kwargs.items():
+    for key, value in kwconf.items():
         var[key] = value
 
 
-def init_trainer(args, now_time, k_fold=0):
-    if args.task == 'segmentation':
-        trainer = TrainerSegmentation(args, now_time, k_fold=k_fold)
-    elif args.task == 'classification':
-        trainer = TrainerClassification(args, now_time, k_fold=k_fold)
-    elif args.task == 'regression':
-        trainer = TrainerRegression(args, now_time, k_fold=k_fold)
-    elif args.task == 'regression_perturb':
-        trainer = TrainerRgressionPerturb(args, now_time, k_fold=k_fold)
+def init_trainer(conf, now_time, k_fold=0):
+    if conf['env']['task'] == 'segmentation':
+        trainer = TrainerSegmentation(conf, now_time, k_fold=k_fold)
+    elif conf['env']['task'] == 'classification':
+        trainer = TrainerClassification(conf, now_time, k_fold=k_fold)
+    elif conf['env']['task'] == 'regression':
+        trainer = TrainerRegression(conf, now_time, k_fold=k_fold)
     else:
         raise ValueError('No trainer found.')
 
@@ -56,12 +53,17 @@ def main():
     parser.add_argument('--config_path', type=str)
     arg, unknown_arg = parser.parse_known_args()
 
+    conf = {}
     if arg.config_path is not None:
-        with open(arg.config_path, 'rb') as f:
-            conf = yaml.load(f.read(), Loader=yaml.Loader)  # load the config file
-            conf['config_path'] = arg.config_path
+        # Create a module spec using the directory path
+        spec = importlib.util.spec_from_file_location("conf", arg.config_path)
+        imported_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(imported_module)
+
+        conf = imported_module.conf
+        conf['config_path'] = arg.config_path
     else:
-        # make unrecognized args to dict
+        # for sweeper case in WandB
         conf = {'config_path': 'configs/sweep_config.yaml'}
         for item in unknown_arg:
             item = item.strip('--')
@@ -78,42 +80,45 @@ def main():
                     else: raise e
             conf[key] = value
 
-    args = argparse.Namespace()
-    conf_to_args(args, **conf)  # pass in keyword args
+    # conf = argparse.Namespace()
+    # conf_to_conf(conf, **conf)  # pass in keyword conf
 
     now_time = datetime.now().strftime("%Y-%m-%d %H%M%S")
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.CUDA_VISIBLE_DEVICES
+    os.environ["CUDA_VISIBLE_DEVICES"] = conf['env']['CUDA_VISIBLE_DEVICES']
 
-    print('Use CUDA :', args.cuda and torch.cuda.is_available())
+    print('Use CUDA :', conf['env']['cuda'] and torch.cuda.is_available())
 
-    if args.debug:
-        args.wandb = False
-        args.data_cache = False
-        # args.transform_mixup = 0
+    if conf['env']['debug']:
+        conf['env']['wandb'] = False
+        for key in conf:
+            if 'dataloader' in key:
+                conf[key]['data_cache'] = False
+        # conf.transform_mixup = 0
 
-    if args.mode == 'train':
-        if hasattr(args, 'train_csv_path_folds') and hasattr(args, 'valid_csv_path_folds'):
-            k_fold = len(args.train_csv_path_folds)
+    if conf['env']['mode'] == 'train':
+
+        if 'data_path_folds' in conf['dataloader_train'].keys():
+            k_fold = len(conf['dataloader_train']['data_path_folds'])
 
             for idx in range(k_fold):
                 print(f'{utils.Colors.BOLD}Running {idx}th fold...{utils.Colors.END}')
-                args.train_csv_path = args.train_csv_path_folds[idx]
-                args.valid_csv_path = args.valid_csv_path_folds[idx]
+                conf['dataloader_train']['data_path'] = conf['dataloader_train']['data_path_folds'][idx]
+                conf['dataloader_valid']['data_path'] = conf['dataloader_valid']['data_path_folds'][idx]
 
-                trainer = init_trainer(args, now_time, k_fold=idx)
+                trainer = init_trainer(conf, now_time, k_fold=idx)
                 trainer.run()
 
         else:
-            trainer = init_trainer(args, now_time)
+            trainer = init_trainer(conf, now_time)
             trainer.run()
 
 
-    elif args.mode in ['inference', 'test']:
-        inferencer = Inferencer(args)
+    elif conf['env']['mode'] in ['valid', 'test']:
+        inferencer = Inferencer(conf)
         inferencer.inference()
 
-    elif args.mode == 'export':
-        exportor = Exportor(args)
+    elif conf['env']['mode'] == 'export':
+        exportor = Exportor(conf)
         exportor.export()
 
     else:

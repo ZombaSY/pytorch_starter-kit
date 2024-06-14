@@ -4,7 +4,7 @@ import random
 import numpy as np
 import ptflops
 import cv2
-import argparse
+import importlib
 
 from models import losses as loss_hub
 from models import lr_scheduler
@@ -17,18 +17,21 @@ class ModelMini:
     def __init__(self):
         self.device = 'cuda'
         self.x = torch.rand([4, 3, 336, 336]).to(self.device)
-        self.y = torch.rand([4, 1, 336, 336]).to(self.device).float()
+        self.y = torch.rand([4, 1, 336, 336]).to(self.device).long()
 
-        self.model = TrainerBase.init_model(argparse.Namespace(model_name='eva_l_reg', hidden_dims=1024, num_class=2, normalization='InstanceNorm1d', activation='SiLU', dropblock=False, freeze_backbone=False),
-                                            self.device)
+        # select model configuraiton and load from configs for test
+        spec = importlib.util.spec_from_file_location("conf", 'configs/train_segmentation.py')
+        imported_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(imported_module)
+        self.conf = imported_module.conf
+
+        self.model = TrainerBase.init_model(self.conf , self.device)
 
         self.model.to(self.device)
-        self.criterion = loss_hub.MSELoss()
+        self.criterion = loss_hub.LabelSmoothingCrossEntropyLoss()
 
-        # self.optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.model.parameters()),
-        #                                    lr=1e-2, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-3)
-        self.optimizer = torch.optim.AdamW(self.model.parameters(),
-                                           lr=1e+2)
+        self.optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.model.parameters()),
+                                           lr=1e-2, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-3)
 
         self.epochs = 3
         self.steps = 10
@@ -61,14 +64,11 @@ class ModelMini:
             for step in range(self.steps):
                 out = self.model(self.x)
                 loss = self.criterion(out['seg'], self.y)
-
-                p = next(self.model.parameters())
-                print(p[0, 0, 0])
-
+                print(loss)
                 loss.backward()
                 self.optimizer.zero_grad()
                 self.optimizer.step()
-                # self.scheduler.step()
+                self.scheduler.step()
 
     def inference(self):
         self.model.eval()
