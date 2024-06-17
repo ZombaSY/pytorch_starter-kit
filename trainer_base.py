@@ -38,15 +38,14 @@ class TrainerBase:
 
         # init model
         self.model = self.init_model(self.conf, self.device)
-        if hasattr(self.conf, 'saved_ckpt'):
-            if self.conf['model']['saved_ckpt'] != '':
-                if 'imagenet' in self.conf['model']['saved_ckpt'].lower():
-                    self.model.module.load_pretrained_imagenet(self.conf['model']['saved_ckpt'])
-                    print('Model loaded successfully!!! (ImageNet)')
-                else:
-                    self.model.module.load_pretrained(self.conf['model']['saved_ckpt'])
-                    print('Model loaded successfully!!! (Custom)')
-                self.model.to(self.device)
+        if self.conf['model']['saved_ckpt'] != '':
+            if 'imagenet' in self.conf['model']['saved_ckpt'].lower():
+                self.model.module.load_pretrained_imagenet(self.conf['model']['saved_ckpt'])
+                print(f'{utils.Colors.LIGHT_RED}Model loaded successfully!!! (ImageNet){utils.Colors.END}')
+            else:
+                self.model.module.load_state_dict(torch.load(self.conf['model']['saved_ckpt']))
+                print(f'{utils.Colors.LIGHT_RED}Model loaded successfully!!! (Custom){utils.Colors.END}')
+            self.model.to(self.device)
 
         # init dataloader
         self.loader_train = self.init_data_loader(conf=self.conf,
@@ -55,7 +54,7 @@ class TrainerBase:
                                                   conf_dataloader=self.conf['dataloader_valid'])
 
         # init optimizer
-        self.optimizer = self.init_optimizer(self.conf, self.model)
+        self.optimizer = self.init_optimizer(self.conf['optimizer'], self.model)
 
         # init scheduler
         self.scheduler = self.set_scheduler(self.conf, self.conf['dataloader_train'], self.optimizer, self.loader_train)
@@ -78,7 +77,7 @@ class TrainerBase:
         if hasattr(self.model.module, 'train_callback'):
             self.callback.train_callback = self.model.module.train_callback
 
-        self._validate_interval = 1 if (len(self.loader_train.Loader) // self.conf['env']['train_fold']) < 1 else (len(self.loader_train.Loader) // self.conf['env']['train_fold']) + 1
+        self._validate_interval = max(1, (len(self.loader_train.Loader) // self.conf['env']['train_fold']) + 1)
 
 
     @abc.abstractmethod
@@ -186,12 +185,12 @@ class TrainerBase:
         return criterion
 
     @staticmethod
-    def init_optimizer(conf, model):
+    def init_optimizer(conf_optimizer, model):
         optimizer = None
 
-        if conf['optimizer']['name'] == 'AdamW':
+        if conf_optimizer['name'] == 'AdamW':
             optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
-                                          lr=conf['optimizer']['lr'], betas=(0.9, 0.999), eps=1e-8, weight_decay=conf['optimizer']['weight_decay'])
+                                          lr=conf_optimizer['lr'], betas=(0.9, 0.999), eps=1e-8, weight_decay=conf_optimizer['weight_decay'])
 
         return optimizer
 

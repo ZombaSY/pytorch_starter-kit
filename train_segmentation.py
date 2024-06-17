@@ -18,9 +18,9 @@ class TrainerSegmentation(TrainerBase):
             target, _ = target
 
             x_in = x_in.to(self.device)
-            target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
+            target = target.long().to(self.device)
 
-            if (x_in.shape[0] / torch.cuda.device_count()) <= torch.cuda.device_count():   # if has 1 batch per GPU
+            if (x_in.shape[0] / torch.cuda.device_count()) <= torch.cuda.device_count():
                 break   # avoid BN issue
 
             output = self.model(x_in)
@@ -64,7 +64,7 @@ class TrainerSegmentation(TrainerBase):
                 target, _ = target
 
                 x_in = x_in.to(self.device)
-                target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
+                target = target.long().to(self.device)
 
                 output = self.model(x_in)
 

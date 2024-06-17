@@ -10,18 +10,6 @@ class TrainerClassification(TrainerBase):
     def __init__(self, conf, now=None, k_fold=0):
         super(TrainerClassification, self).__init__(conf, now=now, k_fold=k_fold)
 
-        self.loader_train = self.init_data_loader(conf=self.conf,
-                                                  conf_dataloader=self.conf['dataloader'],
-                                                  mode='train',
-                                                  csv_path=self.conf['dataset']['train_csv_path'])
-        self.loader_valid = self.init_data_loader(conf=self.conf,
-                                                conf_dataloader=self.conf['dataloader'],
-                                                mode='valid',
-                                                csv_path=self.conf['dataset']['valid_csv_path'])
-
-        self.scheduler = self.set_scheduler(self.conf, self.conf['dataloader_train'], self.optimizer, self.loader_train)
-        self._validate_interval = 1 if (self.loader_train.__len__() // self.conf['env']['train_fold'] // self.conf['dataloader_train']['batch_size']) == 0 else self.loader_train.__len__() // self.conf['env']['train_fold'] // self.conf['dataloader_train']['batch_size']
-
     def _train(self, epoch):
         self.model.train()
 
@@ -31,9 +19,9 @@ class TrainerClassification(TrainerBase):
             target, _ = target
 
             x_in = x_in.to(self.device)
-            target = target.to(self.device)  # (shape: (batch_size, img_h, img_w))
+            target = target.to(self.device)
 
-            if (x_in.shape[0] / torch.cuda.device_count()) <= torch.cuda.device_count():   # if has 1 batch per GPU
+            if (x_in.shape[0] / torch.cuda.device_count()) <= torch.cuda.device_count():
                 break   # avoid BN issue
 
             output = self.model(x_in)
@@ -82,7 +70,7 @@ class TrainerClassification(TrainerBase):
                 target, _ = target
 
                 x_in = x_in.to(self.device)
-                target = target.to(self.device)  # (shape: (batch_size, img_h, img_w))
+                target = target.to(self.device)
 
                 output = self.model(x_in)
 
