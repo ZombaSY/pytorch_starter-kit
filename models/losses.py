@@ -10,7 +10,7 @@ from scipy.ndimage import convolve
 
 
 class CrossEntropyLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, conf):
         super().__init__()
         self.loss = nn.CrossEntropyLoss()
 
@@ -24,10 +24,10 @@ class FocalLoss(nn.Module):
     """
     Multi-class Focal loss implementation
     """
-    def __init__(self, gamma=2, weight=None):
+    def __init__(self, conf):
         super().__init__()
-        self.gamma = gamma
-        self.weight = weight
+        self.gamma = conf['gamma']
+        self.weight = conf['weight']
 
     def forward(self, y_pred, y):
         """
@@ -44,13 +44,13 @@ class FocalLoss(nn.Module):
 
 
 class KLDivergenceLoss(nn.Module):
-    def __init__(self, temperature=1, reduction='batchmean'):
+    def __init__(self, conf):
         super().__init__()
-        self.loss = nn.KLDivLoss(reduction=reduction)
+        self.loss = nn.KLDivLoss(reduction=conf['reduction'])
         self.log_softmax = nn.LogSoftmax(dim=1)
         self.softmax = nn.Softmax(dim=1)
         self.eps = 1e-16
-        self.temperature = temperature
+        self.temperature = conf['temperature']
 
     def forward(self, x, y, alpha=1):
         x = (1 - alpha) * y + alpha * x
@@ -64,7 +64,7 @@ class KLDivergenceLoss(nn.Module):
 class DTMSELoss(nn.Module):
     """Binary Hausdorff loss based on distance transform"""
 
-    def __init__(self):
+    def __init__(self, conf):
         super().__init__()
         self.threshold = 0.5
         self.mse = nn.MSELoss()
@@ -103,9 +103,9 @@ class DTMSELoss(nn.Module):
 class HausdorffDTLoss(nn.Module):
     """Binary Hausdorff loss based on distance transform"""
 
-    def __init__(self, alpha=2.0, **kwconf):
+    def __init__(self, conf):
         super().__init__()
-        self.alpha = torch.tensor(alpha)
+        self.alpha = torch.tensor(conf['alpha'])
 
     @torch.no_grad()
     def distance_field(self, img: np.ndarray) -> np.ndarray:
@@ -165,10 +165,10 @@ class HausdorffDTLoss(nn.Module):
 class HausdorffERLoss(nn.Module):
     """Binary Hausdorff loss based on morphological erosion"""
 
-    def __init__(self, alpha=2.0, erosions=10, **kwconf):
+    def __init__(self, conf):
         super().__init__()
-        self.alpha = alpha
-        self.erosions = erosions
+        self.alpha = conf['alpha']
+        self.erosions = conf['erosions']
         self.prepare_kernels()
 
     def prepare_kernels(self):
@@ -257,7 +257,7 @@ class HausdorffERLoss(nn.Module):
 
 # https://www.kaggle.com/code/bigironsphere/loss-function-library-keras-pytorch/notebook
 class MSELoss(nn.Module):
-    def __init__(self):
+    def __init__(self, conf):
         super().__init__()
 
         self.loss = nn.MSELoss()
@@ -269,7 +269,7 @@ class MSELoss(nn.Module):
 
 
 class BCELoss(nn.Module):
-    def __init__(self):
+    def __init__(self, conf):
         super().__init__()
 
     def forward(self, x, y):
@@ -280,7 +280,7 @@ class BCELoss(nn.Module):
 
 
 class DiceLoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, conf):
         super().__init__()
 
     def forward(self, inputs, targets, smooth=1):
@@ -298,7 +298,7 @@ class DiceLoss(nn.Module):
 
 
 class DiceBCELoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, conf):
         super().__init__()
 
     def forward(self, inputs, targets, smooth=1):
@@ -319,7 +319,7 @@ class DiceBCELoss(nn.Module):
 
 
 class JaccardLoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, conf):
         super().__init__()
 
     def forward(self, inputs, targets, smooth=1):
@@ -342,7 +342,7 @@ class JaccardLoss(nn.Module):
 
 
 class FocalBCELoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, conf):
         super().__init__()
 
     def forward(self, inputs, targets, alpha=0.8, gamma=2, smooth=1):
@@ -363,9 +363,9 @@ class FocalBCELoss(nn.Module):
 
 
 class FocalCELoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, conf):
         super().__init__()
-        self.ce = CrossEntropy()
+        self.ce = CrossEntropyLoss()
 
     def forward(self, x, y, alpha=0.8, gamma=2, smooth=1):
         ce = self.ce(x, y)
@@ -376,7 +376,7 @@ class FocalCELoss(nn.Module):
 
 
 class FocalDiceLoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, conf):
         super().__init__()
 
     def forward(self, x, y, alpha=0.8, gamma=2, smooth=1):
@@ -397,7 +397,7 @@ class FocalDiceLoss(nn.Module):
 
 
 class FocalMSELoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, conf):
         super().__init__()
         self.mse = MSELoss()
 
@@ -410,7 +410,7 @@ class FocalMSELoss(nn.Module):
 
 
 class TverskyLoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, conf):
         super().__init__()
 
     def forward(self, inputs, targets, smooth=1, alpha=0.5, beta=0.5):
@@ -432,7 +432,7 @@ class TverskyLoss(nn.Module):
 
 
 class FocalTverskyLoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, conf):
         super().__init__()
 
     def forward(self, inputs, targets, smooth=1, alpha=0.5, beta=0.5, gamma=1):
@@ -455,9 +455,9 @@ class FocalTverskyLoss(nn.Module):
 
 
 class JSDivergenceLoss(nn.Module):
-    def __init__(self, reduction='batchmean'):
+    def __init__(self, conf):
         super().__init__()
-        self.kld = KLDivergence(reduction=reduction)
+        self.kld = KLDivergenceLoss(reduction=conf['reduction'])
 
     def forward(self, x, y):
         m = (x + y) / 2
@@ -465,53 +465,10 @@ class JSDivergenceLoss(nn.Module):
         q = self.kld(y, m) / 2
 
         return p + q
-
-
-class JSDivergenceLogitLoss(nn.Module):
-    def __init__(self, reduction='batchmean'):
-        super().__init__()
-        self.kld = KLDivergenceLogit(reduction=reduction)
-
-    def forward(self, x, y):
-        m = (x + y) / 2
-        p = self.kld(x, m) / 2
-        q = self.kld(y, m) / 2
-
-        return p + q
-
-
-class JSDivergenceBatchLoss(nn.Module):
-    def __init__(self, reduction='batchmean'):
-        super().__init__()
-        self.jsd = JSDivergence(reduction=reduction)
-
-    def forward(self, x, y):
-        x_batch, _, _, _ = x.shape
-
-        for i in range(x_batch):
-            pass
-
-        return self.jsd(x, y)
-
-
-class JSDivergenceLogitBatchLoss(nn.Module):
-    def __init__(self, reduction='batchmean'):
-        super().__init__()
-        self.jsd = JSDivergenceLogit(reduction=reduction)
-
-    def forward(self, x, y):
-        x_batch, _, _, _ = x.shape
-
-        loss_list = []
-
-        for i in range(x_batch):
-            loss_list.append(self.jsd(y, x[i]))
-
-        return sum(loss_list) / len(loss_list)
 
 
 class MSELoss_SSL(nn.Module):
-    def __init__(self):
+    def __init__(self, conf):
         super().__init__()
         self.mse_loss = nn.MSELoss(reduction='mean')
 
@@ -576,11 +533,11 @@ class InfoNCELoss(nn.Module):
         >>> output = loss(query, positive_key, negative_keys)
     """
 
-    def __init__(self, temperature=0.1, reduction='mean', negative_mode='unpaired'):
+    def __init__(self, conf):
         super().__init__()
-        self.temperature = temperature
-        self.reduction = reduction
-        self.negative_mode = negative_mode
+        self.temperature = conf['temperature']
+        self.reduction = conf['reduction']
+        self.negative_mode = conf['negative_mode']
 
     def forward(self, query, positive_key, negative_keys=None):
         return self.info_nce(query, positive_key, negative_keys,
@@ -657,7 +614,7 @@ class CorrelationCoefficientLoss(nn.Module):
     Notice: output range is [0, 1]
             The closer to 0 indicates the higher pearson correlation coefficient.
     """
-    def __init__(self,):
+    def __init__(self, conf):
         super().__init__()
         self.cos = nn.CosineSimilarity(dim=1, eps=1e-6)
 
@@ -676,7 +633,7 @@ class MSECorrelationCoefficientLoss(nn.Module):
     Notice: output range is [0, 1]
             The closer to 0 indicates the higher pearson correlation coefficient.
     """
-    def __init__(self,):
+    def __init__(self, conf):
         super().__init__()
         self.mse = MSELoss()
         self.corr = CorrelationCoefficientLoss()
@@ -689,9 +646,9 @@ class MSECorrelationCoefficientLoss(nn.Module):
 
 
 class TanHLoss(nn.Module):
-    def __init__(self, temperature=0.5):
+    def __init__(self, conf):
         super().__init__()
-        self.temperature = temperature
+        self.temperature = conf['temperature']
 
     def forward(self, x, y):
 
@@ -699,10 +656,10 @@ class TanHLoss(nn.Module):
 
 
 class LabelSmoothingCrossEntropyLoss(nn.Module):
-    def __init__(self, epsilon: float = 0.1, reduction='mean'):
+    def __init__(self, conf):
         super().__init__()
-        self.epsilon = epsilon
-        self.reduction = reduction
+        self.epsilon = conf['epsilon']
+        self.reduction = conf['reduction']
         self.loss = nn.CrossEntropyLoss()
 
     def linear_combination(self, x, y):
@@ -722,10 +679,10 @@ class LabelSmoothingCrossEntropyLoss(nn.Module):
 
 # https://github.com/ZhenglinZhou/STAR/tree/master/lib/loss
 class WingLoss(nn.Module):
-    def __init__(self, omega=0.01, epsilon=2):
+    def __init__(self, conf):
         super(  ).__init__()
-        self.omega = omega
-        self.epsilon = epsilon
+        self.omega = conf['omega']
+        self.epsilon = conf['epsilon']
 
     def forward(self, pred, target):
         y = target
@@ -743,9 +700,9 @@ class WingLoss(nn.Module):
 
 # https://github.com/ZhenglinZhou/STAR/tree/master/lib/loss
 class SmoothL1Loss(nn.Module):
-    def __init__(self, scale=0.01):
+    def __init__(self, conf):
         super(SmoothL1Loss, self).__init__()
-        self.scale = scale
+        self.scale = conf['scale']
         self.EPSILON = 1e-10
 
     def __repr__(self):

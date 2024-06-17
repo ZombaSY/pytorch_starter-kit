@@ -25,11 +25,11 @@ class TrainerBase:
 
         # save hyper-parameters
         if not self.conf['env']['debug']:
-            with open(self.conf['env']['config_path'], 'r') as f_r:
-                file_path = self.conf['env']['saved_model_directory'] + '/' + now_time
+            with open(self.conf['config_path'], 'r') as f_r:
+                file_path = os.path.join(self.conf['env']['saved_model_directory'], now_time)
                 if not os.path.exists(file_path):
                     os.makedirs(file_path)
-                with open(os.path.join(file_path, self.conf['env']['config_path'].split('/')[-1]), 'w') as f_w:
+                with open(os.path.join(file_path, os.path.split(self.conf['config_path'])[-1]), 'w') as f_w:
                     f_w.write(f_r.read())
 
         # Check cuda available and assign to device
@@ -61,7 +61,7 @@ class TrainerBase:
         self.scheduler = self.set_scheduler(self.conf, self.conf['dataloader_train'], self.optimizer, self.loader_train)
 
         # init criterion
-        self.criterion = self.init_criterion(self.conf['criterion']['name'], self.device)
+        self.criterion = self.init_criterion(self.conf['criterion'], self.device)
 
         # init metrics
         self.metric_train = self.init_metric(self.conf['env']['task'], self.conf['model']['num_class'])
@@ -78,7 +78,7 @@ class TrainerBase:
         if hasattr(self.model.module, 'train_callback'):
             self.callback.train_callback = self.model.module.train_callback
 
-        self._validate_interval = 1 if (self.loader_train.__len__() // self.conf['env']['train_fold'] // self.conf['dataloader_train']['batch_size']) == 0 else self.loader_train.__len__() // self.conf['env']['train_fold'] // self.conf['dataloader_train']['batch_size']
+        self._validate_interval = 1 if (len(self.loader_train.Loader) // self.conf['env']['train_fold']) < 1 else (len(self.loader_train.Loader) // self.conf['env']['train_fold']) + 1
 
 
     @abc.abstractmethod
@@ -180,8 +180,8 @@ class TrainerBase:
         return torch.nn.DataParallel(model)
 
     @staticmethod
-    def init_criterion(criterion_name, device):
-        criterion = getattr(loss_hub, criterion_name)().to(device)
+    def init_criterion(conf_criterion, device):
+        criterion = getattr(loss_hub, conf_criterion['name'])(conf_criterion).to(device)
 
         return criterion
 
@@ -197,11 +197,9 @@ class TrainerBase:
 
     @staticmethod
     def init_metric(task_name, num_class):
-        if task_name == 'segmentation':
+        if 'segmentation' in task_name:
             metric = metrics.StreamSegMetrics_segmentation(num_class)
-        elif task_name == 'classification':
-            metric = metrics.StreamSegMetrics_classification(num_class)
-        elif task_name == 'regression' or 'landmark':
+        elif 'classification' or 'regression' or 'landmark' in task_name:
             metric = metrics.StreamSegMetrics_classification(num_class)
         else:
             raise Exception('No task named', task_name)

@@ -40,9 +40,8 @@ class TrainerRegression(TrainerBase):
 
             batch_losses += loss.item()
 
-            if hasattr(self.conf, 'train_fold'):
-                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx < (self.loader_train.__len__() // self.conf['dataloader']['batch_size']) - self._validate_interval:
-                    self._validate(epoch)
+            if (batch_idx + 1) % self._validate_interval == 0:
+                self._validate(epoch)
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
 

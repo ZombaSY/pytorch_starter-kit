@@ -1,6 +1,7 @@
 import torch
 import os
 import argparse
+import yaml
 import numpy as np
 import random
 import ast
@@ -26,13 +27,6 @@ torch.cuda.manual_seed_all(seed)
 np.random.seed(seed)
 random.seed(seed)
 os.environ['PYTHONHASHSEED'] = str(seed)
-
-
-def conf_to_conf(conf, **kwconf):    # pass in variable numbers of conf
-    var = vars(conf)
-
-    for key, value in kwconf.items():
-        var[key] = value
 
 
 def init_trainer(conf, now_time, k_fold=0):
@@ -63,7 +57,7 @@ def main():
         conf = imported_module.conf
         conf['config_path'] = arg.config_path
     else:
-        # for sweeper case in WandB
+        # for sweeper case in WandB. not working yet
         conf = {'config_path': 'configs/sweep_config.yaml'}
         for item in unknown_arg:
             item = item.strip('--')
@@ -79,9 +73,6 @@ def main():
                     if '/' in value: pass
                     else: raise e
             conf[key] = value
-
-    # conf = argparse.Namespace()
-    # conf_to_conf(conf, **conf)  # pass in keyword conf
 
     now_time = datetime.now().strftime("%Y-%m-%d %H%M%S")
     os.environ["CUDA_VISIBLE_DEVICES"] = conf['env']['CUDA_VISIBLE_DEVICES']
@@ -119,7 +110,11 @@ def main():
 
     elif conf['env']['mode'] == 'export':
         exportor = Exportor(conf)
-        exportor.export()
+
+        if conf['export']['target'] == 'onnx':
+            exportor.torch2onnx()
+        else:
+            raise ValueError(f"unsupported target: {conf['export']['target']}")
 
     else:
         print('No mode supported.')

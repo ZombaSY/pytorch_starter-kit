@@ -52,9 +52,8 @@ class TrainerClassification(TrainerBase):
 
             batch_losses += loss.item()
 
-            if hasattr(self.conf, 'train_fold'):
-                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx < (self.loader_train.__len__() // self.conf['dataset']['batch_size']) - self._validate_interval:
-                    self._validate(epoch)
+            if (batch_idx + 1) % self._validate_interval == 0:
+                self._validate(epoch)
 
             # compute metric
             output_argmax = torch.argmax(output['vec'], dim=1).detach().cpu().numpy()

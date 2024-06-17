@@ -24,7 +24,7 @@ class Inferencer:
         self.loader_valid = TrainerBase.init_data_loader(conf=self.conf,
                                                          conf_dataloader=self.conf['dataloader_valid'])
 
-        self.criterion = TrainerBase.init_criterion(self.conf['criterion']['name'], self.device)
+        self.criterion = TrainerBase.init_criterion(self.conf['criterion'], self.device)
 
         self.model = TrainerBase.init_model(self.conf, self.device)
         self.model.module.load_state_dict(torch.load(self.conf['model']['saved_ckpt']))
@@ -67,6 +67,9 @@ class Inferencer:
 
             utils.log_epoch('validation', epoch, metric_dict, False)
 
+            df = pd.DataFrame({'fn': self.loader_valid.image_loader.df['img_path'],
+                            'label': self.metric_val.get_pred_flatten()})
+            df.to_csv(self.save_dir + '_out.csv', encoding='utf-8-sig', index=False)
             self.metric_val.reset()
 
     def inference_segmentation(self, epoch):
@@ -96,6 +99,7 @@ class Inferencer:
 
             utils.log_epoch('validation', epoch, metric_dict, False)
             self.metric_val.reset()
+
 
     def inference_regression(self, epoch):
         self.model.eval()
@@ -154,6 +158,11 @@ class Inferencer:
                 output_prob = F.softmax(output['seg'], dim=1).detach().cpu().numpy()
 
                 pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_image), x_img, output_prob, itertools.repeat(self.save_dir), img_id, itertools.repeat(self.conf['model']['num_class'])))
+
+        for idx in range(len(output)):
+            data_stat['img_id'] = img_id[idx]
+            data_stat['darkcircle_ratio'] = len(torch.where(torch.argmax(output['seg'][idx], dim=0) == 1)[0]) / (output['seg'][idx].shape[-2] * output['seg'][idx].shape[-1])
+            data_stat['flush_ratio'] = len(torch.where(torch.argmax(output['seg'][idx], dim=0) == 2)[0]) / (output['seg'][idx].shape[-2] * output['seg'][idx].shape[-1])
 
     def __post_process(self, x_img, target, output, img_id, batch_idx):
         data_stat = {}

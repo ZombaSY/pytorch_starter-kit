@@ -28,8 +28,10 @@ class TrainerSegmentation(TrainerBase):
             # compute loss
             loss = self.criterion(output['seg'], target)
             if 'seg_aux' in output:
+                loss_aux = 0
                 for aux in output['seg_aux']:
-                    loss += self.criterion(aux, target)
+                    loss_aux += self.criterion(aux, target)
+                loss_aux /= len(output['seg_aux'])
             if not torch.isfinite(loss):
                 raise Exception('Loss is NAN. End training.')
 
@@ -42,9 +44,8 @@ class TrainerSegmentation(TrainerBase):
 
             batch_losses += loss.item()
 
-            if hasattr(self.conf, 'train_fold'):
-                if batch_idx != 0 and (batch_idx % self._validate_interval) == 0 and batch_idx < (self.loader_train.__len__() // self.conf['dataloader']['batch_size']) - self._validate_interval:
-                    self._validate(epoch)
+            if (batch_idx + 1) % self._validate_interval == 0:
+                self._validate(epoch)
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
 

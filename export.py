@@ -6,6 +6,7 @@ from trainer_base import TrainerBase
 
 
 class Exportor:
+
     def __init__(self, conf):
         self.start_time = time.time()
         self.conf = conf

@@ -46,9 +46,9 @@ class FunctionTimer:
     def __init__(self, _func):
         self.__func = _func
 
-    def __call__(self, *conf, **kwconf):
+    def __call__(self, *conf, **kwargs):
         tt = time.time()
-        self.__func(*conf, **kwconf)
+        self.__func(*conf, **kwargs)
         print(f'\"{self.__func.__name__}\" play time: {time.time() - tt}')
 
     def __enter__(self):

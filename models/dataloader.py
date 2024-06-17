@@ -34,10 +34,10 @@ def augmentations(conf):
     target_size = conf['transform_rand_crop']
     return [albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=conf['transform_rand_resize']),
             albumentations.RandomCrop(height=target_size, width=target_size, p=1.0),
-            albumentations.CoarseDropout(max_holes=4, max_height=target_size // 4, max_width=target_size // 4, min_height=target_size // 16, min_width=target_size // 16, min_holes=1, p=conf['transform_coarse_dropout']),
+            albumentations.CoarseDropout(max_holes=4, max_height=target_size // 8, max_width=target_size // 8, min_height=target_size // 32, min_width=target_size // 32, min_holes=1, p=conf['transform_coarse_dropout']),
             albumentations.HorizontalFlip(p=conf['transform_hflip']),
             albumentations.VerticalFlip(p=conf['transform_vflip']),
-            albumentations.ImageCompression(quality_lower=80, quality_upper=100, p=conf['transform_jpeg']),
+            albumentations.ImageCompression(quality_lower=70, quality_upper=100, p=conf['transform_jpeg']),
             albumentations.GaussianBlur(p=conf['transform_blur']),
             albumentations.CLAHE(p=conf['transform_clahe']),
             albumentations.RandomRain(p=conf['transform_rain']),
@@ -94,7 +94,7 @@ class ImageLoader(Dataset):
         self.len = len(self.df)
 
         if self.conf_dataloader['data_cache']:
-            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.mode}{utils.Colors.END}')
+            print(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
                 self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['input'], itertools.repeat(cv2.IMREAD_COLOR)))
 
@@ -155,7 +155,7 @@ class Image2ImageLoader(Dataset):
 
         # mount_data_on_memory
         if self.conf_dataloader['data_cache']:
-            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.mode}{utils.Colors.END}')
+            print(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
                 self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['input'], itertools.repeat(cv2.IMREAD_COLOR)))
                 self.memory_data_y = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['label'], itertools.repeat(cv2.IMREAD_GRAYSCALE)))
@@ -246,7 +246,7 @@ class Image2VectorLoader(Dataset):
 
         # mount_data_on_memory
         if self.conf_dataloader['data_cache']:
-            print(f'{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.mode}{utils.Colors.END}')
+            print(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
             x_img_path = []
             self.memory_data_y = []
             for idx in range(self.len):
@@ -327,7 +327,7 @@ class Image2VectorLoader(Dataset):
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
             y_vec = torch.tensor(self.df[self.conf_dataloader['label_cols']].values[index])
 
-            if self.conf['env']['task'] == 'classification' and self.mode != 'test':
+            if self.conf['env']['task'] == 'classification' and self.conf_dataloader['mode'] != 'test':
                 y_vec = F.one_hot(y_vec, num_classes=self.conf['model']['num_class'])
 
         x_img_tr, y_vec = self.transform(x_img, y_vec)
