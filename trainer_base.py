@@ -4,7 +4,7 @@ import os
 import wandb
 import math
 
-from models import dataloader as dataloader_hub
+from models import dataloader
 from models import lr_scheduler
 from models import model_implements
 from models import losses as loss_hub
@@ -124,26 +124,7 @@ class TrainerBase:
     @staticmethod
     def init_data_loader(conf,
                          conf_dataloader):
-        if conf_dataloader['name'] == 'Image':
-            loader = dataloader_hub.ImageDataLoader(conf=conf,
-                                                    conf_dataloader=conf_dataloader)
-        elif conf_dataloader['name'] == 'ImageSSL':
-            loader = dataloader_hub.ImageSSLDataLoader(conf=conf,
-                                                       conf_dataloader=conf_dataloader)
-        elif conf_dataloader['name'] == 'Image2Image':
-            loader = dataloader_hub.Image2ImageDataLoader(conf=conf,
-                                                          conf_dataloader=conf_dataloader)
-        elif conf_dataloader['name'] == 'Image2Vector':
-            loader = dataloader_hub.Image2VectorDataLoader(conf=conf,
-                                                           conf_dataloader=conf_dataloader)
-        elif conf_dataloader['name'] == 'ImageStack2Vector':
-            loader = dataloader_hub.ImageStack2VectorDataLoader(conf=conf,
-                                                                conf_dataloader=conf_dataloader)
-        elif conf_dataloader['name'] == 'Image2Landmark':
-            loader = dataloader_hub.Image2LandmarkDataLoader(conf=conf,
-                                                             conf_dataloader=conf_dataloader)
-        else:
-            raise Exception('No dataloader named', conf_dataloader['name'])
+        loader = getattr(dataloader, conf_dataloader['name'])(conf, conf_dataloader)
 
         return loader
 

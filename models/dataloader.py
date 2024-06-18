@@ -422,7 +422,7 @@ class Image2LandmarkLoader(Dataset):
         return len(self.xy)
 
 
-class ImageDataLoader:
+class Image:
 
     def __init__(self, conf, conf_dataloader):
         g = torch.Generator()
@@ -443,7 +443,7 @@ class ImageDataLoader:
         return self.image_loader.__len__()
 
 
-class Image2ImageDataLoader:
+class Image2Image:
 
     def __init__(self, conf, conf_dataloader):
         g = torch.Generator()
@@ -464,7 +464,7 @@ class Image2ImageDataLoader:
         return self.image_loader.__len__()
 
 
-class Image2VectorDataLoader:
+class Image2Vector:
 
     def __init__(self, conf, conf_dataloader):
         g = torch.Generator()
@@ -497,7 +497,7 @@ class Image2VectorDataLoader:
         return self.image_loader.__len__()
 
 
-class Image2LandmarkDataLoader:
+class Image2Landmark:
 
     def __init__(self, conf, conf_dataloader):
         g = torch.Generator()
