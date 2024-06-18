@@ -44,7 +44,7 @@ def augmentations(conf):
             albumentations.RandomFog(p=conf['transform_fog']),
             albumentations.GaussNoise(p=conf['transform_g_noise']),
             albumentations.FancyPCA(p=conf['transform_fancyPCA']),
-            albumentations.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=conf['transform_jitter']),
+            albumentations.ColorJitter(brightness=(0.0, 0.3), contrast=(0.0, 0.3), saturation=(0.0, 0.3), hue=(0.0, 0.1), p=conf['transform_jitter']),
             albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=conf['transform_perspective']),
             ]
 
@@ -103,7 +103,7 @@ class ImageLoader(Dataset):
     def update_transform(self):
         self.transform_resize = albumentations.Resize(height=self.conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
         if self.conf_dataloader['mode'] == 'train':
-            self.transform_augmentation = albumentations.Compose([*augmentations(self.conf_dataloader['augmentations'])])
+            self.transform_augmentation = albumentations.Compose(augmentations(self.conf_dataloader['augmentations']))
         self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
     def transform(self, _input):
@@ -165,7 +165,7 @@ class Image2ImageLoader(Dataset):
     def update_transform(self):
         self.transform_resize = albumentations.Resize(height=self.conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
         if self.conf_dataloader['mode'] == 'train':
-            self.transform_augmentation = albumentations.Compose([*augmentations(self.conf_dataloader['augmentations'])])
+            self.transform_augmentation = albumentations.Compose(augmentations(self.conf_dataloader['augmentations']))
         self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
     def transform(self, _input, _label):
@@ -271,7 +271,7 @@ class Image2VectorLoader(Dataset):
     def update_transform(self):
         self.transform_resize = albumentations.Resize(height=self.conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
         if self.conf_dataloader['mode'] == 'train':
-            self.transform_augmentation = albumentations.Compose([*augmentations(self.conf_dataloader['augmentations'])])
+            self.transform_augmentation = albumentations.Compose(augmentations(self.conf_dataloader['augmentations']))
         self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
     def transform(self, _input, _label):
@@ -372,7 +372,7 @@ class Image2LandmarkLoader(Dataset):
     def update_transform(self):
         self.transform_resize = albumentations.Resize(height=self.conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
         if self.conf_dataloader['mode'] == 'train':
-            self.transform_augmentation = albumentations.Compose([*augmentations(self.conf_dataloader['augmentations'])])
+            self.transform_augmentation = albumentations.Compose(augmentations(self.conf_dataloader['augmentations']))
         self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
     def transform(self, _input, _label):
