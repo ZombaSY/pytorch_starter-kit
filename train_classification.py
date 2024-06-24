@@ -14,7 +14,7 @@ class TrainerClassification(TrainerBase):
         self.model.train()
 
         batch_losses = 0
-        for batch_idx, (x_in, target) in enumerate(self.loader_train.Loader):
+        for iteration, (x_in, target) in enumerate(self.loader_train.Loader):
             x_in, _ = x_in
             target, _ = target
 
@@ -40,7 +40,7 @@ class TrainerClassification(TrainerBase):
 
             batch_losses += loss.item()
 
-            if (batch_idx + 1) % self._validate_interval == 0:
+            if (iteration + 1) % self._validate_interval == 0:
                 self._validate(epoch)
 
             # compute metric
@@ -64,7 +64,7 @@ class TrainerClassification(TrainerBase):
         self.model.eval()
 
 
-        for batch_idx, (x_in, target) in enumerate(self.loader_valid.Loader):
+        for iteration, (x_in, target) in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
                 x_in, _ = x_in
                 target, _ = target

@@ -57,7 +57,7 @@ def main():
         conf = imported_module.conf
         conf['config_path'] = arg.config_path
     else:
-        # for sweeper case in WandB. not working yet
+        # for sweeper case in WandB
         conf = {'config_path': 'configs/sweep_config.yaml'}
         for item in unknown_arg:
             item = item.strip('--')
@@ -74,6 +74,9 @@ def main():
                     else: raise e
             conf[key] = value
 
+    # conf = argparse.Namespace()
+    # conf_to_conf(conf, **conf)  # pass in keyword conf
+
     now_time = datetime.now().strftime("%Y-%m-%d %H%M%S")
     os.environ["CUDA_VISIBLE_DEVICES"] = conf['env']['CUDA_VISIBLE_DEVICES']
 
@@ -87,7 +90,7 @@ def main():
         # conf.transform_mixup = 0
 
     if conf['env']['mode'] == 'train':
-
+        # check K-folds
         if 'data_path_folds' in conf['dataloader_train'].keys():
             k_fold = len(conf['dataloader_train']['data_path_folds'])
 

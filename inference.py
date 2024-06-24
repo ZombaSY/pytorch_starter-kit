@@ -45,7 +45,7 @@ class Inferencer:
     def inference_classification(self, epoch):
         self.model.eval()
 
-        for batch_idx, (x_in, target) in enumerate(self.loader_valid.Loader):
+        for iteration, (x_in, target) in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
                 x_in, _ = x_in
                 target, _ = target
@@ -75,7 +75,7 @@ class Inferencer:
     def inference_segmentation(self, epoch):
         self.model.eval()
 
-        for batch_idx, (x_in, target) in enumerate(self.loader_valid.Loader):
+        for iteration, (x_in, target) in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
                 x_in, img_id = x_in
                 target, _ = target
@@ -85,7 +85,7 @@ class Inferencer:
 
                 output = self.model(x_in)
 
-                self.__post_process(x_in, target, output, img_id, batch_idx)
+                self.__post_process(x_in, target, output, img_id, iteration)
 
         if self.conf['env']['mode'] == 'valid':
             metrics_out = self.metric_val.get_results()
@@ -106,7 +106,7 @@ class Inferencer:
         metric_dict = {'loss': []}
         batch_losses = 0
 
-        for batch_idx, (x_in, target) in enumerate(self.loader_valid.Loader):
+        for iteration, (x_in, target) in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
                 x_in, img_id = x_in
                 target, _ = target
@@ -123,7 +123,7 @@ class Inferencer:
                         raise Exception('Loss is NAN. End training.')
                     batch_losses += loss.item()
 
-                self.__post_process(x_in, target, output, img_id, batch_idx)
+                self.__post_process(x_in, target, output, img_id, iteration)
 
         if self.conf['env']['mode'] == 'valid':
             loss_mean = batch_losses / self.loader_valid.Loader.__len__()
@@ -164,7 +164,7 @@ class Inferencer:
             data_stat['darkcircle_ratio'] = len(torch.where(torch.argmax(output['seg'][idx], dim=0) == 1)[0]) / (output['seg'][idx].shape[-2] * output['seg'][idx].shape[-1])
             data_stat['flush_ratio'] = len(torch.where(torch.argmax(output['seg'][idx], dim=0) == 2)[0]) / (output['seg'][idx].shape[-2] * output['seg'][idx].shape[-1])
 
-    def __post_process(self, x_img, target, output, img_id, batch_idx):
+    def __post_process(self, x_img, target, output, img_id, iteration):
         data_stat = {}
 
         if self.conf['env']['task'] == 'segmentation':
@@ -178,7 +178,7 @@ class Inferencer:
             else:
                 self.data_stat[key].append(data_stat[key])
 
-        print(f'batch_idx {batch_idx} -> {batch_idx * self.conf["dataloader_valid"]["batch_size"]} images \t Done !!')     # TODO: last batch_idx is invalid
+        print(f'iteration {iteration} -> {iteration * self.conf["dataloader_valid"]["batch_size"]} images \t Done !!')     # TODO: last iteration is invalid
 
     def inference(self):
         if self.conf['env']['task'] == 'segmentation':

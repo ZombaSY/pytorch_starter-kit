@@ -172,7 +172,9 @@ class TrainerBase:
         if conf_optimizer['name'] == 'AdamW':
             optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
                                           lr=conf_optimizer['lr'], betas=(0.9, 0.999), eps=1e-8, weight_decay=conf_optimizer['weight_decay'])
-
+        elif conf_optimizer['name'] == 'Adam':
+            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
+                                         lr=conf_optimizer['lr'], betas=(0.9, 0.999), eps=1e-8, weight_decay=conf_optimizer['weight_decay'])
         return optimizer
 
     @staticmethod
