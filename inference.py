@@ -150,7 +150,8 @@ class Inferencer:
         # compute metric
         if self.conf['dataloader_valid']['name'] == 'Image2Image':
             output_argmax = torch.argmax(output['seg'], dim=1).cpu()
-            self.metric_val.update(target[0][0].cpu().detach().numpy(), output_argmax[0].cpu().detach().numpy())
+            for b in range(output['seg'].shape[0]):
+                self.metric_val.update(target[b][0].cpu().detach().numpy(), output_argmax[b].cpu().detach().numpy())
 
         if self.conf['env']['draw_results']:
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
@@ -178,7 +179,7 @@ class Inferencer:
             else:
                 self.data_stat[key].append(data_stat[key])
 
-        print(f'iteration {iteration} -> {iteration * self.conf["dataloader_valid"]["batch_size"]} images \t Done !!')     # TODO: last iteration is invalid
+        print(f'iteration {iteration} -> {(iteration + 1) * self.conf["dataloader_valid"]["batch_size"]} images \t Done !!')     # TODO: last iteration is invalid
 
     def inference(self):
         if self.conf['env']['task'] == 'segmentation':

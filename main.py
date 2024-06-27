@@ -74,9 +74,6 @@ def main():
                     else: raise e
             conf[key] = value
 
-    # conf = argparse.Namespace()
-    # conf_to_conf(conf, **conf)  # pass in keyword conf
-
     now_time = datetime.now().strftime("%Y-%m-%d %H%M%S")
     os.environ["CUDA_VISIBLE_DEVICES"] = conf['env']['CUDA_VISIBLE_DEVICES']
 
@@ -105,7 +102,6 @@ def main():
         else:
             trainer = init_trainer(conf, now_time)
             trainer.run()
-
 
     elif conf['env']['mode'] in ['valid', 'test']:
         inferencer = Inferencer(conf)
