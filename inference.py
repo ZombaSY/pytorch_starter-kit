@@ -134,19 +134,26 @@ class Inferencer:
             utils.log_epoch('validation', epoch, metric_dict, self.conf['env']['wandb'])
             self.metric_val.reset()
 
-    def __post_process_landmark(self, x_img, target, output, img_id, data_stat):
+    def __post_process_regression(self, x_img, target, output, img_id):
+        for idx in range(x_img.shape[0]):
+            utils.append_data_stats(self.data_stat, 'img_id', img_id[idx])
+            for i in range(output['vec'].shape[-1]):
+                key_name = 'predict_' + str(i).zfill(2)
+                utils.append_data_stats(self.data_stat, key_name, output['vec'][idx][i].detach().cpu().item())
+
+    def __post_process_landmark(self, x_img, target, output, img_id):
         if self.conf['env']['draw_results']:
 
             if not os.path.exists(self.save_dir):
                 os.mkdir(self.save_dir)
 
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std).detach().cpu().numpy()
+                x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std).detach().cpu()
                 output_np = output['vec'].detach().cpu().numpy()
 
                 pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_landmark), x_img, output_np, itertools.repeat(self.save_dir), img_id))
 
-    def __post_process_segmentation(self, x_img, target, output, img_id, data_stat):
+    def __post_process_segmentation(self, x_img, target, output, img_id):
         # compute metric
         if self.conf['dataloader_valid']['name'] == 'Image2Image':
             output_argmax = torch.argmax(output['seg'], dim=1).cpu()
@@ -160,24 +167,18 @@ class Inferencer:
 
                 pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_image), x_img, output_prob, itertools.repeat(self.save_dir), img_id, itertools.repeat(self.conf['model']['num_class'])))
 
-        for idx in range(len(output)):
-            data_stat['img_id'] = img_id[idx]
-            data_stat['darkcircle_ratio'] = len(torch.where(torch.argmax(output['seg'][idx], dim=0) == 1)[0]) / (output['seg'][idx].shape[-2] * output['seg'][idx].shape[-1])
-            data_stat['flush_ratio'] = len(torch.where(torch.argmax(output['seg'][idx], dim=0) == 2)[0]) / (output['seg'][idx].shape[-2] * output['seg'][idx].shape[-1])
+        for idx in range(x_img.shape[0]):
+            utils.append_data_stats(self.data_stat, 'img_id', img_id[idx])
+            utils.append_data_stats(self.data_stat, 'darkcircle_ratio', len(torch.where(torch.argmax(output['seg'][idx], dim=0) == 1)[0]) / (output['seg'][idx].shape[-2] * output['seg'][idx].shape[-1]))
+            utils.append_data_stats(self.data_stat, 'flush_ratio', len(torch.where(torch.argmax(output['seg'][idx], dim=0) == 2)[0]) / (output['seg'][idx].shape[-2] * output['seg'][idx].shape[-1]))
 
     def __post_process(self, x_img, target, output, img_id, iteration):
-        data_stat = {}
-
         if self.conf['env']['task'] == 'segmentation':
-            self.__post_process_segmentation(x_img, target, output, img_id, data_stat)
+            self.__post_process_segmentation(x_img, target, output, img_id)
         elif self.conf['env']['task'] == 'landmark':
-            self.__post_process_landmark(x_img, target, output, img_id, data_stat)
-
-        for key in data_stat.keys():
-            if key not in self.data_stat.keys():
-                self.data_stat[key] = [data_stat[key]]
-            else:
-                self.data_stat[key].append(data_stat[key])
+            self.__post_process_landmark(x_img, target, output, img_id)
+        elif self.conf['env']['task'] == 'regression':
+            self.__post_process_regression(x_img, target, output, img_id)
 
         print(f'iteration {iteration} -> {(iteration + 1) * self.conf["dataloader_valid"]["batch_size"]} images \t Done !!')     # TODO: last iteration is invalid
 
