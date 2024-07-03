@@ -167,11 +167,6 @@ class Inferencer:
 
                 pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_image), x_img, output_prob, itertools.repeat(self.save_dir), img_id, itertools.repeat(self.conf['model']['num_class'])))
 
-        for idx in range(x_img.shape[0]):
-            utils.append_data_stats(self.data_stat, 'img_id', img_id[idx])
-            utils.append_data_stats(self.data_stat, 'darkcircle_ratio', len(torch.where(torch.argmax(output['seg'][idx], dim=0) == 1)[0]) / (output['seg'][idx].shape[-2] * output['seg'][idx].shape[-1]))
-            utils.append_data_stats(self.data_stat, 'flush_ratio', len(torch.where(torch.argmax(output['seg'][idx], dim=0) == 2)[0]) / (output['seg'][idx].shape[-2] * output['seg'][idx].shape[-1]))
-
     def __post_process(self, x_img, target, output, img_id, iteration):
         if self.conf['env']['task'] == 'segmentation':
             self.__post_process_segmentation(x_img, target, output, img_id)
