@@ -98,6 +98,7 @@ def main():
 
                 trainer = init_trainer(conf, now_time, k_fold=idx)
                 trainer.run()
+                del trainer # release memory
 
         else:
             trainer = init_trainer(conf, now_time)
