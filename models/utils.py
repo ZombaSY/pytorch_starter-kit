@@ -56,12 +56,12 @@ class FunctionTimer:
 
 
 # https://arxiv.org/abs/1905.04899
-def cut_mix(_input, _refer, mask_1=None, mask_2=None):
+def cut_mix(_input, _refer, _input_label=None, _refer_label=None):
     """
     :param _input: PIL.Image or ndarray
     :param _refer: PIL.Image or ndarray
-    :param mask_1: PIL.Image or ndarray
-    :param mask_2: PIL.Image or ndarray
+    :param _input_label: PIL.Image or ndarray
+    :param _refer_label: PIL.Image or ndarray
 
     :returns: cut-mixed image
     """
@@ -94,28 +94,32 @@ def cut_mix(_input, _refer, mask_1=None, mask_2=None):
     if cy_1 + ch_1 > h1: ch_1 = h1 - cy_1  # push overflowing area
     if cx_1 + cw_1 > w1: cw_1 = w1 - cx_1
 
+    # generate cutout_mask for post-process
+    cutout_mask = np.zeros(_input.shape[:2], dtype=np.bool_)
+    cutout_mask[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = True
+
     cutout_img = _refer[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
     cutout_img = cv2.resize(cutout_img, (cw_1, ch_1))
 
     _input[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_img
 
-    if mask_1 is not None and mask_2 is not None:
-        mask_1 = np.array(mask_1)
-        mask_2 = np.array(mask_2)
+    if _input_label is not None and _refer_label is not None:
+        _input_label = np.array(_input_label)
+        _refer_label = np.array(_refer_label)
 
-        cutout_mask = mask_2[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
+        cutout_mask = _refer_label[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
         cutout_mask = cv2.resize(cutout_mask, (cw_1, ch_1), interpolation=cv2.INTER_NEAREST)
-        mask_1[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_mask
+        _input_label[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_mask
 
         if _is_pil:
-            return Image.fromarray(_input.astype(np.uint8)), Image.fromarray(mask_1.astype(np.uint8))
+            return Image.fromarray(_input.astype(np.uint8)), Image.fromarray(_input_label.astype(np.uint8)), Image.fromarray(cutout_mask)
         else:
-            return _input.astype(np.uint8), mask_1.astype(np.uint8)
+            return _input.astype(np.uint8), _input_label.astype(np.uint8), cutout_mask
 
     if _is_pil:
-        return Image.fromarray(_input.astype(np.uint8)), None
+        return Image.fromarray(_input.astype(np.uint8)), cutout_mask
     else:
-        return _input.astype(np.uint8), None
+        return _input.astype(np.uint8), cutout_mask
 
 
 def grey_to_heatmap(img, is_bgr=True):
@@ -152,7 +156,7 @@ def cv2_imwrite(fns_img, img):
 
 def denormalize_img(img, mean, std):
     img_t = img.permute(0, 2, 3, 1)
-    img_t = ((img_t * std) + mean) * 255
+    img_t = (img_t * std + mean) * 255
 
     return img_t
 
