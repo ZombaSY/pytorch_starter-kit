@@ -1,6 +1,5 @@
 import torch
 import wandb
-import numpy as np
 
 from models import utils
 from trainer_base import TrainerBase
@@ -14,9 +13,9 @@ class TrainerClassification(TrainerBase):
         self.model.train()
 
         batch_losses = 0
-        for iteration, (x_in, target) in enumerate(self.loader_train.Loader):
-            x_in, _ = x_in
-            target, _ = target
+        for iteration, data in enumerate(self.loader_train.Loader):
+            x_in = data['input']
+            target = data['label']
 
             x_in = x_in.to(self.device)
             target = target.to(self.device)
@@ -33,7 +32,7 @@ class TrainerClassification(TrainerBase):
 
             # ----- backward ----- #
             self.optimizer.zero_grad()
-            loss.backward()
+            self.accelerator.backward(loss)
             self.optimizer.step()
             if self.scheduler is not None:
                 self.scheduler.step()
@@ -64,10 +63,10 @@ class TrainerClassification(TrainerBase):
         self.model.eval()
 
 
-        for iteration, (x_in, target) in enumerate(self.loader_valid.Loader):
+        for iteration, data in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
-                x_in, _ = x_in
-                target, _ = target
+                x_in = data['input']
+                target = data['label']
 
                 x_in = x_in.to(self.device)
                 target = target.to(self.device)

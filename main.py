@@ -1,7 +1,6 @@
 import torch
 import os
 import argparse
-import yaml
 import numpy as np
 import random
 import ast
@@ -84,6 +83,7 @@ def main():
         for key in conf:
             if 'dataloader' in key:
                 conf[key]['data_cache'] = False
+                conf[key]['workers'] = 1
         # conf.transform_mixup = 0
 
     if conf['env']['mode'] == 'train':

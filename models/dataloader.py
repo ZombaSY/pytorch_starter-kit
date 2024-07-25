@@ -134,7 +134,8 @@ class ImageLoader(Dataset):
 
         x_img_tr = self.transform(x_img)
 
-        return (x_img_tr, x_path), (x_img_tr, x_path)
+        return {'input': x_img_tr,
+                'input_path': x_path}
 
     def __len__(self):
         return self.len
@@ -197,7 +198,10 @@ class ImageSSLLoader(ImageLoader):
         else:
            x_img_target, x_img_target_mask = self.transform(x_img)
 
-        return (x_img_target, x_img_target_mask), (x_img_perturbs, x_path)
+        return {'input': x_img_target,
+                'input_mask': x_img_target_mask,
+                'input_perturb': x_img_perturbs,
+                'input_path': x_path}
 
 
 class Image2ImageLoader(Dataset):
@@ -285,7 +289,10 @@ class Image2ImageLoader(Dataset):
 
         img_x_tr, img_y_tr = self.transform(img_x, img_y)
 
-        return (img_x_tr, x_path), (img_y_tr, y_path)
+        return {'input': img_x_tr,
+                'label': img_y_tr,
+                'input_path': x_path,
+                'label_path': y_path}
 
     def __len__(self):
         return self.len
@@ -391,7 +398,9 @@ class Image2VectorLoader(Dataset):
 
         x_img_tr, y_vec = self.transform(x_img, y_vec)
 
-        return (x_img_tr, x_path), (y_vec, x_path)
+        return {'input': x_img_tr,
+                'label': y_vec,
+                'input_path': x_path}
 
     def __len__(self):
         return self.len
@@ -475,7 +484,9 @@ class Image2LandmarkLoader(Dataset):
 
         x_input, y_label = self.transform(x_input, y_label)
 
-        return (x_input, x_path), (y_label, x_path)
+        return {'input': x_input,
+                'label': y_label,
+                'input_path': x_path}
 
     def __len__(self):
         return len(self.xy)

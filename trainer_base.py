@@ -3,6 +3,7 @@ import torch
 import os
 import wandb
 import math
+import timm
 
 from models import dataloader
 from models import lr_scheduler
@@ -12,6 +13,7 @@ from models import utils
 from models import metrics
 
 from datetime import datetime
+from accelerate import Accelerator
 
 
 class TrainerBase:
@@ -19,6 +21,7 @@ class TrainerBase:
 
     def __init__(self, conf, now=None, k_fold=0):
         self.conf = conf
+        self.accelerator = Accelerator()    # `$accelearte config` to set configuration at first
         now_time = now if now is not None else datetime.now().strftime("%Y%m%d %H%M%S")
         self.saved_model_directory = self.conf['env']['saved_model_directory'] + '/' + now_time
         self.k_fold = k_fold
@@ -45,7 +48,8 @@ class TrainerBase:
             else:
                 self.model.module.load_state_dict(torch.load(self.conf['model']['saved_ckpt']))
                 print(f'{utils.Colors.LIGHT_RED}Model loaded successfully!!! (Custom){utils.Colors.END}')
-            self.model.to(self.device)
+        if self.conf['model']['use_model_ema']:
+            self.model_ema = timm.utils.ModelEmaV2(self.model, decay=0.9999, device=self.device)
 
         # init dataloader
         self.loader_train = self.init_data_loader(conf=self.conf,
@@ -79,6 +83,8 @@ class TrainerBase:
 
         self._validate_interval = max(1, (len(self.loader_train.Loader) // self.conf['env']['train_fold']) + 1)
 
+        # set acceleration
+        self.model, self.optimizer, self.scheduler, self.loader_train, self.loader_valid = self.accelerator.prepare(self.model, self.optimizer, self.scheduler, self.loader_train, self.loader_valid)
 
     @abc.abstractmethod
     def _train(self, epoch):
