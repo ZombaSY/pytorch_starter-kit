@@ -45,10 +45,10 @@ class Inferencer:
     def inference_classification(self, epoch):
         self.model.eval()
 
-        for iteration, (x_in, target) in enumerate(self.loader_valid.Loader):
+        for iteration, data in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
-                x_in, _ = x_in
-                target, _ = target
+                x_in = data['input']
+                target = data['label']
 
                 x_in = x_in.to(self.device)
                 target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
@@ -75,10 +75,11 @@ class Inferencer:
     def inference_segmentation(self, epoch):
         self.model.eval()
 
-        for iteration, (x_in, target) in enumerate(self.loader_valid.Loader):
+        for iteration, data in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
-                x_in, img_id = x_in
-                target, _ = target
+                x_in = data['input']
+                target = data['label']
+                img_id = data['input_path']
 
                 x_in = x_in.to(self.device)
                 target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
@@ -106,10 +107,11 @@ class Inferencer:
         metric_dict = {'loss': []}
         batch_losses = 0
 
-        for iteration, (x_in, target) in enumerate(self.loader_valid.Loader):
+        for iteration, data in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
-                x_in, img_id = x_in
-                target, _ = target
+                x_in = data['input']
+                target = data['label']
+                img_id = data['input_path']
 
                 x_in = x_in.to(self.device)
                 target = target.to(self.device)  # (shape: (batch_size, img_h, img_w))
@@ -148,14 +150,14 @@ class Inferencer:
                 os.mkdir(self.save_dir)
 
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std).detach().cpu()
+                x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std).detach().cpu().numpy()
                 output_np = output['vec'].detach().cpu().numpy()
 
                 pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_landmark), x_img, output_np, itertools.repeat(self.save_dir), img_id))
 
     def __post_process_segmentation(self, x_img, target, output, img_id):
         # compute metric
-        if self.conf['dataloader_valid']['name'] == 'Image2Image':
+        if self.conf['dataloader_valid']['name'] == 'Image2Image' and self.conf['env']['mode'] == 'valid':
             output_argmax = torch.argmax(output['seg'], dim=1).cpu()
             for b in range(output['seg'].shape[0]):
                 self.metric_val.update(target[b][0].cpu().detach().numpy(), output_argmax[b].cpu().detach().numpy())
@@ -166,6 +168,13 @@ class Inferencer:
                 output_prob = F.softmax(output['seg'], dim=1).detach().cpu().numpy()
 
                 pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_image), x_img, output_prob, itertools.repeat(self.save_dir), img_id, itertools.repeat(self.conf['model']['num_class'])))
+
+        for idx in range(x_img.shape[0]):
+            output_argmax = torch.argmax(output['seg'][idx], dim=0)
+            utils.append_data_stats(self.data_stat, 'img_id', img_id[idx])
+            for i in range(self.conf['model']['num_class']):
+                key_name = 'segmap_ratio_' + str(i).zfill(2)
+                utils.append_data_stats(self.data_stat, key_name, len(torch.where(output_argmax == i)[0]) / (output['seg'][idx].shape[-2] * output['seg'][idx].shape[-1]))
 
     def __post_process(self, x_img, target, output, img_id, iteration):
         if self.conf['env']['task'] == 'segmentation':

@@ -135,7 +135,8 @@ class ImageLoader(Dataset):
         x_img_tr = self.transform(x_img)
 
         return {'input': x_img_tr,
-                'input_path': x_path}
+                'input_path': x_path,
+                'label': torch.empty(0)}
 
     def __len__(self):
         return self.len
@@ -440,7 +441,9 @@ class Image2LandmarkLoader(Dataset):
     def update_transform(self):
         self.transform_resize = albumentations.Resize(height=self.conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
         if self.conf_dataloader['mode'] == 'train':
-            self.transform_augmentation = albumentations.Compose(augmentations(self.conf_dataloader['augmentations']))
+            self.transform_augmentation = albumentations.Compose(
+                augmentations(self.conf_dataloader['augmentations']),
+                keypoint_params=albumentations.KeypointParams(format='xy', remove_invisible=False, angle_in_degrees=True))
         self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
     def transform(self, _input, _label):

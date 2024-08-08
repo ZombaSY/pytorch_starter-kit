@@ -59,6 +59,7 @@ conf=dict(
     name='Image2Vector',
     mode='valid',
     data_path='/path/to/valid.csv',
+    label_cols=['col1', 'col2', 'col3'],
     data_cache=True,
     weighted_sampler=False,
     batch_size=32,

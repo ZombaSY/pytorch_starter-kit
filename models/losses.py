@@ -256,6 +256,17 @@ class HausdorffERLoss(nn.Module):
 
 
 # https://www.kaggle.com/code/bigironsphere/loss-function-library-keras-pytorch/notebook
+class L1loss(nn.Module):
+    def __init__(self, conf):
+        super().__init__()
+
+        self.loss = nn.L1Loss()
+
+    def forward(self, x, y):
+        y = y.float()
+
+        return self.loss(x.squeeze(), y.squeeze())
+
 class MSELoss(nn.Module):
     def __init__(self, conf):
         super().__init__()
@@ -681,6 +692,7 @@ class LabelSmoothingCrossEntropyLoss(nn.Module):
 class WingLoss(nn.Module):
     def __init__(self, conf):
         super(  ).__init__()
+        # omega=0.01, epsilon=2
         self.omega = conf['omega']
         self.epsilon = conf['epsilon']
 

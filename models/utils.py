@@ -162,8 +162,9 @@ def denormalize_img(img, mean, std):
 
 
 def draw_image(x_img, output_prob, img_save_dir, img_id, n_class):
-    img_fn = os.path.split(img_id)[-1]
+    img_fn = os.path.splitext(os.path.split(img_id)[-1])[0]
     output_grey = (output_prob * 255).astype(np.uint8)
+
     # output_grey = np.where(output_grey > 128, 255, 0)
 
     # output_grey_tmp = np.where(output_grey > 128, 1, 0)[0]
