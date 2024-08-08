@@ -28,7 +28,7 @@ class ModelMini:
         self.model = TrainerBase.init_model(self.conf , self.device)
 
         self.model.to(self.device)
-        self.criterion = loss_hub.LabelSmoothingCrossEntropyLoss()
+        self.criterion = TrainerBase.init_criterion(self.conf['criterion'], self.device)
 
         self.optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.model.parameters()),
                                            lr=1e-2, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-3)
