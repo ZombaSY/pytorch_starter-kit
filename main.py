@@ -13,7 +13,6 @@ from train_regression import TrainerRegression
 from train_classification import TrainerClassification
 from inference import Inferencer
 from datetime import datetime
-from models import utils
 
 
 # fix seed for reproducibility
@@ -76,8 +75,6 @@ def main():
     now_time = datetime.now().strftime("%Y-%m-%d %H%M%S")
     os.environ["CUDA_VISIBLE_DEVICES"] = conf['env']['CUDA_VISIBLE_DEVICES']
 
-    print('Use CUDA :', conf['env']['cuda'] and torch.cuda.is_available())
-
     if conf['env']['debug']:
         conf['env']['wandb'] = False
         for key in conf:
@@ -90,7 +87,6 @@ def main():
             k_fold = len(conf['dataloader_train']['data_path_folds'])
 
             for idx in range(k_fold):
-                print(f'{utils.Colors.BOLD}Running {idx}th fold...{utils.Colors.END}')
                 conf['dataloader_train']['data_path'] = conf['dataloader_train']['data_path_folds'][idx]
                 conf['dataloader_valid']['data_path'] = conf['dataloader_valid']['data_path_folds'][idx]
 
@@ -115,9 +111,9 @@ def main():
             raise ValueError(f"unsupported target: {conf['export']['target']}")
 
     else:
-        print('No mode supported.')
+        raise ValueError(f"unsupported mode: {conf['env']['mode']}")
 
-    sys.exit()  # safe exit
+    sys.exit()
 
 
 if __name__ == "__main__":

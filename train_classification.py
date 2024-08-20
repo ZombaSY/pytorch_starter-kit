@@ -62,7 +62,6 @@ class TrainerClassification(TrainerBase):
     def _validate(self, epoch):
         self.model.eval()
 
-
         for iteration, data in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
                 x_in = data['input']
@@ -94,8 +93,8 @@ class TrainerClassification(TrainerBase):
             self._validate(epoch)
 
             if (epoch - self.last_saved_epoch) > self.conf['env']['early_stop_epoch']:
-                print('The model seems to be converged. Early stop training.')
-                print(f'Best acc -----> {self.metric_best["f1"]}')
+                utils.Logger().info('The model seems to be converged. Early stop training.')
+                utils.Logger().info(f'Best acc -----> {self.metric_best["f1"]}')
                 if self.conf['env']['wandb']:
                     wandb.log({f'Best f1': self.metric_best['f1']})
                 break

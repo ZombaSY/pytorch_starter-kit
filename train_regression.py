@@ -101,8 +101,8 @@ class TrainerRegression(TrainerBase):
             self._validate(epoch)
 
             if (epoch - self.last_saved_epoch) > self.conf['env']['early_stop_epoch']:
-                print('The model seems to be converged. Early stop training.')
-                print(f'Best loss -----> {self.metric_best["loss"]}')
+                utils.Logger().info('The model seems to be converged. Early stop training.')
+                utils.Logger().info(f'Best loss -----> {self.metric_best["loss"]}')
                 if self.conf['env']['wandb']:
                     wandb.log({f'Best f1': self.metric_best['loss']})
                 break

@@ -4,6 +4,8 @@ import os
 import wandb
 import math
 import timm
+import shutil
+import logging
 
 from models import dataloader
 from models import lr_scheduler
@@ -23,32 +25,38 @@ class TrainerBase:
         self.conf = conf
         self.accelerator = Accelerator()    # `$accelearte config` to set configuration at first
         now_time = now if now is not None else datetime.now().strftime("%Y%m%d %H%M%S")
-        self.saved_model_directory = self.conf['env']['saved_model_directory'] + '/' + now_time
+        self.saved_model_directory = os.path.join(self.conf['env']['saved_model_directory'], now_time)
         self.k_fold = k_fold
 
         # save hyper-parameters
         if not self.conf['env']['debug']:
-            with open(self.conf['config_path'], 'r') as f_r:
-                file_path = os.path.join(self.conf['env']['saved_model_directory'], now_time)
-                if not os.path.exists(file_path):
-                    os.makedirs(file_path)
-                with open(os.path.join(file_path, os.path.split(self.conf['config_path'])[-1]), 'w') as f_w:
-                    f_w.write(f_r.read())
+            # make direcotry
+            if not os.path.exists(self.saved_model_directory):
+                os.makedirs(self.saved_model_directory)
+            
+            # save configuration
+            shutil.copy(self.conf['config_path'], os.path.join(self.saved_model_directory, os.path.split(self.conf['config_path'])[-1]))
+
+            # init logger file
+            utils.Logger(os.path.join(self.saved_model_directory, 'log.txt'), level=logging.DEBUG if self.conf['env']['debug'] else logging.INFO)
+            
+            utils.Logger().info(f'{utils.Colors.BOLD}Running {self.k_fold}th fold...{utils.Colors.END}')
 
         # Check cuda available and assign to device
         use_cuda = self.conf['env']['cuda'] and torch.cuda.is_available()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
+        utils.Logger(f'device is located to {self.device}')
 
         # init model
         self.model = self.init_model(self.conf, self.device)
         if self.conf['model']['saved_ckpt'] != '':
             if 'imagenet' in self.conf['model']['saved_ckpt'].lower():
                 self.model.module.load_pretrained_imagenet(self.conf['model']['saved_ckpt'])
-                print(f'{utils.Colors.LIGHT_RED}Model loaded successfully!!! (ImageNet){utils.Colors.END}')
+                utils.Logger().info(f'{utils.Colors.LIGHT_RED}Model loaded successfully!!! (ImageNet){utils.Colors.END}')
             else:
                 self.model.module.load_state_dict(torch.load(self.conf['model']['saved_ckpt']))
-                print(f'{utils.Colors.LIGHT_RED}Model loaded successfully!!! (Custom){utils.Colors.END}')
-        if self.conf['model']['use_model_ema']:
+                utils.Logger().info(f'{utils.Colors.LIGHT_RED}Model loaded successfully!!! (Custom){utils.Colors.END}')
+        if self.conf['model']['use_ema']:
             self.model_ema = timm.utils.ModelEmaV2(self.model, decay=0.9999, device=self.device)
 
         # init dataloader
@@ -99,21 +107,22 @@ class TrainerBase:
         pass
 
     def save_model(self, epoch, metric=None, metric_name='metric'):
-        file_path = self.saved_model_directory + '/'
+        if not self.conf['env']['debug']:
+            file_path = self.saved_model_directory
 
-        file_format = file_path + self.conf['model']['name'] + '-folds_' + str(self.k_fold) + '-' + metric_name + '_' + str(metric)[:6] + '-Epoch_' + str(epoch) + '.pt'
+            file_format = os.path.join(file_path, self.conf['model']['name'] + '-folds_' + str(self.k_fold) + '-' + metric_name + '_' + str(metric)[:6] + '-Epoch_' + str(epoch) + '.pt')
 
-        if not os.path.exists(file_path):
-            os.makedirs(file_path)
+            if not os.path.exists(file_path):
+                os.makedirs(file_path)
 
-        if metric_name in self.model_post_path_dict.keys():
-            os.remove(self.model_post_path_dict[metric_name])
-        self.model_post_path_dict[metric_name] = file_format
+            if metric_name in self.model_post_path_dict.keys():
+                os.remove(self.model_post_path_dict[metric_name])
+            self.model_post_path_dict[metric_name] = file_format
 
-        torch.save(self.model.module.state_dict(), file_format)
+            torch.save(self.model.module.state_dict(), file_format)
 
-        print(f'{utils.Colors.LIGHT_RED}{file_format} model saved!!{utils.Colors.END}')
-        self.last_saved_epoch = epoch
+            utils.Logger().info(f'{utils.Colors.LIGHT_RED}save model to {file_format}{utils.Colors.END}')
+            self.last_saved_epoch = epoch
 
     def check_metric(self, epoch, metric_dict):
         if not hasattr(self, 'metric_best'):
@@ -123,7 +132,7 @@ class TrainerBase:
                 self.save_model(epoch, metric_dict[key], metric_name=key)
         else:
             for key in metric_dict.keys():
-                if (key == 'loss' and metric_dict[key] < self.metric_best[key]) or (key != 'loss' and metric_dict[key] > self.metric_best[key]):
+                if ('loss' in key and metric_dict[key] < self.metric_best[key]) or ('loss' not in key and metric_dict[key] > self.metric_best[key]):
                     self.metric_best[key] = metric_dict[key]
                     self.save_model(epoch, metric_dict[key], metric_name=key)
 
@@ -153,7 +162,7 @@ class TrainerBase:
             elif conf['scheduler']['name'] == 'WarmupConstant':
                 scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=steps_per_epoch * conf['scheduler']['warmup_epoch'])
             else:
-                print(f"{utils.Colors.LIGHT_PURPLE}No scheduler found --> {conf['scheduler']['name']}{utils.Colors.END}")
+                utils.Logger().info(f"{utils.Colors.LIGHT_PURPLE}No scheduler found --> {conf['scheduler']['name']}{utils.Colors.END}")
         else:
             pass
 

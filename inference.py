@@ -101,7 +101,6 @@ class Inferencer:
             utils.log_epoch('validation', epoch, metric_dict, False)
             self.metric_val.reset()
 
-
     def inference_regression(self, epoch):
         self.model.eval()
         metric_dict = {'loss': []}

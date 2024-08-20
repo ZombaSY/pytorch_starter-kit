@@ -94,7 +94,7 @@ class ImageLoader(Dataset):
         self.len = len(self.df)
 
         if self.conf_dataloader['data_cache']:
-            print(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
+            utils.Logger().info(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
                 self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['input'], itertools.repeat(cv2.IMREAD_COLOR)))
 
@@ -142,69 +142,6 @@ class ImageLoader(Dataset):
         return self.len
 
 
-class ImageSSLLoader(ImageLoader):
-
-    def __init__(self, conf, conf_dataloader):
-        super(ImageSSLLoader, self).__init__(conf, conf_dataloader)
-
-
-    def transform_cutmix(self, _input):
-        if self.conf_dataloader['mode'] != 'train':
-            raise Exception('Unsupported mode.')
-
-        random_gen = random.Random()
-
-        transform = self.transform_resize(image=_input)
-        _input = transform['image']
-        cutout_mask = np.zeros(_input.shape[:2], dtype=np.bool_)
-        if random_gen.random() < self.conf_dataloader['augmentations']['transform_cutmix']:
-            rand_n = random_gen.randint(0, self.len - 1)
-            if self.conf_dataloader['data_cache']:
-                _input_refer = self.memory_data_x[rand_n]['data']
-            else:
-                _input_refer = utils.cv2_imread(self.df['input'][rand_n], cv2.IMREAD_COLOR)
-
-            transform_ref = self.transform_resize(image=_input_refer)
-            _input_refer = transform_ref['image']
-            _input, cutout_mask = utils.cut_mix(_input, _input_refer)
-
-        _input = _input.astype(np.uint8)
-        transform = self.transform_augmentation(image=_input)
-
-        norm = self.transforms_normalize(image=transform['image'])
-        _input = norm['image']
-        _input = np.transpose(_input, [2, 0, 1])
-
-        _input = torch.from_numpy(_input.astype(np.float32))
-        cutout_mask = torch.from_numpy(cutout_mask.astype(np.bool_))
-
-        return _input, cutout_mask
-
-    def __getitem__(self, index):
-        if self.conf_dataloader['data_cache']:
-            x_img = self.memory_data_x[index]['data']
-            x_path = self.memory_data_x[index]['path']
-        else:
-            x_path = self.df['input'][index]
-            x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
-
-        if self.conf_dataloader['mode'] == 'train':
-            x_img_target, x_img_target_mask = self.transform_cutmix(x_img)
-
-            x_img_perturbs = torch.empty([0, *x_img_target.shape])
-            x_img_target_np = (torch.permute(x_img_target, [1, 2, 0]).numpy() * self.image_std + self.image_mean) * 255     # re-format the canonical target to numpy array to make perturbations
-            for i in range(self.conf_dataloader['perturbation_nums']):
-                x_img_tr = self.transform(x_img_target_np).unsqueeze(0)
-                x_img_perturbs = torch.cat([x_img_perturbs, x_img_tr], dim=0)
-        else:
-           x_img_target, x_img_target_mask = self.transform(x_img)
-
-        return {'input': x_img_target,
-                'input_mask': x_img_target_mask,
-                'input_perturb': x_img_perturbs,
-                'input_path': x_path}
-
-
 class Image2ImageLoader(Dataset):
 
     def __init__(self, conf, conf_dataloader):
@@ -219,7 +156,7 @@ class Image2ImageLoader(Dataset):
 
         # mount_data_on_memory
         if self.conf_dataloader['data_cache']:
-            print(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
+            utils.Logger().info(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
                 self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['input'], itertools.repeat(cv2.IMREAD_COLOR)))
                 self.memory_data_y = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['label'], itertools.repeat(cv2.IMREAD_GRAYSCALE)))
@@ -313,7 +250,7 @@ class Image2VectorLoader(Dataset):
 
         # mount_data_on_memory
         if self.conf_dataloader['data_cache']:
-            print(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
+            utils.Logger().info(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
             x_img_path = []
             self.memory_data_y = []
             for idx in range(self.len):
@@ -502,27 +439,6 @@ class Image:
         g.manual_seed(3407)
 
         self.image_loader = ImageLoader(conf, conf_dataloader)
-
-        # use your own data loader
-        self.Loader = MultiEpochsDataLoader(self.image_loader,
-                                            batch_size=conf_dataloader['batch_size'],
-                                            num_workers=conf_dataloader['workers'],
-                                            shuffle=(conf_dataloader['mode']=='train'),
-                                            worker_init_fn=seed_worker,
-                                            generator=g,
-                                            pin_memory=True)
-
-    def __len__(self):
-        return self.image_loader.__len__()
-
-
-class ImageSSL:
-
-    def __init__(self, conf, conf_dataloader):
-        g = torch.Generator()
-        g.manual_seed(3407)
-
-        self.image_loader = ImageSSLLoader(conf, conf_dataloader)
 
         # use your own data loader
         self.Loader = MultiEpochsDataLoader(self.image_loader,

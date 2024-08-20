@@ -93,8 +93,8 @@ class TrainerSegmentation(TrainerBase):
             self._validate(epoch)
 
             if (epoch - self.last_saved_epoch) > self.conf['env']['early_stop_epoch']:
-                print('The model seems to be converged. Early stop training.')
-                print(f'Best mIoU -----> {self.metric_best["mIoU"]}')
+                utils.Logger().info('The model seems to be converged. Early stop training.')
+                utils.Logger().info(f'Best mIoU -----> {self.metric_best["mIoU"]}')
                 if self.conf['env']['wandb']:
                     wandb.log({f'Best mIoU': self.metric_best['mIoU']})
                 break

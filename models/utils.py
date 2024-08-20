@@ -6,10 +6,9 @@ import random
 import time
 import os
 import wandb
+import logging
 
-from torch.autograd import Variable
 from timm.models.layers import trunc_normal_
-from matplotlib.image import imread
 from PIL import Image
 from sklearn.neighbors import KernelDensity
 
@@ -42,6 +41,39 @@ class Colors:
     END = "\033[0m"
 
 
+def singleton(obj):
+    instances = {}
+
+    def wrapper(*args, **kwargs):
+        if obj not in instances:
+            instances[obj] = obj(*args, **kwargs)
+        return instances[obj]
+
+    return wrapper
+
+
+@singleton
+class Logger(logging.Logger):
+    def __init__(self, dst, level=logging.INFO):
+        super().__init__('logger')
+        self.setLevel(level)
+        
+        # string formatting
+        print_formatter = logging.Formatter(f'%(message)s')
+        write_formatter = logging.Formatter(f'[%(asctime)s][%(levelname)s|%(filename)s:%(lineno)s] >> %(message)s')
+        
+        # file writing handler
+        stream_handler = logging.StreamHandler()    
+        stream_handler.setFormatter(print_formatter)
+        self.addHandler(stream_handler)
+        
+        # file name handler 
+        if self.level is not logging.DEBUG:
+            file_handler = logging.FileHandler(filename=dst)    
+            file_handler.setFormatter(write_formatter)
+            self.addHandler(file_handler)
+        
+        
 class FunctionTimer:
     def __init__(self, _func):
         self.__func = _func
@@ -49,7 +81,7 @@ class FunctionTimer:
     def __call__(self, *conf, **kwargs):
         tt = time.time()
         self.__func(*conf, **kwargs)
-        print(f'\"{self.__func.__name__}\" play time: {time.time() - tt}')
+        Logger().info(f'\"{self.__func.__name__}\" play time: {time.time() - tt}')
 
     def __enter__(self):
         return self
@@ -186,7 +218,7 @@ def get_mixup_sample_rate(y_list):
         min = np.min(targets)
         max = np.max(targets)
         std = np.std(targets)
-        print(f'y stats: mean = {mean}, max = {max}, min = {min}, std = {std}')
+        Logger().info(f'y stats: mean = {mean}, max = {max}, min = {min}, std = {std}')
         return mean, min, max, std
 
     mix_idx = []
@@ -202,17 +234,10 @@ def get_mixup_sample_rate(y_list):
         data_i = data_list[i]
         data_i = data_i.reshape(-1, data_i.shape[0])  # get 2Dn
 
-        # if i % (data_len // 10) == 0:
-        #     print('Mixup sample prepare {:.2f}%'.format(i * 100.0 / data_len))
-        # if i == 0: print(f'data_list.shape = {data_list.shape}, std(data_list) = {torch.std(data_list)}')#, data_i = {data_i}' + f'data_i.shape = {data_i.shape}')
-
         # KDE sample rate
         kd = KernelDensity(kernel='gaussian', bandwidth=1.75).fit(data_i)  # should be 2D
         each_rate = np.exp(kd.score_samples(data_list))
-        each_rate /= np.sum(each_rate)  # norm
-
-        # visualization: observe relative rate distribution shot
-        # stats_values(each_rate)
+        each_rate /= np.sum(each_rate)
 
         mix_idx.append(each_rate)
 
@@ -304,11 +329,12 @@ def log_epoch(mode, epoch, metric_dict, use_wandb=False):
 
     for key in metric_dict.keys():
         log_str = f'{mode} {key}: {metric_dict[key]}'
-        print(f'{log_color} {epoch} epoch / {log_str} {Colors.END}')
+        Logger().info(f'{log_color} {epoch} epoch / {log_str} {Colors.END}')
 
         if use_wandb:
             wandb.log({f'{mode} {key}': metric_dict[key]},
                         step=epoch)
+
 
 def append_data_stats(data_stats, key, value):
     if key in data_stats.keys():
