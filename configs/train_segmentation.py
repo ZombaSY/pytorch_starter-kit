@@ -46,6 +46,7 @@ conf=dict(
       transform_rand_resize=0.7,
       transform_rand_crop=256,
       transform_rain=0.01,
+      transform_rotate=0.3,
     )
   ),
 

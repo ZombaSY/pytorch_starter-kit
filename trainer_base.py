@@ -33,13 +33,12 @@ class TrainerBase:
             # make direcotry
             if not os.path.exists(self.saved_model_directory):
                 os.makedirs(self.saved_model_directory)
-            
+
             # save configuration
             shutil.copy(self.conf['config_path'], os.path.join(self.saved_model_directory, os.path.split(self.conf['config_path'])[-1]))
 
             # init logger file
             utils.Logger(os.path.join(self.saved_model_directory, 'log.txt'), level=logging.DEBUG if self.conf['env']['debug'] else logging.INFO)
-            
             utils.Logger().info(f'{utils.Colors.BOLD}Running {self.k_fold}th fold...{utils.Colors.END}')
 
         # Check cuda available and assign to device

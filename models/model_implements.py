@@ -94,7 +94,6 @@ class ConvNextV2_l_regression(nn.Module):
         return out_dict
 
 
-
 class Mobileone_s0_landmark(nn.Module):
     def __init__(self, conf_model):
         super().__init__()

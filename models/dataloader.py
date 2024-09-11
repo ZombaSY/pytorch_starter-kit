@@ -34,7 +34,7 @@ def augmentations(conf):
     target_size = conf['transform_rand_crop']
     return [albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=conf['transform_rand_resize']),
             albumentations.RandomCrop(height=target_size, width=target_size, p=1.0),
-            albumentations.CoarseDropout(max_holes=4, max_height=target_size // 8, max_width=target_size // 8, min_height=target_size // 32, min_width=target_size // 32, min_holes=1, p=conf['transform_coarse_dropout']),
+            albumentations.CoarseDropout(max_holes=4, max_height=target_size // 4, max_width=target_size // 4, min_height=target_size // 16, min_width=target_size // 16, min_holes=1, p=conf['transform_coarse_dropout']),
             albumentations.HorizontalFlip(p=conf['transform_hflip']),
             albumentations.VerticalFlip(p=conf['transform_vflip']),
             albumentations.ImageCompression(quality_lower=70, quality_upper=100, p=conf['transform_jpeg']),
@@ -44,7 +44,8 @@ def augmentations(conf):
             albumentations.RandomFog(p=conf['transform_fog']),
             albumentations.GaussNoise(p=conf['transform_g_noise']),
             albumentations.FancyPCA(p=conf['transform_fancyPCA']),
-            albumentations.ColorJitter(brightness=(0.0, 0.3), contrast=(0.0, 0.3), saturation=(0.0, 0.3), hue=(0.0, 0.1), p=conf['transform_jitter']),
+            albumentations.ColorJitter(brightness=(0.7, 1.0), contrast=(0.7, 1.0), saturation=(0.7, 1.0), hue=(-0.05, 0.05), p=conf['transform_jitter']),
+            albumentations.Rotate(limit=(-30, 30), p=conf['transform_rotate']),
             albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=conf['transform_perspective']),
             ]
 
@@ -358,9 +359,9 @@ class Image2LandmarkLoader(Dataset):
                             71, 70, 69, 68, 67, 66, 65, 64,
                             75, 76, 77, 72, 73, 74,
                             79, 78, 81, 80, 83, 82,
-                            90, 89, 88, 87, 86, 85, 84, 95, 94, 93, 92, 91, 100, 99, 98, 97, 96, 103, 102, 101, 105, 104
-                            ]
+                            90, 89, 88, 87, 86, 85, 84, 95, 94, 93, 92, 91, 100, 99, 98, 97, 96, 103, 102, 101, 105, 104]
         self.points_flip = np.array(self.points_flip).tolist()
+
         if 'train' in os.path.split(self.conf_dataloader['data_path'])[-1]:
             sub_dir = 'images_train'
         elif 'valid' in os.path.split(self.conf_dataloader['data_path'])[-1]:
@@ -380,33 +381,36 @@ class Image2LandmarkLoader(Dataset):
         if self.conf_dataloader['mode'] == 'train':
             self.transform_augmentation = albumentations.Compose(
                 augmentations(self.conf_dataloader['augmentations']),
-                keypoint_params=albumentations.KeypointParams(format='xy', remove_invisible=False, angle_in_degrees=True))
+                keypoint_params=albumentations.KeypointParams(format='xy', remove_invisible=False)
+                )
         self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
     def transform(self, _input, _label):
         random_gen = random.Random()
+        _label = _label.reshape(self.conf['model']['num_class'] // 2, 2).astype(np.float32)
         transform = self.transform_resize(image=_input)
         _input = transform['image']
 
         if self.conf_dataloader['mode'] == 'train':
-            if random_gen.random() < self.conf_dataloader['augmentations']['transform_landmark_hflip']:
-                _input, _label = utils.random_hflip(_input, _label, self.points_flip)
 
-            if random_gen.random() < self.conf_dataloader['augmentations']['transform_landmark_rotate']:
-                angle_max = 10
-                theta_max = np.radians(angle_max)
-                theta = random.uniform(-theta_max, theta_max)
-                _input, _label = utils.random_rotate(_input, _label, theta)
+            if random_gen.random() < self.conf_dataloader['augmentations']['transform_landmark_hflip']:
+                _input, _label = utils.random_hflip_landmark(_input, _label, self.points_flip)
 
             _input = _input.astype(np.uint8)
-            transform = self.transform_augmentation(image=_input)
-            _input = transform['image']
+            _label[..., 0] = _label[..., 0] * self.conf_dataloader['input_size'][1]
+            _label[..., 1] = _label[..., 1] * self.conf_dataloader['input_size'][0]
+            transform = self.transform_augmentation(image=_input, keypoints=_label)
+
+            _input, _label = transform['image'], np.array(transform['keypoints']).astype(np.float32)
+            _label[..., 0] = _label[..., 0] / self.conf_dataloader['input_size'][1]
+            _label[..., 1] = _label[..., 1] / self.conf_dataloader['input_size'][0]
 
         norm = self.transforms_normalize(image=_input)
         _input = norm['image']
         _input = np.transpose(_input, [2, 0, 1])
         _input = torch.from_numpy(_input.astype(np.float32))
         _label = torch.from_numpy(_label.astype(np.float32))
+        _label = _label.reshape(self.conf['model']['num_class'])
 
         return _input, _label
 
@@ -422,10 +426,11 @@ class Image2LandmarkLoader(Dataset):
             x_input = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
             y_label = self.xy[index][1]
 
-        x_input, y_label = self.transform(x_input, y_label)
+        x_input_t, y_label_t = self.transform(x_input, y_label)
 
-        return {'input': x_input,
-                'label': y_label,
+        return {'input': x_input_t,
+                'input_ori': x_input,
+                'label': y_label_t,
                 'input_path': x_path}
 
     def __len__(self):

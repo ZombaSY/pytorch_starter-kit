@@ -50,6 +50,7 @@ conf=dict(
       transform_rand_resize=0.0,
       transform_rand_crop=336,
       transform_rain=0.2,
+      transform_rotate=0.3,
       transform_landmark_rotate=0.5,
       transform_landmark_hflip=0.5,
     )

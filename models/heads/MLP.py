@@ -17,9 +17,8 @@ class SimpleClassifier(nn.Module):
             nn.Flatten(start_dim=1),
 
             activation(),
-            DropPath(0.1) if dropblock else nn.Identity(),
+            DropPath(0.2) if dropblock else nn.Identity(),
             normalization(in_features),
-
             nn.Linear(in_features, num_class),
         )
 
