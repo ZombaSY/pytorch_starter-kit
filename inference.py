@@ -1,10 +1,10 @@
 import torch
-import time
 import numpy as np
 import os
 import pandas as pd
 import multiprocessing
 import itertools
+import logging
 
 from models import utils
 from trainer_base import TrainerBase
@@ -13,9 +13,7 @@ from torch.nn import functional as F
 
 
 class Inferencer:
-
     def __init__(self, conf):
-        self.start_time = time.time()
         self.conf = conf
 
         use_cuda = self.conf['env']['cuda'] and torch.cuda.is_available()
@@ -41,6 +39,9 @@ class Inferencer:
         self.image_std = torch.tensor(self.loader_valid.image_loader.image_std).to(self.device)
 
         self.data_stat = {}
+
+        self.saved_model_directory = os.path.split(self.conf['model']['saved_ckpt'])[0]
+        utils.Logger(os.path.join(self.saved_model_directory, 'log-test.txt'), level=logging.DEBUG if self.conf['env']['debug'] else logging.INFO)
 
     def inference_classification(self, epoch):
         self.model.eval()
@@ -109,11 +110,10 @@ class Inferencer:
         for iteration, data in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
                 x_in = data['input']
-                target = data['label']
                 img_id = data['input_path']
+                target = data['label'].to(self.device) if 'label' in data.keys() else None
 
                 x_in = x_in.to(self.device)
-                target = target.to(self.device)  # (shape: (batch_size, img_h, img_w))
 
                 output = self.model(x_in)
 
@@ -132,7 +132,7 @@ class Inferencer:
             metric_dict = {}
             metric_dict['loss'] = loss_mean
 
-            utils.log_epoch('validation', epoch, metric_dict, self.conf['env']['wandb'])
+            utils.log_epoch('validation', epoch, metric_dict, False)
             self.metric_val.reset()
 
     def __post_process_regression(self, x_img, target, output, img_id):
@@ -183,7 +183,7 @@ class Inferencer:
         elif self.conf['env']['task'] == 'regression':
             self.__post_process_regression(x_img, target, output, img_id)
 
-        print(f'iteration {iteration} -> {(iteration + 1) * self.conf["dataloader_valid"]["batch_size"]} images \t Done !!')     # TODO: last iteration is invalid
+        print(f'iteration {iteration} -> {(iteration + 1) * self.conf["dataloader_valid"]["batch_size"]} images done !!')     # TODO: last iteration is invalid
 
     def inference(self):
         if self.conf['env']['task'] == 'segmentation':

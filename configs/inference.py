@@ -10,13 +10,13 @@ conf=dict(
   ),
 
   model=dict(
-    name='ConvNextV2_l_regression',
-    num_class=1,
+    name='Mobileone_s0_regression',
+    num_class=1000,
     in_channel=3,
     normalization='InstanceNorm1d',
     activation='ReLU',
     dropblock=True,
-    saved_ckpt='/path/to/model.pt',
+    use_ema=False,
   ),
 
   dataloader_valid=dict(

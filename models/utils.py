@@ -57,23 +57,23 @@ class Logger(logging.Logger):
     def __init__(self, dst, level=logging.INFO):
         super().__init__('logger')
         self.setLevel(level)
-        
+
         # string formatting
         print_formatter = logging.Formatter(f'%(message)s')
         write_formatter = logging.Formatter(f'[%(asctime)s][%(levelname)s|%(filename)s:%(lineno)s] >> %(message)s')
-        
+
         # file writing handler
-        stream_handler = logging.StreamHandler()    
+        stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(print_formatter)
         self.addHandler(stream_handler)
-        
-        # file name handler 
+
+        # file name handler
         if self.level is not logging.DEBUG:
-            file_handler = logging.FileHandler(filename=dst)    
+            file_handler = logging.FileHandler(filename=dst)
             file_handler.setFormatter(write_formatter)
             self.addHandler(file_handler)
-        
-        
+
+
 class FunctionTimer:
     def __init__(self, _func):
         self.__func = _func
@@ -196,11 +196,7 @@ def denormalize_img(img, mean, std):
 def draw_image(x_img, output_prob, img_save_dir, img_id, n_class):
     img_fn = os.path.splitext(os.path.split(img_id)[-1])[0]
     output_grey = (output_prob * 255).astype(np.uint8)
-
-    # output_grey = np.where(output_grey > 128, 255, 0)
-
-    # output_grey_tmp = np.where(output_grey > 128, 1, 0)[0]
-    # x_img_tmp = x_img * output_grey_tmp[..., None].repeat(3, axis=-1)
+    # output_grey = np.where(output_grey > 128, output_grey, 0)
 
     if not os.path.exists(img_save_dir):
         os.mkdir(img_save_dir)
@@ -252,17 +248,25 @@ def init_weights(m):
         torch.nn.init.constant_(m.bias, 0)
 
 
-def random_hflip(image, target, points_flip):
+def random_hflip_landmark(image, target, points_flip):
     image = cv2.flip(image, 1)  # 1: horizontal
     target = np.array(target).reshape(-1, 2)
     target = target[points_flip, :]
     target[:, 0] = 1 - target[:, 0]
-    target = target.flatten()
 
     return image, target
 
 
-def random_rotate(image, target, theta):
+def random_vflip_landmark(image, target, points_flip):
+    image = cv2.flip(image, 0)  # 0: vertical
+    target = np.array(target).reshape(-1, 2)
+    target = target[points_flip, :]
+    target[:, 1] = 1 - target[:, 1]
+
+    return image, target
+
+
+def random_rotate_landmark(image, target, theta):
     image_center = tuple(np.array(image.shape[1::-1]) / 2)
     rot_mat = cv2.getRotationMatrix2D(image_center, math.degrees(theta), 1.0)
     image = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
@@ -303,16 +307,20 @@ def get_landmark_label(root_path, label_file, task_type=None):
     return labels_new
 
 
-def draw_landmark(img, lmk, save_dir, img_fn):
+def draw_landmark(img, lmk, save_dir, img_fn, put_index=True):
     tmp_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     lmk = np.reshape(lmk, (-1, 2))
     for index in range(lmk.shape[0]):
         tmp_img = cv2.resize(tmp_img, (512, 512))
-        cv2.circle(tmp_img, (int(lmk[index][0] * tmp_img.shape[0]), int(lmk[index][1] * tmp_img.shape[1])), 2, (0, 255, 0), 1)
+        draw_pos = (int(lmk[index][0] * tmp_img.shape[0]), int(lmk[index][1] * tmp_img.shape[1]))
+        cv2.circle(tmp_img, draw_pos, 2, (0, 255, 0), 3)
+        if put_index:
+            cv2.putText(tmp_img, str(index), (draw_pos[0] + 3, draw_pos[1] + 3), cv2.FONT_HERSHEY_PLAIN, 1, (255,0,0), 1)
 
     img_fn = os.path.split(img_fn)[-1]
     fn = os.path.join(save_dir, img_fn)
     cv2_imwrite(fn, tmp_img)
+    np.save(fn.replace('.png', '.npy'), lmk)
 
 
 def multiprocessing_wrapper(conf):
@@ -333,7 +341,7 @@ def log_epoch(mode, epoch, metric_dict, use_wandb=False):
 
         if use_wandb:
             wandb.log({f'{mode} {key}': metric_dict[key]},
-                        step=epoch)
+                      step=epoch)
 
 
 def append_data_stats(data_stats, key, value):
@@ -345,5 +353,5 @@ def append_data_stats(data_stats, key, value):
 
 class TrainerCallBack:
 
-    def train_callback(self):
+    def on_train_start(self):
         pass

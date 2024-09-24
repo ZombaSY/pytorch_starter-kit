@@ -195,7 +195,7 @@ class TrainerBase:
     def init_metric(task_name, num_class):
         if 'segmentation' in task_name:
             metric = metrics.StreamSegMetrics_segmentation(num_class)
-        elif 'classification' or 'regression' or 'landmark' in task_name:
+        elif task_name in ['classification', 'regression', 'landmark']:
             metric = metrics.StreamSegMetrics_classification(num_class)
         else:
             raise Exception('No task named', task_name)

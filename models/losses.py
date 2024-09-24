@@ -267,6 +267,7 @@ class L1loss(nn.Module):
 
         return self.loss(x.squeeze(), y.squeeze())
 
+
 class MSELoss(nn.Module):
     def __init__(self, conf):
         super().__init__()
@@ -692,7 +693,7 @@ class LabelSmoothingCrossEntropyLoss(nn.Module):
 class WingLoss(nn.Module):
     def __init__(self, conf):
         super(  ).__init__()
-        # omega=0.01, epsilon=2
+        # omega=0.1, epsilon=2
         self.omega = conf['omega']
         self.epsilon = conf['epsilon']
 

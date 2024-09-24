@@ -26,6 +26,18 @@ class TrainerRegression(TrainerBase):
 
             output = self.model(x_in)
 
+            '''
+            For visualize input data
+
+            image_mean = torch.tensor(self.loader_train.image_loader.image_mean).to(self.device)
+            image_std = torch.tensor(self.loader_train.image_loader.image_std).to(self.device)
+            x_raw = utils.denormalize_img(x_in, image_mean, image_std).detach().cpu().numpy()
+            for i in range(len(x_raw)):
+                tmp1 = x_raw[i]
+                tmp2 = target[i].detach().cpu().numpy()
+                utils.draw_landmark(tmp1, tmp2, 'input-batch', str(i).zfill(3) + '.png')
+            '''
+
             # compute loss
             loss = self.criterion(output['vec'], target)
             if not torch.isfinite(loss):
@@ -104,5 +116,5 @@ class TrainerRegression(TrainerBase):
                 utils.Logger().info('The model seems to be converged. Early stop training.')
                 utils.Logger().info(f'Best loss -----> {self.metric_best["loss"]}')
                 if self.conf['env']['wandb']:
-                    wandb.log({f'Best f1': self.metric_best['loss']})
+                    wandb.log({f'Best loss': self.metric_best['loss']})
                 break

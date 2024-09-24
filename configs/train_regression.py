@@ -1,3 +1,6 @@
+input_size=[128, 128]   # (height, width)
+crop_size=128
+
 conf=dict(
   env=dict(
     debug=True,
@@ -18,21 +21,26 @@ conf=dict(
     name='Mobileone_s0_regression',
     num_class=1,
     in_channel=3,
-    # base_c=16,
     normalization='InstanceNorm1d',
     activation='ReLU',
     dropblock=True,
+    use_ema=False,
   ),
 
   dataloader_train=dict(
     name='Image2Vector',
     mode='train',
     data_path='/path/to/train.csv',
+    # data_path_folds=['/path/to/train-fold_0.csv',
+    #                  '/path/to/train-fold_1.csv',
+    #                  '/path/to/train-fold_2.csv',
+    #                  '/path/to/train-fold_3.csv',
+    #                  '/path/to/train-fold_4.csv'],
     label_cols=['col1', 'col2', 'col3'],
     data_cache=True,
     weighted_sampler=False,
     batch_size=32,
-    input_size=[448, 448],  # (height, width)
+    input_size=input_size,
     workers=8,
 
     augmentations=dict(
@@ -50,7 +58,7 @@ conf=dict(
       transform_jpeg=0.5,
       transform_perspective=0.1,
       transform_rand_resize=0.0,
-      transform_rand_crop=448,
+      transform_rand_crop=crop_size,
       transform_rain=0.2,
       transform_rotate=0.3,
     )
@@ -59,12 +67,17 @@ conf=dict(
   dataloader_valid=dict(
     name='Image2Vector',
     mode='valid',
-    data_path='/path/to/train.csv',
+    data_path='/path/to/valid.csv',
+    # data_path_folds=['/path/to/valid-fold_0.csv',
+    #                  '/path/to/valid-fold_1.csv',
+    #                  '/path/to/valid-fold_2.csv',
+    #                  '/path/to/valid-fold_3.csv',
+    #                  '/path/to/valid-fold_4.csv'],
     label_cols=['col1', 'col2', 'col3'],
     data_cache=True,
     weighted_sampler=False,
     batch_size=32,
-    input_size=[448, 448],  # (height, width)
+    input_size=input_size,
     workers=8,
   ),
 
@@ -74,9 +87,9 @@ conf=dict(
 
   optimizer=dict(
     name='AdamW',
-    lr=0.001,
-    lr_min=0.0001,
-    weight_decay=0.005,
+    lr=1e-3,
+    lr_min=1e-4,
+    weight_decay=5e-3,
 
     scheduler=dict(
       name='WarmupCosine',

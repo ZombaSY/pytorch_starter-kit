@@ -16,15 +16,15 @@ from datetime import datetime
 
 
 # fix seed for reproducibility
-seed = 3407
-torch.manual_seed(seed)
+SEED = 3407
+torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
 # torch.use_deterministic_algorithms(True)  # raise error if CUDA >= 10.2
 torch.backends.cudnn.benchmark = True
-torch.cuda.manual_seed_all(seed)
-np.random.seed(seed)
-random.seed(seed)
-os.environ['PYTHONHASHSEED'] = str(seed)
+torch.cuda.manual_seed_all(SEED)
+np.random.seed(SEED)
+random.seed(SEED)
+os.environ['PYTHONHASHSEED'] = str(SEED)
 
 
 def init_trainer(conf, now_time, k_fold=0):
