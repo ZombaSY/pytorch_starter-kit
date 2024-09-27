@@ -9,7 +9,26 @@
 - CUDA: 12.4
 
 ## Dataset
-The dataset should be listed in the `[train].csv` with each columns `[input_paths]` and `[label_path]`.
+The dataset should be listed in the `[train].csv` and `[valid].csv` with each columns `[input_paths]` and `[label_paths]`.<br>
+`[input_paths]` and `[label_paths]` can differ from tasks.
+
+```
+# [train].csv
+input_paths             | label_paths
+/path/to/input01.jpg    | /path/to/label01.jpg
+/path/to/input03.jpg    | /path/to/label03.jpg
+/path/to/input04.jpg    | /path/to/label04.jpg
+...                     | ...
+/path/to/input99.jpg    | /path/to/label99.jpg
+```
+```
+# [valid].csv
+input_paths             | label_paths
+/path/to/input02.jpg    | /path/to/label02.jpg
+/path/to/input05.jpg    | /path/to/label05.jpg
+...                     | ...
+/path/to/input98.jpg    | /path/to/label98.jpg
+```
 
 ## Configuration
 All the configurations of train, inference, and export can be easily modified with "configs/[task_name].py"<br>
