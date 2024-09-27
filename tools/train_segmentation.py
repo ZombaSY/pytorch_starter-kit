@@ -1,14 +1,13 @@
 import torch
-import numpy as np
 import wandb
 
 from models import utils
-from trainer_base import TrainerBase
+from tools.trainer_base import TrainerBase
 
 
-class TrainerRegression(TrainerBase):
+class TrainerSegmentation(TrainerBase):
     def __init__(self, conf, now=None, k_fold=0):
-        super(TrainerRegression, self).__init__(conf, now=now, k_fold=k_fold)
+        super(TrainerSegmentation, self).__init__(conf, now=now, k_fold=k_fold)
 
     def _train(self, epoch):
         self.model.train()
@@ -19,27 +18,20 @@ class TrainerRegression(TrainerBase):
             target = data['label']
 
             x_in = x_in.to(self.device)
-            target = target.to(self.device)
+            target = target.long().to(self.device)
 
             if (x_in.shape[0] / torch.cuda.device_count()) <= torch.cuda.device_count():
                 break   # avoid BN issue
 
             output = self.model(x_in)
 
-            '''
-            For visualize input data
-
-            image_mean = torch.tensor(self.loader_train.image_loader.image_mean).to(self.device)
-            image_std = torch.tensor(self.loader_train.image_loader.image_std).to(self.device)
-            x_raw = utils.denormalize_img(x_in, image_mean, image_std).detach().cpu().numpy()
-            for i in range(len(x_raw)):
-                tmp1 = x_raw[i]
-                tmp2 = target[i].detach().cpu().numpy()
-                utils.draw_landmark(tmp1, tmp2, 'input-batch', str(i).zfill(3) + '.png')
-            '''
-
             # compute loss
-            loss = self.criterion(output['vec'], target)
+            loss = self.criterion(output['seg'], target)
+            if 'seg_aux' in output:
+                loss_aux = 0
+                for aux in output['seg_aux']:
+                    loss_aux += self.criterion(aux, target)
+                loss_aux /= len(output['seg_aux'])
             if not torch.isfinite(loss):
                 raise Exception('Loss is NAN. End training.')
 
@@ -66,42 +58,30 @@ class TrainerRegression(TrainerBase):
     def _validate(self, epoch):
         self.model.eval()
 
-        list_score = []
-        list_target = []
-        batch_losses = 0
         for iteration, data in enumerate(self.loader_valid.Loader):
             with torch.no_grad():
                 x_in = data['input']
                 target = data['label']
 
                 x_in = x_in.to(self.device)
-                target = target.to(self.device)
+                target = target.long().to(self.device)
 
                 output = self.model(x_in)
 
-                # compute loss
-                loss = self.criterion(output['vec'], target)
-                if not torch.isfinite(loss):
-                    raise Exception('Loss is NAN. End training.')
+                # compute metric
+                output_argmax = torch.argmax(output['seg'], dim=1).cpu()
+                for b in range(output['seg'].shape[0]):
+                    self.metric_val.update(target[b][0].cpu().detach().numpy(), output_argmax[b].cpu().detach().numpy())
 
-                batch_losses += loss.item()
 
-                target_item = target.cpu().numpy()
-                score_item = output['vec'].detach().cpu().numpy()
-                for b in range(output['vec'].shape[0]):
-                    list_score.append(score_item[b].tolist())
-                    list_target.append(target_item[b].tolist())
-
-        # Calculate the correlation between the two lists
-        correlation1 = np.corrcoef(np.array(list_score).T[0], np.array(list_target).T[0])[0, 1]
-        correlation2 = np.corrcoef(np.array(list_score).T[1], np.array(list_target).T[1])[0, 1]
-        correlation = (correlation1 + correlation2) / 2
-
-        loss_mean = batch_losses / self.loader_valid.Loader.__len__()
+        metrics_out = self.metric_val.get_results()
+        c_iou = [metrics_out['Class IoU'][i] for i in range(self.conf['model']['num_class'])]
+        m_iou = sum(c_iou) / self.conf['model']['num_class']
 
         metric_dict = {}
-        metric_dict['loss'] = loss_mean
-        metric_dict['corr'] = correlation
+        metric_dict['mIoU'] = m_iou
+        for i in range(len(c_iou)):
+            metric_dict[f'cIoU_{i}'] = c_iou[i]
 
         utils.log_epoch('validation', epoch, metric_dict, self.conf['env']['wandb'])
         self.check_metric(epoch, metric_dict)
@@ -114,7 +94,7 @@ class TrainerRegression(TrainerBase):
 
             if (epoch - self.last_saved_epoch) > self.conf['env']['early_stop_epoch']:
                 utils.Logger().info('The model seems to be converged. Early stop training.')
-                utils.Logger().info(f'Best loss -----> {self.metric_best["loss"]}')
+                utils.Logger().info(f'Best mIoU -----> {self.metric_best["mIoU"]}')
                 if self.conf['env']['wandb']:
-                    wandb.log({f'Best loss': self.metric_best['loss']})
+                    wandb.log({f'Best mIoU': self.metric_best['mIoU']})
                 break

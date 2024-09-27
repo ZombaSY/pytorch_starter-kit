@@ -105,13 +105,14 @@ class ImageLoader(Dataset):
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
                 self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['input'], itertools.repeat(cv2.IMREAD_COLOR)))
 
-        self.update_transform()
+        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(self.conf_dataloader)
 
-    def update_transform(self):
-        self.transform_resize = albumentations.Resize(height=self.conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
-        if self.conf_dataloader['mode'] == 'train':
-            self.transform_augmentation = albumentations.Compose(augmentations(self.conf_dataloader['augmentations']))
-        self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
+    def init_transform(self, conf_dataloader):
+        transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
+        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations']))
+        transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
+
+        return transform_resize, transform_augmentation, transforms_normalize
 
     def transform(self, _input):
         if self.conf_dataloader['mode'] == 'train':
@@ -154,38 +155,27 @@ class ImageSSLLoader(ImageLoader):
     def __init__(self, conf, conf_dataloader):
         super(ImageSSLLoader, self).__init__(conf, conf_dataloader)
 
+        # overwrite inherited transforms
+        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(self.conf['dataloader_train'])
+        _, self.transform_augmentation_ssl, _ = self.init_transform(self.conf_dataloader)
 
-    def transform_cutmix(self, _input):
-        if self.conf_dataloader['mode'] != 'train':
-            raise Exception('Unsupported mode.')
+    def transform_ssl(self, _input):
+        if self.conf_dataloader['mode'] == 'train':
+            transform = self.transform_resize(image=_input)
+            _input = transform['image']
 
-        random_gen = random.Random()
-
-        transform = self.transform_resize(image=_input)
-        _input = transform['image']
-        cutout_mask = np.zeros(_input.shape[:2], dtype=np.bool_)
-        if random_gen.random() < self.conf_dataloader['augmentations']['transform_cutmix']:
-            rand_n = random_gen.randint(0, self.len - 1)
-            if self.conf_dataloader['data_cache']:
-                _input_refer = self.memory_data_x[rand_n]['data']
-            else:
-                _input_refer = utils.cv2_imread(self.df['input'][rand_n], cv2.IMREAD_COLOR)
-
-            transform_ref = self.transform_resize(image=_input_refer)
-            _input_refer = transform_ref['image']
-            _input, cutout_mask = utils.cut_mix(_input, _input_refer)
-
-        _input = _input.astype(np.uint8)
-        transform = self.transform_augmentation(image=_input)
+            _input = _input.astype(np.uint8)
+            transform = self.transform_augmentation_ssl(image=_input)
+        else:
+            transform = self.transform_resize(image=_input)
 
         norm = self.transforms_normalize(image=transform['image'])
         _input = norm['image']
         _input = np.transpose(_input, [2, 0, 1])
 
         _input = torch.from_numpy(_input.astype(np.float32))
-        cutout_mask = torch.from_numpy(cutout_mask.astype(np.bool_))
 
-        return _input, cutout_mask
+        return _input
 
     def __getitem__(self, index):
         if self.conf_dataloader['data_cache']:
@@ -196,18 +186,17 @@ class ImageSSLLoader(ImageLoader):
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
 
         if self.conf_dataloader['mode'] == 'train':
-            x_img_target, x_img_target_mask = self.transform_cutmix(x_img)
+            x_img_target = self.transform(x_img)  # canonical target is once transformed by `dataloader_train.augmentation`
 
             x_img_perturbs = torch.empty([0, *x_img_target.shape])
-            x_img_target_np = (torch.permute(x_img_target, [1, 2, 0]).numpy() * self.image_std + self.image_mean) * 255     # re-format the canonical target to numpy array to make perturbations
+            x_img_target_np = (torch.permute(x_img_target, [1, 2, 0]).numpy() * self.image_std + self.image_mean) * 255
             for i in range(self.conf_dataloader['perturbation_nums']):
-                x_img_tr = self.transform(x_img_target_np).unsqueeze(0)
+                x_img_tr = self.transform_ssl(x_img_target_np).unsqueeze(0)
                 x_img_perturbs = torch.cat([x_img_perturbs, x_img_tr], dim=0)
         else:
-           x_img_target, x_img_target_mask = self.transform(x_img)
+           x_img_target = self.transform(x_img)
 
         return {'input': x_img_target,
-                'input_mask': x_img_target_mask,
                 'input_perturb': x_img_perturbs,
                 'input_path': x_path}
 
@@ -231,13 +220,14 @@ class Image2ImageLoader(Dataset):
                 self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['input'], itertools.repeat(cv2.IMREAD_COLOR)))
                 self.memory_data_y = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['label'], itertools.repeat(cv2.IMREAD_GRAYSCALE)))
 
-        self.update_transform()
+        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(self.conf_dataloader)
 
-    def update_transform(self):
-        self.transform_resize = albumentations.Resize(height=self.conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
-        if self.conf_dataloader['mode'] == 'train':
-            self.transform_augmentation = albumentations.Compose(augmentations(self.conf_dataloader['augmentations']))
-        self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
+    def init_transform(self, conf_dataloader):
+        transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
+        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations']))
+        transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
+
+        return transform_resize, transform_augmentation, transforms_normalize
 
     def transform(self, _input, _label):
         random_gen = random.Random()
@@ -340,13 +330,14 @@ class Image2VectorLoader(Dataset):
                 # mix-up
                 self.mixup_sample = np.ones(self.len) / self.len
 
-        self.update_transform()
+        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(self.conf_dataloader)
 
-    def update_transform(self):
-        self.transform_resize = albumentations.Resize(height=self.conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
-        if self.conf_dataloader['mode'] == 'train':
-            self.transform_augmentation = albumentations.Compose(augmentations(self.conf_dataloader['augmentations']))
-        self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
+    def init_transform(self, conf_dataloader):
+        transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
+        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations']))
+        transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
+
+        return transform_resize, transform_augmentation, transforms_normalize
 
     def transform(self, _input, _label):
         random_gen = random.Random()
@@ -459,21 +450,22 @@ class Image2LandmarkLoader(Dataset):
                 self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['input'], itertools.repeat(cv2.IMREAD_COLOR)))
                 self.memory_data_y = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_numpy_data), self.df['label']))
 
-        self.update_transform()
+        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(self.conf_dataloader)
 
-    def update_transform(self):
-        self.transform_resize = albumentations.Resize(height=self.conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
-        if self.conf_dataloader['mode'] == 'train':
-            self.transform_augmentation = albumentations.Compose(
+    def init_transform(self, conf_dataloader):
+        transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
+        transform_augmentation = albumentations.Compose(
                 augmentations(self.conf_dataloader['augmentations']),
-                keypoint_params=albumentations.KeypointParams(format='xy', remove_invisible=False))
-        self.transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
+                keypoint_params=albumentations.KeypointParams(format='xy', remove_invisible=False)
+                )
+        transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
+
+        return transform_resize, transform_augmentation, transforms_normalize
 
     def transform(self, _input, _label):
         random_gen = random.Random()
         transform = self.transform_resize(image=_input)
         _input = transform['image']
-        _label = np.roll(_label, 1, axis=-1) # yx to xy
 
         if self.conf_dataloader['mode'] == 'train':
 

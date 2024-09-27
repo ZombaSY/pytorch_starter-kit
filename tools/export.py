@@ -3,7 +3,7 @@ import time
 import os
 import onnx
 
-from trainer_base import TrainerBase
+from tools.trainer_base import TrainerBase
 from onnxsim import simplify
 
 
@@ -35,6 +35,5 @@ class Exportor:
         print('onnx simplified!')
 
     def export(self):
-        # execution squence
         self.torch2onnx()
         self.onnx_simplify()

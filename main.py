@@ -7,11 +7,13 @@ import ast
 import sys
 import importlib
 
-from export import Exportor
-from train_segmentation import TrainerSegmentation
-from train_regression import TrainerRegression
-from train_classification import TrainerClassification
-from inference import Inferencer
+from tools.export import Exportor
+from tools.train_segmentation import TrainerSegmentation
+from tools.train_segmentation_ssl import TrainerSegmentationSSL
+from tools.train_regression import TrainerRegression
+from tools.train_regression_ssl import TrainerRegressionSSL
+from tools.train_classification import TrainerClassification
+from tools.inference import Inferencer
 from datetime import datetime
 
 
@@ -30,10 +32,14 @@ os.environ['PYTHONHASHSEED'] = str(SEED)
 def init_trainer(conf, now_time, k_fold=0):
     if conf['env']['task'] == 'segmentation':
         trainer = TrainerSegmentation(conf, now_time, k_fold=k_fold)
+    elif conf['env']['task'] == 'segmentation-ssl':
+        trainer = TrainerSegmentationSSL(conf, now_time, k_fold=k_fold)
     elif conf['env']['task'] == 'classification':
         trainer = TrainerClassification(conf, now_time, k_fold=k_fold)
-    elif conf['env']['task'] == 'regression':
+    elif conf['env']['task'] in ['regression', 'landmark']:
         trainer = TrainerRegression(conf, now_time, k_fold=k_fold)
+    elif conf['env']['task'] in ['regression-ssl', 'landmark-ssl']:
+        trainer = TrainerRegressionSSL(conf, now_time, k_fold=k_fold)
     else:
         raise ValueError('No trainer found.')
 
@@ -80,6 +86,7 @@ def main():
         for key in conf:
             if 'dataloader' in key:
                 conf[key]['data_cache'] = False
+        # conf.transform_mixup = 0
 
     if conf['env']['mode'] == 'train':
         # check K-folds
@@ -106,7 +113,7 @@ def main():
         exportor = Exportor(conf)
 
         if conf['export']['target'] == 'onnx':
-            exportor.torch2onnx()
+            exportor.export()
         else:
             raise ValueError(f"unsupported target: {conf['export']['target']}")
 

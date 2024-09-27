@@ -2,7 +2,7 @@ import torch
 import wandb
 
 from models import utils
-from trainer_base import TrainerBase
+from tools.trainer_base import TrainerBase
 
 
 class TrainerClassification(TrainerBase):
@@ -94,7 +94,7 @@ class TrainerClassification(TrainerBase):
 
             if (epoch - self.last_saved_epoch) > self.conf['env']['early_stop_epoch']:
                 utils.Logger().info('The model seems to be converged. Early stop training.')
-                utils.Logger().info(f'Best acc -----> {self.metric_best["f1"]}')
+                utils.Logger().info(f'Best f1 -----> {self.metric_best["f1"]}')
                 if self.conf['env']['wandb']:
                     wandb.log({f'Best f1': self.metric_best['f1']})
                 break

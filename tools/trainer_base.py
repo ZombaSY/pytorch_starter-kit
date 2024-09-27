@@ -120,7 +120,7 @@ class TrainerBase:
 
             torch.save(self.model.module.state_dict(), file_format)
 
-            utils.Logger().info(f'{utils.Colors.LIGHT_RED}save model to {file_format}{utils.Colors.END}')
+            utils.Logger().info(f'{utils.Colors.LIGHT_RED}model saved -> {file_format}{utils.Colors.END}')
             self.last_saved_epoch = epoch
 
     def check_metric(self, epoch, metric_dict):
@@ -195,7 +195,7 @@ class TrainerBase:
     def init_metric(task_name, num_class):
         if 'segmentation' in task_name:
             metric = metrics.StreamSegMetrics_segmentation(num_class)
-        elif task_name in ['classification', 'regression', 'landmark']:
+        elif task_name in ['classification', 'regression', 'landmark', 'regression-ssl', 'landmark-ssl']:
             metric = metrics.StreamSegMetrics_classification(num_class)
         else:
             raise Exception('No task named', task_name)

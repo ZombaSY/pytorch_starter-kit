@@ -10,9 +10,8 @@ conf=dict(
     wandb=True,
     saved_model_directory='model_ckpt',
     project_name='wandb_project',
-    task='regression',
-
-    train_fold=2,
+    task='landmark',
+    train_fold=1,
     epoch=10000,
     early_stop_epoch=300,
   ),

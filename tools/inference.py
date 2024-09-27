@@ -1,4 +1,5 @@
 import torch
+import time
 import numpy as np
 import os
 import pandas as pd
@@ -7,7 +8,7 @@ import itertools
 import logging
 
 from models import utils
-from trainer_base import TrainerBase
+from tools.trainer_base import TrainerBase
 
 from torch.nn import functional as F
 
