@@ -7,11 +7,11 @@ import cv2
 import multiprocessing
 import albumentations
 import itertools
+import copy
 
 from torch.utils.data import Dataset
 from torch.nn import functional as F
 from models import utils
-from main import SEED
 
 
 # fix randomness on DataLoader
@@ -109,7 +109,7 @@ class ImageLoader(Dataset):
 
     def init_transform(self, conf_dataloader):
         transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
-        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations']))
+        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations'])) if conf_dataloader['mode'] == 'train' else None
         transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
         return transform_resize, transform_augmentation, transforms_normalize
@@ -140,7 +140,7 @@ class ImageLoader(Dataset):
             x_path = self.df['input'][index]
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
 
-        x_img_tr = self.transform(x_img)
+        x_img_tr = self.transform(copy.deepcopy(x_img))
 
         return {'input': x_img_tr,
                 'input_path': x_path,
@@ -186,12 +186,12 @@ class ImageSSLLoader(ImageLoader):
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
 
         if self.conf_dataloader['mode'] == 'train':
-            x_img_target = self.transform(x_img)  # canonical target is once transformed by `dataloader_train.augmentation`
+            x_img_target = self.transform(copy.deepcopy(x_img))  # canonical target is once transformed by `dataloader_train.augmentation`
 
             x_img_perturbs = torch.empty([0, *x_img_target.shape])
             x_img_target_np = (torch.permute(x_img_target, [1, 2, 0]).numpy() * self.image_std + self.image_mean) * 255
             for i in range(self.conf_dataloader['perturbation_nums']):
-                x_img_tr = self.transform_ssl(x_img_target_np).unsqueeze(0)
+                x_img_tr = self.transform_ssl(copy.deepcopy(x_img_target_np)).unsqueeze(0)
                 x_img_perturbs = torch.cat([x_img_perturbs, x_img_tr], dim=0)
         else:
            x_img_target = self.transform(x_img)
@@ -224,7 +224,7 @@ class Image2ImageLoader(Dataset):
 
     def init_transform(self, conf_dataloader):
         transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
-        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations']))
+        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations'])) if conf_dataloader['mode'] == 'train' else None
         transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
         return transform_resize, transform_augmentation, transforms_normalize
@@ -285,7 +285,7 @@ class Image2ImageLoader(Dataset):
             img_x = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
             img_y = utils.cv2_imread(y_path, cv2.IMREAD_GRAYSCALE)
 
-        img_x_tr, img_y_tr = self.transform(img_x, img_y)
+        img_x_tr, img_y_tr = self.transform(copy.deepcopy(img_x), copy.deepcopy(img_y))
 
         return {'input': img_x_tr,
                 'label': img_y_tr,
@@ -334,7 +334,7 @@ class Image2VectorLoader(Dataset):
 
     def init_transform(self, conf_dataloader):
         transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
-        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations']))
+        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations'])) if conf_dataloader['mode'] == 'train' else None
         transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
         return transform_resize, transform_augmentation, transforms_normalize
@@ -395,7 +395,7 @@ class Image2VectorLoader(Dataset):
             if self.conf['env']['task'] == 'classification' and self.conf_dataloader['mode'] != 'test':
                 y_vec = F.one_hot(y_vec, num_classes=self.conf['model']['num_class'])
 
-        x_img_tr, y_vec = self.transform(x_img, y_vec)
+        x_img_tr, y_vec = self.transform(copy.deepcopy(x_img), copy.deepcopy(y_vec))
 
         return {'input': x_img_tr,
                 'label': y_vec,
@@ -433,11 +433,10 @@ class Image2LandmarkLoader(Dataset):
          0,  1,  2,  3,  4,  5,]
         '''
         self.points_hflip = [5,  4,  3,  2,  1,  0,
-                             11, 10, 9,  8,  7,  6,
-                             17, 16, 15, 14, 13, 12,
-                             23, 22, 21, 20, 19, 18]
-
-        self.image_mean = [0.5, 0.5, 0.5]
+			     11, 10 ,9,  8,  7,  6,
+			     17, 16, 15, 14, 13, 12,
+			     23, 22, 21, 20, 19, 18]
+	self.image_mean = [0.5, 0.5, 0.5]
         self.image_std = [0.25, 0.25, 0.25]
 
         self.df = pd.read_csv(conf_dataloader['data_path'])
@@ -455,9 +454,9 @@ class Image2LandmarkLoader(Dataset):
     def init_transform(self, conf_dataloader):
         transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
         transform_augmentation = albumentations.Compose(
-                augmentations(self.conf_dataloader['augmentations']),
+                augmentations(conf_dataloader['augmentations']),
                 keypoint_params=albumentations.KeypointParams(format='xy', remove_invisible=False)
-                )
+                ) if conf_dataloader['mode'] == 'train' else None
         transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
         return transform_resize, transform_augmentation, transforms_normalize
@@ -504,7 +503,7 @@ class Image2LandmarkLoader(Dataset):
             img_x = read_image_data(x_path, cv2.IMREAD_COLOR)['data']
             img_y = read_numpy_data(y_path)['data']
 
-        img_x_tr, img_y_tr = self.transform(img_x, img_y)
+        img_x_tr, img_y_tr = self.transform(copy.deepcopy(img_x), copy.deepcopy(img_y))
 
         return {'input': img_x_tr,
                 'label': img_y_tr,
@@ -519,7 +518,7 @@ class Image:
 
     def __init__(self, conf, conf_dataloader):
         g = torch.Generator()
-        g.manual_seed(3407)
+        g.manual_seed(utils.SEED)
 
         self.image_loader = ImageLoader(conf, conf_dataloader)
 
@@ -540,7 +539,7 @@ class ImageSSL:
 
     def __init__(self, conf, conf_dataloader):
         g = torch.Generator()
-        g.manual_seed(SEED)
+        g.manual_seed(utils.SEED)
 
         self.image_loader = ImageSSLLoader(conf, conf_dataloader)
 
@@ -561,7 +560,7 @@ class Image2Image:
 
     def __init__(self, conf, conf_dataloader):
         g = torch.Generator()
-        g.manual_seed(3407)
+        g.manual_seed(utils.SEED)
 
         self.image_loader = Image2ImageLoader(conf, conf_dataloader)
 
@@ -582,7 +581,7 @@ class Image2Vector:
 
     def __init__(self, conf, conf_dataloader):
         g = torch.Generator()
-        g.manual_seed(3407)
+        g.manual_seed(utils.SEED)
 
         self.image_loader = Image2VectorLoader(conf, conf_dataloader)
 
@@ -614,7 +613,7 @@ class Image2Vector:
 class Image2Landmark:
     def __init__(self, conf, conf_dataloader):
         g = torch.Generator()
-        g.manual_seed(SEED)
+        g.manual_seed(utils.SEED)
 
         self.image_loader = Image2LandmarkLoader(conf, conf_dataloader)
 

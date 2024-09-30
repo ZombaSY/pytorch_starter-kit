@@ -15,10 +15,10 @@ from tools.train_regression_ssl import TrainerRegressionSSL
 from tools.train_classification import TrainerClassification
 from tools.inference import Inferencer
 from datetime import datetime
+from models.utils import SEED
 
 
 # fix seed for reproducibility
-SEED = 3407
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
 # torch.use_deterministic_algorithms(True)  # raise error if CUDA >= 10.2

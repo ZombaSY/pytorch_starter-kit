@@ -12,6 +12,8 @@ from timm.models.layers import trunc_normal_
 from PIL import Image
 from sklearn.neighbors import KernelDensity
 
+SEED = 3407
+
 
 class Colors:
     """ ANSI color codes """
