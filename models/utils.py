@@ -322,7 +322,7 @@ def draw_landmark(img, lmk, save_dir, img_fn, put_index=True):
     img_fn = os.path.split(img_fn)[-1]
     fn = os.path.join(save_dir, img_fn)
     cv2_imwrite(fn, tmp_img)
-    np.save(fn.replace('.png', '.npy'), lmk)
+    np.save(fn.replace('.png', '.npy').replace('.jpg', '.npy'), lmk)
 
 
 def multiprocessing_wrapper(conf):

@@ -6,9 +6,10 @@ import ptflops
 import cv2
 import importlib
 
+from accelerate import Accelerator
 from models import losses as loss_hub
 from models import lr_scheduler
-from trainer_base import TrainerBase
+from tools.trainer_base import TrainerBase
 
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
@@ -16,11 +17,13 @@ os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 class ModelMini:
     def __init__(self):
         self.device = 'cuda'
-        self.x = torch.rand([4, 3, 336, 336]).to(self.device)
-        self.y = torch.rand([4, 1, 336, 336]).to(self.device).long()
+        self.accelerator = Accelerator()
+
+        self.x = torch.rand([4, 3, 128, 128]).to(self.device)
+        self.y = torch.rand([4, 1, 128, 128]).to(self.device).long()
 
         # select model configuraiton and load from configs for test
-        spec = importlib.util.spec_from_file_location("conf", 'configs/train_segmentation.py')
+        spec = importlib.util.spec_from_file_location("conf", 'configs/train_landmark.py')
         imported_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(imported_module)
         self.conf = imported_module.conf
@@ -28,7 +31,7 @@ class ModelMini:
         self.model = TrainerBase.init_model(self.conf , self.device)
 
         self.model.to(self.device)
-        self.criterion = TrainerBase.init_criterion(self.conf['criterion'], self.device)
+        self.criterion = loss_hub.CrossEntropyLoss(self.conf ['criterion'])
 
         self.optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.model.parameters()),
                                            lr=1e-2, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-3)
@@ -43,10 +46,12 @@ class ModelMini:
                                                            cycles=self.cycles,
                                                            last_epoch=-1)
 
+        self.model, self.optimizer = self.accelerator.prepare(self.model, self.optimizer)
+
         # torch.save(self.model.get_saved_weight(), 'unet.pt')
-        self.train_mini()
-        self.inference()
-        # self.measure_computations()
+        # self.train_mini()
+        # self.inference()
+        self.measure_computations()
         # self.measure_inference_time()
         # self.measure_memory_consumption()
         # self.save_jit()
@@ -64,8 +69,8 @@ class ModelMini:
             for step in range(self.steps):
                 out = self.model(self.x)
                 loss = self.criterion(out['seg'], self.y)
-                print(loss)
-                loss.backward()
+                # self.accelerator.backward(loss)
+                self.accelerator.backward(loss)
                 self.optimizer.zero_grad()
                 self.optimizer.step()
                 self.scheduler.step()

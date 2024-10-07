@@ -72,7 +72,7 @@ class TrainerRegressionSSL(TrainerRegression):
 
             if (epoch - self.last_saved_epoch) > self.conf['env']['early_stop_epoch' ]:
                 utils.Logger().info('The model seems to be converged. Early stop training.')
-                utils.Logger().info(f'Best mIoU -----> {self.metric_best["mIoU"]}')
+                utils.Logger().info(f'Best loss -----> {self.metric_best["loss"]}')
                 if self.conf['env']['wandb']:
-                    wandb.log({f'Best mIoU': self.metric_best['mIoU']})
+                    wandb.log({f'Best loss': self.metric_best['loss']})
                 break
