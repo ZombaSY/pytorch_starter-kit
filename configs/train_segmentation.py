@@ -53,6 +53,7 @@ conf=dict(
       transform_perspective=0.1,
       transform_rand_resize=0.7,
       transform_rand_crop=crop_size,
+      transform_resize=input_size,
       transform_rain=0.01,
       transform_rotate=0.3,
     )

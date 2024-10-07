@@ -36,23 +36,24 @@ def read_numpy_data(path):
     return {'data': data, 'path': path}
 
 
-def augmentations(conf):
-    target_size = conf['transform_rand_crop']
-    return [albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=conf['transform_rand_resize']),
-            albumentations.RandomCrop(height=target_size, width=target_size, p=1.0),
-            albumentations.CoarseDropout(max_holes=4, max_height=target_size // 4, max_width=target_size // 4, min_height=target_size // 16, min_width=target_size // 16, min_holes=1, p=conf['transform_coarse_dropout']),
-            albumentations.HorizontalFlip(p=conf['transform_hflip']),
-            albumentations.VerticalFlip(p=conf['transform_vflip']),
-            albumentations.ImageCompression(quality_lower=70, quality_upper=100, p=conf['transform_jpeg']),
-            albumentations.GaussianBlur(p=conf['transform_blur']),
-            albumentations.CLAHE(p=conf['transform_clahe']),
-            albumentations.RandomRain(p=conf['transform_rain']),
-            albumentations.RandomFog(p=conf['transform_fog']),
-            albumentations.GaussNoise(p=conf['transform_g_noise']),
-            albumentations.FancyPCA(p=conf['transform_fancyPCA']),
-            albumentations.ColorJitter(brightness=(0.7, 1.0), contrast=(0.7, 1.0), saturation=(0.7, 1.0), hue=(-0.05, 0.05), p=conf['transform_jitter']),
-            albumentations.Rotate(limit=(-30, 30), p=conf['transform_rotate']),
-            albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=conf['transform_perspective']),
+def augmentations(conf_augmentation):
+    crop_size = conf_augmentation['transform_rand_crop']
+    return [albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=conf_augmentation['transform_rand_resize']),
+            albumentations.RandomCrop(height=crop_size, width=crop_size, p=1.0),
+            albumentations.CoarseDropout(max_holes=4, max_height=crop_size // 4, max_width=crop_size // 4, min_height=crop_size // 16, min_width=crop_size // 16, min_holes=1, p=conf_augmentation['transform_coarse_dropout']),
+            albumentations.HorizontalFlip(p=conf_augmentation['transform_hflip']),
+            albumentations.VerticalFlip(p=conf_augmentation['transform_vflip']),
+            albumentations.ImageCompression(quality_lower=70, quality_upper=100, p=conf_augmentation['transform_jpeg']),
+            albumentations.GaussianBlur(p=conf_augmentation['transform_blur']),
+            albumentations.CLAHE(p=conf_augmentation['transform_clahe']),
+            albumentations.RandomRain(p=conf_augmentation['transform_rain']),
+            albumentations.RandomFog(p=conf_augmentation['transform_fog']),
+            albumentations.GaussNoise(p=conf_augmentation['transform_g_noise']),
+            albumentations.FancyPCA(p=conf_augmentation['transform_fancyPCA']),
+            albumentations.ColorJitter(brightness=(0.7, 1.0), contrast=(0.7, 1.0), saturation=(0.7, 1.0), hue=(-0.05, 0.05), p=conf_augmentation['transform_jitter']),
+            albumentations.Rotate(limit=(-30, 30), p=conf_augmentation['transform_rotate']),
+            albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=conf_augmentation['transform_perspective']),
+            albumentations.Resize(conf_augmentation['transform_resize'][0], width=conf_augmentation['transform_resize'][1], p=1)
             ]
 
 
