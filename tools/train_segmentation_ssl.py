@@ -68,7 +68,6 @@ class TrainerSegmentationSSL(TrainerSegmentation):
             self._validate(epoch)
             if epoch >= self.conf['dataloader_ssl']['train_warmup_epoch']:
                 self._train_ssl(epoch)
-                self._validate(epoch)
 
             if (epoch - self.last_saved_epoch) > self.conf['env']['early_stop_epoch' ]:
                 utils.Logger().info('The model seems to be converged. Early stop training.')
