@@ -81,8 +81,8 @@ conf=dict(
   optimizer=dict(
     name='AdamW',
     lr=1e-5,
-    lr_min=5e-7
-    weight_decay=5e-3
+    lr_min=5e-7,
+    weight_decay=5e-3,
 
     scheduler=dict(
       name='WarmupCosine',
