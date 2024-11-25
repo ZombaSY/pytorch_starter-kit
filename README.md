@@ -1,4 +1,4 @@
-# Pytorch starter-kit poject for newers
+# Pytorch starter-kit for beginners
 
 
 ## Environments
