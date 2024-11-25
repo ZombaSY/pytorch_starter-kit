@@ -437,7 +437,7 @@ class Image2LandmarkLoader(Dataset):
 			     11, 10 ,9,  8,  7,  6,
 			     17, 16, 15, 14, 13, 12,
 			     23, 22, 21, 20, 19, 18]
-	self.image_mean = [0.5, 0.5, 0.5]
+        self.image_mean = [0.5, 0.5, 0.5]
         self.image_std = [0.25, 0.25, 0.25]
 
         self.df = pd.read_csv(conf_dataloader['data_path'])
