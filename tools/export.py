@@ -35,6 +35,12 @@ class Exportor:
         dummy_input = torch.autograd.Variable(torch.randn(self.conf['export']['input_shape'])).to(self.device)
         torch.onnx.export(self.model, dummy_input, self.save_dir + '.onnx', opset_version=self.conf['export']['opset_version'])
 
+    def torch2torchscript(self):
+        with torch.no_grad():
+            self.model.eval()
+            m = torch.jit.script(self.model)
+            torch.jit.save(m, self.save_dir + '.torchscript')
+
     def onnx_simplify(self):
         onnx_model = onnx.load(self.save_dir + '.onnx')
         onnx_model, check = simplify(onnx_model)
