@@ -118,7 +118,6 @@ class Exportor:
     def pb2tfjs(self):
         tfjs.converters.convert_tf_saved_model(self.save_dir, os.path.join(self.save_dir, 'tfjs'))
 
-
     def export(self):
         self.torch2onnx()
         self.onnx_simplify()

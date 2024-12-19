@@ -156,7 +156,7 @@ class ImageSSLLoader(ImageLoader):
     def __init__(self, conf, conf_dataloader):
         super(ImageSSLLoader, self).__init__(conf, conf_dataloader)
 
-        # overwrite inherited transforms
+        # overwrite inherited transforms with `train` status
         self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(self.conf['dataloader_train'])
         _, self.transform_augmentation_ssl, _ = self.init_transform(self.conf_dataloader)
 

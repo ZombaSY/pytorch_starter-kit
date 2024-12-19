@@ -74,7 +74,7 @@ class TrainerClassification(TrainerBase):
 
                 # compute metric
                 output_argmax = torch.argmax(output['vec'], dim=1).detach().cpu().numpy()
-                target_argmax = torch.argmax(target.squeeze() if (self.conf['dataloader']['batch_size'] // 4) != 1 else target, dim=1).detach().cpu().numpy()
+                target_argmax = torch.argmax(target.squeeze(), dim=1).detach().cpu().numpy()
                 self.metric_val.update(output_argmax, target_argmax)
 
         metric_result = self.metric_val.get_results()
