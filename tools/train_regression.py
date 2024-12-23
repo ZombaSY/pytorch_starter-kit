@@ -84,16 +84,13 @@ class TrainerRegression(TrainerBase):
 
                 batch_losses += loss.item()
 
-                target_item = target.cpu().numpy()
-                score_item = output['vec'].detach().cpu().numpy()
-                for b in range(output['vec'].shape[0]):
-                    list_score.append(score_item[b].tolist())
-                    list_target.append(target_item[b].tolist())
+                score_item = output['vec'].detach().squeeze().cpu().numpy().tolist()
+                target_item = target.squeeze().cpu().numpy().tolist()
 
-        # Calculate the correlation between the two lists
-        correlation1 = np.corrcoef(np.array(list_score).T[0], np.array(list_target).T[0])[0, 1]
-        correlation2 = np.corrcoef(np.array(list_score).T[1], np.array(list_target).T[1])[0, 1]
-        correlation = (correlation1 + correlation2) / 2
+                list_score.extend(score_item)
+                list_target.extend(target_item)
+
+        correlation = np.corrcoef(np.array(list_score), np.array(list_target))[0, 1]
 
         loss_mean = batch_losses / self.loader_valid.Loader.__len__()
 
