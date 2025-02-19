@@ -83,10 +83,11 @@ conf=dict(
     lr=1e-5,
     lr_min=5e-7,
     weight_decay=5e-3,
+  ),
 
-    scheduler=dict(
-      name='WarmupCosine',
-      cycles=50,
-      warmup_epoch=20),
+  scheduler=dict(
+    name='WarmupCosine',
+    cycles=50,
+    warmup_epoch=20
   ),
 )

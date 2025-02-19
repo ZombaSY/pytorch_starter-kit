@@ -56,6 +56,7 @@ class TrainerRegression(TrainerBase):
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
 
         metric_dict = {}
+        metric_dict['lr'] = self.get_learning_rate()
         metric_dict['loss'] = loss_mean
 
         utils.log_epoch('train', epoch, metric_dict, self.conf['env']['wandb'])

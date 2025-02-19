@@ -135,6 +135,10 @@ class TrainerBase:
                     self.metric_best[key] = metric_dict[key]
                     self.save_model(epoch, metric_dict[key], metric_name=key)
 
+    def get_learning_rate(self):
+        for param_group in self.optimizer.param_groups:
+            return param_group['lr']
+
     @staticmethod
     def init_data_loader(conf,
                          conf_dataloader):
@@ -147,23 +151,20 @@ class TrainerBase:
         scheduler = None
         steps_per_epoch = math.ceil((data_loader.__len__() / conf_dataloader['batch_size']))
 
-        if hasattr(conf, 'scheduler'):
-            if conf['scheduler']['name'] == 'WarmupCosine':
-                scheduler = lr_scheduler.WarmupCosineSchedule(optimizer=optimizer,
-                                                              warmup_steps=steps_per_epoch * conf['scheduler']['warmup_epoch'],
-                                                              t_total=conf['env']['epoch'] * steps_per_epoch,
-                                                              cycles=conf['env']['epoch'] / conf['scheduler']['cycles'],
-                                                              last_epoch=-1)
-            elif conf['scheduler']['name'] == 'CosineAnnealing':
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=conf['scheduler']['cycles'], eta_min=conf['scheduler']['lr_min'])
-            elif conf['scheduler']['name'] == 'Constant':
-                scheduler = lr_scheduler.ConstantLRSchedule(optimizer, last_epoch=-1)
-            elif conf['scheduler']['name'] == 'WarmupConstant':
-                scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=steps_per_epoch * conf['scheduler']['warmup_epoch'])
-            else:
-                utils.Logger().info(f"{utils.Colors.LIGHT_PURPLE}No scheduler found --> {conf['scheduler']['name']}{utils.Colors.END}")
+        if conf['scheduler']['name'] == 'WarmupCosine':
+            scheduler = lr_scheduler.WarmupCosineSchedule(optimizer=optimizer,
+                                                            warmup_steps=steps_per_epoch * conf['scheduler']['warmup_epoch'],
+                                                            t_total=conf['env']['epoch'] * steps_per_epoch,
+                                                            cycles=conf['env']['epoch'] / conf['scheduler']['cycles'],
+                                                            last_epoch=-1)
+        elif conf['scheduler']['name'] == 'CosineAnnealing':
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=conf['scheduler']['cycles'], eta_min=conf['scheduler']['lr_min'])
+        elif conf['scheduler']['name'] == 'Constant':
+            scheduler = lr_scheduler.ConstantLRSchedule(optimizer, last_epoch=-1)
+        elif conf['scheduler']['name'] == 'WarmupConstant':
+            scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=steps_per_epoch * conf['scheduler']['warmup_epoch'])
         else:
-            pass
+            utils.Logger().info(f"{utils.Colors.LIGHT_PURPLE}No scheduler found --> {conf['scheduler']['name']}{utils.Colors.END}")
 
         return scheduler
 
