@@ -44,7 +44,7 @@ class TrainerBase:
         # Check cuda available and assign to device
         use_cuda = self.conf['env']['cuda'] and torch.cuda.is_available()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
-        utils.Logger(f'device is located to {self.device}')
+        utils.Logger().info(f'device is located to {self.device}')
 
         # init model
         self.model = self.init_model(self.conf, self.device)

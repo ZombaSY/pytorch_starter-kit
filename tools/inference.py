@@ -69,9 +69,6 @@ class Inferencer:
 
             utils.log_epoch('validation', epoch, metric_dict, False)
 
-            df = pd.DataFrame({'fn': self.loader_valid.image_loader.df['img_path'],
-                            'label': self.metric_val.get_pred_flatten()})
-            df.to_csv(self.save_dir + '_out.csv', encoding='utf-8-sig', index=False)
             self.metric_val.reset()
 
     def inference_segmentation(self, epoch):
@@ -195,5 +192,6 @@ class Inferencer:
             self.inference_regression(0)
 
         # save meta data
-        df = pd.DataFrame(self.data_stat)
-        df.to_csv(self.save_dir + '_out.csv', encoding='utf-8-sig', index=False)
+        if self.conf['env']['mode'] == 'valid':
+            df = pd.DataFrame(self.data_stat)
+            df.to_csv(self.save_dir + '_out.csv', encoding='utf-8-sig', index=False)
