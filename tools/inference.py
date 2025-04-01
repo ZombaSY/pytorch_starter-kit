@@ -42,7 +42,7 @@ class Inferencer:
         self.data_stat = {}
 
         self.saved_model_directory = os.path.split(self.conf['model']['saved_ckpt'])[0]
-        utils.Logger(os.path.join(self.saved_model_directory, 'log-test.txt'), level=logging.DEBUG if self.conf['env']['debug'] else logging.INFO)
+        utils.Logger('log.txt', level=logging.DEBUG if self.conf['env']['debug'] else logging.INFO)
 
     def inference_classification(self, epoch):
         self.model.eval()

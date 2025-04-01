@@ -40,6 +40,8 @@ class TrainerBase:
             # init logger file
             utils.Logger(os.path.join(self.saved_model_directory, 'log.txt'), level=logging.DEBUG if self.conf['env']['debug'] else logging.INFO)
             utils.Logger().info(f'{utils.Colors.BOLD}Running {self.k_fold}th fold...{utils.Colors.END}')
+        else:
+            utils.Logger('log.txt', level=logging.DEBUG if self.conf['env']['debug'] else logging.INFO)
 
         # Check cuda available and assign to device
         use_cuda = self.conf['env']['cuda'] and torch.cuda.is_available()
