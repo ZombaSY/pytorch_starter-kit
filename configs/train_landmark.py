@@ -1,5 +1,6 @@
 input_size=[128, 128]   # (height, width)
 crop_size=128
+data_cache=True
 
 conf=dict(
     env=dict(
@@ -37,7 +38,7 @@ conf=dict(
         #                  '/path/to/train-fold_2.csv',
         #                  '/path/to/train-fold_3.csv',
         #                  '/path/to/train-fold_4.csv'],
-        data_cache=True,
+        data_cache=data_cache,
         weighted_sampler=False,
         batch_size=64,
         input_size=input_size,
@@ -74,7 +75,7 @@ conf=dict(
         #                  '/path/to/valid-fold_2.csv',
         #                  '/path/to/valid-fold_3.csv',
         #                  '/path/to/valid-fold_4.csv'],
-        data_cache=True,
+        data_cache=data_cache,
         weighted_sampler=False,
         batch_size=64,
         input_size=input_size,

@@ -49,6 +49,25 @@ class SimpleClassifier(nn.Module):
         return self.classifier(feat)
 
 
+class SimpleRegressor(nn.Module):
+    def __init__(self, channel_in, num_class=1):
+        super().__init__()
+        self.reg_layer = nn.Sequential(*[
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(start_dim=1),
+            nn.Dropout(p=0.2, inplace=True),
+            nn.Linear(channel_in, 256),
+            nn.Linear(256, num_class),
+        ])
+
+        self.apply(utils.init_weights)
+
+    def forward(self, feat):
+        x_reg = self.reg_layer(feat)
+
+        return x_reg
+
+
 class SimpleClassifierTransformer(nn.Module):
     def __init__(self, in_features, num_class, normalization='BatchNorm1d', activation='ReLU', dropblock=True):
         super().__init__()

@@ -8,6 +8,7 @@ from models.backbones import timm_backbone
 from models.backbones import MobileOne
 from models.heads import MLP
 from collections import OrderedDict
+from tools import utils_tool
 
 
 class Swin_t(nn.Module):
@@ -173,5 +174,41 @@ class Mobileone_s0_classification(nn.Module):
 
         out_dict['vec'] = logits
         out_dict['feat'] = feat
+
+        return out_dict
+
+
+class SegmentatorRegressor(nn.Module):
+    def __init__(self, conf_model):
+        super().__init__()
+        self.segmentator = utils_tool.init_model(conf_model, 'cpu')  # recursive initialization
+        if conf_model['model']['saved_ckpt'] != '':                  # for ineference
+            self.segmentator.module.load_state_dict(torch.load(conf_model['model']['saved_ckpt']))
+        self.backbone = MobileOne.mobileone(variant='s0')
+        self.classifier = MLP.SimpleRegressor(channel_in=1024, num_class=conf_model['num_class'])
+        self.train_score_callback()
+
+    def train_score_callback(self):
+        self.segmentator.eval()
+        for p in self.segmentator.parameters():
+            p.requires_grad = False
+
+    def forward(self, x):
+        out = self.segmentator(x)
+        out_dict = {}
+
+        seg_map = torch.softmax(out['seg'], dim=1)
+        seg_mask = sum(torch.unbind(seg_map, dim=1)[1:])    # get the RoI mask from segmentation result
+        seg_mask = torch.clamp(seg_mask, 0, 1).unsqueeze(1) / 2
+        mask = torch.zeros_like(seg_mask) + 0.5
+        mask = mask + seg_mask
+        x_mask = x * mask
+
+        feat = self.backbone(x_mask)
+        score = self.classifier(feat[-1])
+
+        out_dict['seg'] = out['seg']
+        out_dict['vec'] = score
+        out_dict['feat'] = feat[-1]
 
         return out_dict
