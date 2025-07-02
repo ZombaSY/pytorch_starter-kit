@@ -4,7 +4,6 @@
 ## Environments
 
 - OS: Ubuntu 22.040. LTS
-- GPU: Tesla H100 80GB
 - GPU Driver version: 550.54.14
 - CUDA: 12.4
 
@@ -31,8 +30,8 @@ input_paths             | label_paths
 ```
 
 ## 💙 Configuration
-All the configurations of train, inference, and export can be easily modified with "configs/[task_name].py"<br>
-For example, to run "segmentation", edit "configs/train_segmentation.py" script and excute directly in command line:
+All the configurations of train, inference, and export can be easily modified with`configs/[task_name].py`<br>
+For example, to run "segmentation" edit `configs/train_segmentation.py` script and excute directly in command line:
 ```
 python3 main.py --config_path "configs/train_segmentation.py"
 ```
