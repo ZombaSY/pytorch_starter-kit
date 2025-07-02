@@ -1,30 +1,30 @@
 # import os
-# import tensorflow as tf
 # import onnx
 # import torch
-# import time
-# import tensorflowjs as tfjs
-
-# from tools.trainer_base import TrainerBase
 # from onnxsim import simplify
 # from onnx_tf.backend import prepare
+# from models.backbones.MobileOne import reparameterize_model
+# from tools.trainer_base import TrainerBase
+
+# # import tensorflow as tf # tflite export
+# # import tensorflowjs as tfjs # tfjs export
+# import coremltools as ct  # coreml export
+# import coremltools.optimize as cto # coreml export
 
 
 class Exportor:
 
     def __init__(self, conf):
-        self.start_time = time.time()
         self.conf = conf
 
         use_cuda = self.conf['env']['cuda'] and torch.cuda.is_available()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
 
         self.model = TrainerBase.init_model(self.conf, self.device).module
-        self.model.load_state_dict(torch.load(self.conf['model']['saved_ckpt']))
+        self.model.load_state_dict(torch.load(self.conf['model']['saved_ckpt']), strict=True)
         self.model.eval()
 
-        from models.backbones.MobileOne import reparameterize_model
-        self.model.backbone = reparameterize_model(self.model.backbone)
+        self.model = reparameterize_model(self.model)
 
         dir_path, fn = os.path.split(self.conf['model']['saved_ckpt'])
         fn, ext = os.path.splitext(fn)
@@ -34,12 +34,6 @@ class Exportor:
     def torch2onnx(self):
         dummy_input = torch.autograd.Variable(torch.randn(self.conf['export']['input_shape'])).to(self.device)
         torch.onnx.export(self.model, dummy_input, self.save_dir + '.onnx', opset_version=self.conf['export']['opset_version'])
-
-    def torch2torchscript(self):
-        with torch.no_grad():
-            self.model.eval()
-            m = torch.jit.script(self.model)
-            torch.jit.save(m, self.save_dir + '.torchscript')
 
     def onnx_simplify(self):
         onnx_model = onnx.load(self.save_dir + '.onnx')
@@ -118,14 +112,48 @@ class Exportor:
     def pb2tfjs(self):
         tfjs.converters.convert_tf_saved_model(self.save_dir, os.path.join(self.save_dir, 'tfjs'))
 
+    def torch2torchjit(self):
+        dummy_input = torch.randn(self.conf['export']['input_shape']).to(self.device)
+        self.traced_model = torch.jit.trace(self.model.eval(), dummy_input, strict=False)
+
+    def torchjit2coreml(self):
+        bias = [0.0, 0.0, 0.0]
+        scale = 1 / 255
+        classifier_config = None
+
+        mlmodel = ct.convert(
+            self.traced_model,
+            inputs=[ct.ImageType("input", shape=self.conf['export']['input_shape'], scale=scale, bias=bias)],  # expects ct.TensorType
+            classifier_config=classifier_config,
+            # minimum_deployment_target=ct.target.iOS15,  # warning: >=16 causes pipeline errors
+            convert_to="neuralnetwork",
+            outputs=[ct.TensorType(name="output")],
+        )
+
+        # pacakage description
+        mlmodel.author = 'Sunyong Seo'
+        mlmodel.license = 'lululab.inc'
+        mlmodel.version = '1.0.0'
+        mlmodel.short_description = "The face landmarker network for the IQA-RT module."
+
+        # save
+        mlmodel.save(self.save_dir + '.mlpackage')  #.mlpackage,.mlmodel
+
     def export(self):
-        self.torch2onnx()
-        self.onnx_simplify()
+        if self.conf['export']['target'] == 'coreml':
+            self.torch2torchjit()
+            self.torchjit2coreml()
+        else:
+            self.torch2onnx()
+            self.onnx_simplify()
 
-        if self.conf['export']['target'] == 'tflite':
-            self.onnx2pb()
-            self.pb2tflite()
+            if self.conf['export']['target'] == 'onnx':
+                exit()
 
-        if self.conf['export']['target'] == 'tfjs':
             self.onnx2pb()
-            self.pb2tfjs()
+
+            if self.conf['export']['target'] == 'tflite':
+                self.pb2tflite()
+
+            if self.conf['export']['target'] == 'tfjs':
+                self.pb2tfjs()

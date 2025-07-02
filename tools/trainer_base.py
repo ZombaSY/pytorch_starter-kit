@@ -2,18 +2,12 @@ import abc
 import torch
 import os
 import wandb
-import math
 import timm
 import shutil
 import logging
 
-from models import dataloader
-from models import lr_scheduler
-from models import model_implements
-from models import losses as loss_hub
 from models import utils
-from models import metrics
-
+from tools import utils_tool
 from datetime import datetime
 from accelerate import Accelerator
 
@@ -49,7 +43,7 @@ class TrainerBase:
         utils.Logger().info(f'device is located to {self.device}')
 
         # init model
-        self.model = self.init_model(self.conf, self.device)
+        self.model = utils_tool.init_model(self.conf, self.device)
         if self.conf['model']['saved_ckpt'] != '':
             if 'imagenet' in self.conf['model']['saved_ckpt'].lower():
                 self.model.module.load_pretrained_imagenet(self.conf['model']['saved_ckpt'])
@@ -61,23 +55,23 @@ class TrainerBase:
             self.model_ema = timm.utils.ModelEmaV2(self.model, decay=0.9999, device=self.device)
 
         # init dataloader
-        self.loader_train = self.init_data_loader(conf=self.conf,
+        self.loader_train = utils_tool.init_data_loader(conf=self.conf,
                                                   conf_dataloader=self.conf['dataloader_train'])
-        self.loader_valid = self.init_data_loader(conf=self.conf,
+        self.loader_valid = utils_tool.init_data_loader(conf=self.conf,
                                                   conf_dataloader=self.conf['dataloader_valid'])
 
         # init optimizer
-        self.optimizer = self.init_optimizer(self.conf['optimizer'], self.model)
+        self.optimizer = utils_tool.init_optimizer(self.conf['optimizer'], self.model)
 
         # init scheduler
-        self.scheduler = self.set_scheduler(self.conf, self.conf['dataloader_train'], self.optimizer, self.loader_train)
+        self.scheduler = utils_tool.set_scheduler(self.conf, self.conf['dataloader_train'], self.optimizer, self.loader_train)
 
         # init criterion
-        self.criterion = self.init_criterion(self.conf['criterion'], self.device)
+        self.criterion = utils_tool.init_criterion(self.conf['criterion'], self.device)
 
         # init metrics
-        self.metric_train = self.init_metric(self.conf['env']['task'], self.conf['model']['num_class'])
-        self.metric_val = self.init_metric(self.conf['env']['task'], self.conf['model']['num_class'])
+        self.metric_train = utils_tool.init_metric(self.conf['env']['task'], self.conf['model']['num_class'])
+        self.metric_val = utils_tool.init_metric(self.conf['env']['task'], self.conf['model']['num_class'])
 
         if self.conf['env']['wandb']:
             wandb.init(project='{}'.format(self.conf['env']['project_name']), config=conf, name=now_time,
@@ -140,67 +134,3 @@ class TrainerBase:
     def get_learning_rate(self):
         for param_group in self.optimizer.param_groups:
             return param_group['lr']
-
-    @staticmethod
-    def init_data_loader(conf,
-                         conf_dataloader):
-        loader = getattr(dataloader, conf_dataloader['name'])(conf, conf_dataloader)
-
-        return loader
-
-    @staticmethod
-    def set_scheduler(conf, conf_dataloader, optimizer, data_loader):
-        scheduler = None
-        steps_per_epoch = math.ceil((data_loader.__len__() / conf_dataloader['batch_size']))
-
-        if conf['scheduler']['name'] == 'WarmupCosine':
-            scheduler = lr_scheduler.WarmupCosineSchedule(optimizer=optimizer,
-                                                            warmup_steps=steps_per_epoch * conf['scheduler']['warmup_epoch'],
-                                                            t_total=conf['env']['epoch'] * steps_per_epoch,
-                                                            cycles=conf['env']['epoch'] / conf['scheduler']['cycles'],
-                                                            last_epoch=-1)
-        elif conf['scheduler']['name'] == 'CosineAnnealing':
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=conf['scheduler']['cycles'], eta_min=conf['scheduler']['lr_min'])
-        elif conf['scheduler']['name'] == 'Constant':
-            scheduler = lr_scheduler.ConstantLRSchedule(optimizer, last_epoch=-1)
-        elif conf['scheduler']['name'] == 'WarmupConstant':
-            scheduler = lr_scheduler.WarmupConstantSchedule(optimizer, warmup_steps=steps_per_epoch * conf['scheduler']['warmup_epoch'])
-        else:
-            utils.Logger().info(f"{utils.Colors.LIGHT_PURPLE}No scheduler found --> {conf['scheduler']['name']}{utils.Colors.END}")
-
-        return scheduler
-
-    @staticmethod
-    def init_model(conf, device):
-        model = getattr(model_implements, conf['model']['name'])(conf['model']).to(device)
-
-        return torch.nn.DataParallel(model)
-
-    @staticmethod
-    def init_criterion(conf_criterion, device):
-        criterion = getattr(loss_hub, conf_criterion['name'])(conf_criterion).to(device)
-
-        return criterion
-
-    @staticmethod
-    def init_optimizer(conf_optimizer, model):
-        optimizer = None
-
-        if conf_optimizer['name'] == 'AdamW':
-            optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
-                                          lr=conf_optimizer['lr'], betas=(0.9, 0.999), eps=1e-8, weight_decay=conf_optimizer['weight_decay'])
-        elif conf_optimizer['name'] == 'Adam':
-            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
-                                         lr=conf_optimizer['lr'], betas=(0.9, 0.999), eps=1e-8, weight_decay=conf_optimizer['weight_decay'])
-        return optimizer
-
-    @staticmethod
-    def init_metric(task_name, num_class):
-        if 'segmentation' in task_name:
-            metric = metrics.StreamSegMetrics_segmentation(num_class)
-        elif task_name in ['classification', 'regression', 'landmark', 'regression-ssl', 'landmark-ssl']:
-            metric = metrics.StreamSegMetrics_classification(num_class)
-        else:
-            raise Exception('No task named', task_name)
-
-        return metric

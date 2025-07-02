@@ -2,6 +2,7 @@ import torch
 import wandb
 import einops
 
+from tools import utils_tool
 from models import utils
 from tools.train_segmentation import TrainerSegmentation
 
@@ -10,10 +11,11 @@ class TrainerSegmentationSSL(TrainerSegmentation):
     def __init__(self, conf, now=None, k_fold=0):
         super(TrainerSegmentationSSL, self).__init__(conf, now=now, k_fold=k_fold)
 
-        self.loader_train_ssl = self.init_data_loader(conf=self.conf,
+        self.loader_train_ssl = utils_tool.init_data_loader(conf=self.conf,
                                                       conf_dataloader=self.conf['dataloader_ssl'])
-        self.criterion_ssl = self.init_criterion(self.conf['criterion_ssl'], self.device)
-        self.optimizer_ssl = self.init_optimizer(self.conf['optimizer_ssl'], self.model)
+        self.criterion_ssl = utils_tool.init_criterion(self.conf['criterion_ssl'], self.device)
+        self.optimizer_ssl = utils_tool.init_optimizer(self.conf['optimizer_ssl'], self.model)
+        self.scheduler_ssl = utils_tool.set_scheduler(self.conf, self.conf['dataloader_ssl'], self.optimizer_ssl, self.loader_train_ssl)
 
     def _train_ssl(self, epoch):
         self.model.train()
@@ -51,6 +53,8 @@ class TrainerSegmentationSSL(TrainerSegmentation):
             self.optimizer_ssl.zero_grad()
             self.accelerator.backward(loss)
             self.optimizer_ssl.step()
+            if self.scheduler_ssl is not None:
+                self.scheduler_ssl.step()
 
             batch_losses += loss.item()
 

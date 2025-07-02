@@ -8,8 +8,8 @@ import itertools
 import logging
 
 from models import utils
-from tools.trainer_base import TrainerBase
-
+from tools import utils_tool
+from models.backbones.MobileOne import reparameterize_model
 from torch.nn import functional as F
 
 
@@ -19,14 +19,18 @@ class Inferencer:
 
         use_cuda = self.conf['env']['cuda'] and torch.cuda.is_available()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
+        self.saved_model_directory = os.path.split(self.conf['model']['saved_ckpt'])[0]
+        utils.Logger('log.txt', level=logging.DEBUG if self.conf['env']['debug'] else logging.INFO)
 
-        self.loader_valid = TrainerBase.init_data_loader(conf=self.conf,
+
+        self.loader_valid = utils_tool.init_data_loader(conf=self.conf,
                                                          conf_dataloader=self.conf['dataloader_valid'])
 
-        self.criterion = TrainerBase.init_criterion(self.conf['criterion'], self.device)
+        self.criterion = utils_tool.init_criterion(self.conf['criterion'], self.device)
 
-        self.model = TrainerBase.init_model(self.conf, self.device)
-        self.model.module.load_state_dict(torch.load(self.conf['model']['saved_ckpt']))
+        self.model = utils_tool.init_model(self.conf, self.device)
+        self.model.module.load_state_dict(torch.load(self.conf['model']['saved_ckpt']), strict=True)
+        self.model = reparameterize_model(self.model)
         self.model.eval()
 
         dir_path, fn = os.path.split(self.conf['model']['saved_ckpt'])
@@ -34,15 +38,12 @@ class Inferencer:
 
         self.save_dir = os.path.join(dir_path, fn)
         self.num_batches_val = int(len(self.loader_valid))
-        self.metric_val = TrainerBase.init_metric(self.conf['env']['task'], self.conf['model']['num_class'])
+        self.metric_val = utils_tool.init_metric(self.conf['env']['task'], self.conf['model']['num_class'])
 
         self.image_mean = torch.tensor(self.loader_valid.image_loader.image_mean).to(self.device)
         self.image_std = torch.tensor(self.loader_valid.image_loader.image_std).to(self.device)
 
         self.data_stat = {}
-
-        self.saved_model_directory = os.path.split(self.conf['model']['saved_ckpt'])[0]
-        utils.Logger('log.txt', level=logging.DEBUG if self.conf['env']['debug'] else logging.INFO)
 
     def inference_classification(self, epoch):
         self.model.eval()
@@ -163,7 +164,6 @@ class Inferencer:
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
                 x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std).detach().cpu().numpy()
                 output_prob = F.softmax(output['seg'], dim=1).detach().cpu().numpy()
-
                 pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_image), x_img, output_prob, itertools.repeat(self.save_dir), img_id, itertools.repeat(self.conf['model']['num_class'])))
 
         for idx in range(x_img.shape[0]):
@@ -192,6 +192,5 @@ class Inferencer:
             self.inference_regression(0)
 
         # save meta data
-        if self.conf['env']['mode'] == 'valid':
-            df = pd.DataFrame(self.data_stat)
-            df.to_csv(self.save_dir + '_out.csv', encoding='utf-8-sig', index=False)
+        df = pd.DataFrame(self.data_stat)
+        df.to_csv(self.save_dir + '_out.csv', encoding='utf-8-sig', index=False)
