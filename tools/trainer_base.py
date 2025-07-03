@@ -130,7 +130,3 @@ class TrainerBase:
                 if ('loss' in key and metric_dict[key] < self.metric_best[key]) or ('loss' not in key and metric_dict[key] > self.metric_best[key]):
                     self.metric_best[key] = metric_dict[key]
                     self.save_model(epoch, metric_dict[key], metric_name=key)
-
-    def get_learning_rate(self):
-        for param_group in self.optimizer.param_groups:
-            return param_group['lr']

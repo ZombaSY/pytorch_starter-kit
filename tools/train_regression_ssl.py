@@ -61,7 +61,7 @@ class TrainerRegressionSSL(TrainerRegression):
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
 
         metric_dict = {}
-        metric_dict['lr'] = self.get_learning_rate()
+        metric_dict['lr_ssl'] = utils_tool.get_learning_rate(self.optimizer_ssl)
         metric_dict['loss_ssl'] = loss_mean
 
         utils.log_epoch('train', epoch, metric_dict, self.conf['env']['wandb'])

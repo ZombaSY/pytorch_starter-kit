@@ -2,6 +2,7 @@ import torch
 import wandb
 
 from models import utils
+from tools import utils_tool
 from tools.trainer_base import TrainerBase
 
 
@@ -52,7 +53,7 @@ class TrainerClassification(TrainerBase):
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
 
         metric_dict = {}
-        metric_dict['lr'] = self.get_learning_rate()
+        metric_dict['lr'] = utils_tool.get_learning_rate(self.optimizer)
         metric_dict['acc'] = metric_result['acc']
         metric_dict['f1'] = metric_result['f1']
         metric_dict['loss'] = loss_mean
