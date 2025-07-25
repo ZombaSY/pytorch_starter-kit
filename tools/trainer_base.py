@@ -80,6 +80,8 @@ class TrainerBase:
 
         self.model_post_path_dict = {}
         self.last_saved_epoch = 0
+
+        # apply callback
         self.callback = utils.TrainerCallBack()
         if hasattr(self.model.module, 'train_callback'):
             self.callback.train_callback = self.model.module.train_callback
