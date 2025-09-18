@@ -50,18 +50,13 @@ class TrainerRegressionSSL(TrainerRegression):
                 raise Exception('Loss is NAN. End training.')
 
             # ----- backward ----- #
-            self.optimizer_ssl.zero_grad()
-            self.accelerator.backward(loss)
-            self.optimizer_ssl.step()
-            if self.scheduler_ssl is not None:
-                self.scheduler_ssl.step()
+            self._backward_and_update_weight(self.optimizer_ssl, loss, scheduler=self.scheduler_ssl)
 
             batch_losses += loss.item()
 
         loss_mean = batch_losses / self.loader_train.Loader.__len__()
 
         metric_dict = {}
-        metric_dict['lr_ssl'] = utils_tool.get_learning_rate(self.optimizer_ssl)
         metric_dict['loss_ssl'] = loss_mean
 
         utils.log_epoch('train', epoch, metric_dict, self.conf['env']['wandb'])
@@ -70,7 +65,9 @@ class TrainerRegressionSSL(TrainerRegression):
     def run(self):
         for epoch in range(1, self.conf['env']['epoch'] + 1):
             self._train(epoch)
-            self._validate(epoch)
+            self._validate(self.model, epoch)
+            if self.model_ema is not None:
+                self._validate(self.model_ema.module, epoch, log_prefix='[EMA]')
             if epoch >= self.conf['dataloader_ssl']['train_warmup_epoch']:
                 self._train_ssl(epoch)
 
