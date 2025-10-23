@@ -11,9 +11,11 @@ class TrainerRegression(TrainerBase):
         super(TrainerRegression, self).__init__(conf, now=now, k_fold=k_fold)
 
     def _train(self, epoch):
+        self.callback.on_train_start()
         self.model.train()
 
         batch_losses = 0
+
         for iteration, data in enumerate(self.loader_train.Loader):
             x_in = data['input']
             target = data['label']
@@ -25,16 +27,6 @@ class TrainerRegression(TrainerBase):
                 break   # avoid BN issue
 
             output = self.model(x_in)
-
-            '''
-            aa = torch.tensor(self.loader_train.image_loader.image_mean).to(self.device)
-            bb = torch.tensor(self.loader_train.image_loader.image_std).to(self.device)
-            x_img = utils.denormalize_img(x_in, aa, bb).detach().cpu().numpy()
-            for i in range(len(x_img)):
-                tmp1 = x_img[i]
-                tmp2 = target[i].detach().cpu().numpy()
-                utils.draw_landmark(tmp1, tmp2, 'tmp', str(i) + '.png')
-            '''
 
             # compute loss
             loss = self.criterion(output['vec'], target)
@@ -88,16 +80,10 @@ class TrainerRegression(TrainerBase):
                     list_score.append(score_item[b].tolist())
                     list_target.append(target_item[b].tolist())
 
-        # Calculate the correlation between the two lists
-        # correlation1 = np.corrcoef(np.array(list_score).T[0], np.array(list_target).T[0])[0, 1]
-        # correlation2 = np.corrcoef(np.array(list_score).T[1], np.array(list_target).T[1])[0, 1]
-        # correlation = (correlation1 + correlation2) / 2
-
         loss_mean = batch_losses / self.loader_valid.Loader.__len__()
 
         metric_dict = {}
         metric_dict[log_prefix + 'loss'] = loss_mean
-        # metric_dict[log_prefix + 'corr'] = correlation
 
         utils.log_epoch('validation', epoch, metric_dict, self.conf['env']['wandb'], prefix=log_prefix)
         self.evaluate_model(model, epoch, metric_dict)

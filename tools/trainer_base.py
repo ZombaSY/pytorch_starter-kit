@@ -86,12 +86,13 @@ class TrainerBase:
         self.last_saved_epoch = 0
         self.callback = utils.TrainerCallBack()
         if hasattr(self.model.module, 'train_callback'):
-            self.callback.train_callback = self.model.module.train_callback
+            self.callback.on_train_start = self.model.module.train_callback
 
         self._validate_interval = max(1, (len(self.loader_train.Loader) // self.conf['env']['train_fold']) + 1)
 
         # set acceleration
         self.model, self.optimizer, self.scheduler, self.loader_train, self.loader_valid = self.accelerator.prepare(self.model, self.optimizer, self.scheduler, self.loader_train, self.loader_valid)
+
 
     @abc.abstractmethod
     def _train(self, epoch):

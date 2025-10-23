@@ -74,7 +74,6 @@ def init_metric(task_name, num_class):
 
     return metric
 
-
 def get_learning_rate(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']

@@ -30,6 +30,7 @@ class Inferencer:
 
         self.model = utils_tool.init_model(self.conf, self.device)
         self.model.module.load_state_dict(torch.load(self.conf['model']['saved_ckpt']), strict=True)
+
         self.model = reparameterize_model(self.model)
         self.model.eval()
 
@@ -83,7 +84,6 @@ class Inferencer:
 
                 x_in = x_in.to(self.device)
                 target = target.long().to(self.device)  # (shape: (batch_size, img_h, img_w))
-
                 output = self.model(x_in)
 
                 self.__post_process(x_in, target, output, img_id, iteration)

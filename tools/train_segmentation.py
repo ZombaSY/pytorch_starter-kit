@@ -10,6 +10,7 @@ class TrainerSegmentation(TrainerBase):
         super(TrainerSegmentation, self).__init__(conf, now=now, k_fold=k_fold)
 
     def _train(self, epoch):
+        self.callback.on_train_start()
         self.model.train()
 
         batch_losses = 0
