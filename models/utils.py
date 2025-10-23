@@ -1,22 +1,23 @@
+import logging
+import math
+import os
+import random
+import time
+
 import cv2
 import numpy as np
 import torch
-import math
-import random
-import time
-import os
 import wandb
-import logging
-
-from timm.models.layers import trunc_normal_
 from PIL import Image
 from sklearn.neighbors import KernelDensity
+from timm.models.layers import trunc_normal_
 
 SEED = 3407
 
 
 class Colors:
-    """ ANSI color codes """
+    """ANSI color codes"""
+
     BLACK = "\033[0;30m"
     RED = "\033[0;31m"
     GREEN = "\033[0;32m"
@@ -57,12 +58,12 @@ def singleton(obj):
 @singleton
 class Logger(logging.Logger):
     def __init__(self, dst, level=logging.INFO):
-        super().__init__('logger')
+        super().__init__("logger")
         self.setLevel(level)
 
         # string formatting
-        print_formatter = logging.Formatter(f'%(message)s')
-        write_formatter = logging.Formatter(f'[%(asctime)s][%(levelname)s|%(filename)s:%(lineno)s] >> %(message)s')
+        print_formatter = logging.Formatter("%(message)s")
+        write_formatter = logging.Formatter("[%(asctime)s][%(levelname)s|%(filename)s:%(lineno)s] >> %(message)s")
 
         # file writing handler
         stream_handler = logging.StreamHandler()
@@ -83,7 +84,7 @@ class FunctionTimer:
     def __call__(self, *conf, **kwargs):
         tt = time.time()
         self.__func(*conf, **kwargs)
-        Logger().info(f'\"{self.__func.__name__}\" play time: {time.time() - tt}')
+        Logger().info(f'"{self.__func.__name__}" play time: {time.time() - tt}')
 
     def __enter__(self):
         return self
@@ -125,28 +126,34 @@ def cut_mix(_input, _refer, _input_label=None, _refer_label=None):
     cw_2 = int((rand_w + 0.25) * w2)
     ch_2 = int((rand_h + 0.25) * h2)
 
-    if cy_1 + ch_1 > h1: ch_1 = h1 - cy_1  # push overflowing area
-    if cx_1 + cw_1 > w1: cw_1 = w1 - cx_1
+    if cy_1 + ch_1 > h1:
+        ch_1 = h1 - cy_1  # push overflowing area
+    if cx_1 + cw_1 > w1:
+        cw_1 = w1 - cx_1
 
     # generate cutout_mask for post-process
     cutout_mask = np.zeros(_input.shape[:2], dtype=np.bool_)
-    cutout_mask[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = True
+    cutout_mask[cy_1 : cy_1 + ch_1, cx_1 : cx_1 + cw_1] = True
 
-    cutout_img = _refer[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
+    cutout_img = _refer[cy_2 : cy_2 + ch_2, cx_2 : cx_2 + cw_2]
     cutout_img = cv2.resize(cutout_img, (cw_1, ch_1))
 
-    _input[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_img
+    _input[cy_1 : cy_1 + ch_1, cx_1 : cx_1 + cw_1] = cutout_img
 
     if _input_label is not None and _refer_label is not None:
         _input_label = np.array(_input_label)
         _refer_label = np.array(_refer_label)
 
-        cutout_mask = _refer_label[cy_2:cy_2 + ch_2, cx_2:cx_2 + cw_2]
+        cutout_mask = _refer_label[cy_2 : cy_2 + ch_2, cx_2 : cx_2 + cw_2]
         cutout_mask = cv2.resize(cutout_mask, (cw_1, ch_1), interpolation=cv2.INTER_NEAREST)
-        _input_label[cy_1:cy_1 + ch_1, cx_1:cx_1 + cw_1] = cutout_mask
+        _input_label[cy_1 : cy_1 + ch_1, cx_1 : cx_1 + cw_1] = cutout_mask
 
         if _is_pil:
-            return Image.fromarray(_input.astype(np.uint8)), Image.fromarray(_input_label.astype(np.uint8)), Image.fromarray(cutout_mask)
+            return (
+                Image.fromarray(_input.astype(np.uint8)),
+                Image.fromarray(_input_label.astype(np.uint8)),
+                Image.fromarray(cutout_mask),
+            )
         else:
             return _input.astype(np.uint8), _input_label.astype(np.uint8), cutout_mask
 
@@ -175,7 +182,7 @@ def cv2_imread(fns_img, color=cv2.IMREAD_UNCHANGED):
     img_array = np.fromfile(fns_img, np.uint8)
     img = cv2.imdecode(img_array, color)
     if img.shape[-1] == 3 and color in [cv2.IMREAD_UNCHANGED, cv2.IMREAD_COLOR]:
-        img = cv2.cvtColor(img ,cv2.COLOR_BGR2RGB)  # convert color space for albumentaitons
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # convert color space for albumentaitons
     return img.astype(np.uint8)
 
 
@@ -184,7 +191,7 @@ def cv2_imwrite(fns_img, img):
     result, encoded_img = cv2.imencode(extension, img)
 
     if result:
-        with open(fns_img, mode='w+b') as f:
+        with open(fns_img, mode="w+b") as f:
             encoded_img.tofile(f)
 
 
@@ -203,9 +210,9 @@ def draw_image(x_img, output_prob, img_save_dir, img_id, n_class):
     if not os.path.exists(img_save_dir):
         os.mkdir(img_save_dir)
 
-    cv2_imwrite(os.path.join(img_save_dir, img_fn) + '.png', cv2.cvtColor(x_img, cv2.COLOR_RGB2BGR))
+    cv2_imwrite(os.path.join(img_save_dir, img_fn) + ".png", cv2.cvtColor(x_img, cv2.COLOR_RGB2BGR))
     for i in range(1, n_class):
-        cv2_imwrite(os.path.join(img_save_dir, img_fn) + f'_map_class_{i}.png', output_grey[i])
+        cv2_imwrite(os.path.join(img_save_dir, img_fn) + f"_map_class_{i}.png", output_grey[i])
 
 
 # https://arxiv.org/abs/2210.05775
@@ -216,7 +223,7 @@ def get_mixup_sample_rate(y_list):
         min = np.min(targets)
         max = np.max(targets)
         std = np.std(targets)
-        Logger().info(f'y stats: mean = {mean}, max = {max}, min = {min}, std = {std}')
+        Logger().info(f"y stats: mean = {mean}, max = {max}, min = {min}, std = {std}")
         return mean, min, max, std
 
     mix_idx = []
@@ -233,7 +240,7 @@ def get_mixup_sample_rate(y_list):
         data_i = data_i.reshape(-1, data_i.shape[0])  # get 2Dn
 
         # KDE sample rate
-        kd = KernelDensity(kernel='gaussian', bandwidth=1.75).fit(data_i)  # should be 2D
+        kd = KernelDensity(kernel="gaussian", bandwidth=1.75).fit(data_i)  # should be 2D
         each_rate = np.exp(kd.score_samples(data_list))
         each_rate /= np.sum(each_rate)
 
@@ -246,7 +253,7 @@ def get_mixup_sample_rate(y_list):
 
 def init_weights(m):
     if isinstance(m, (torch.nn.Conv2d, torch.nn.Linear)):
-        trunc_normal_(m.weight, std=.02)
+        trunc_normal_(m.weight, std=0.02)
         torch.nn.init.constant_(m.bias, 0)
 
 
@@ -276,7 +283,7 @@ def random_rotate_landmark(image, target, theta):
     center_x = 0.5
     center_y = 0.5
     landmark_num = int(len(target) / 2)
-    target_center = np.array(target) - np.array([center_x, center_y]*landmark_num)
+    target_center = np.array(target) - np.array([center_x, center_y] * landmark_num)
     target_center = target_center.reshape(landmark_num, 2)
 
     c, s = np.cos(theta), np.sin(theta)
@@ -289,7 +296,7 @@ def random_rotate_landmark(image, target, theta):
 
 def get_landmark_label(root_path, label_file, task_type=None):
     label_path = os.path.join(root_path, label_file)
-    with open(label_path, 'r') as f:
+    with open(label_path, "r") as f:
         labels = f.readlines()
     labels = [x.strip().split() for x in labels]
     if len(labels[0]) == 1:
@@ -317,12 +324,14 @@ def draw_landmark(img, lmk, save_dir, img_fn, put_index=True):
         draw_pos = (int(lmk[index][0] * tmp_img.shape[0]), int(lmk[index][1] * tmp_img.shape[1]))
         cv2.circle(tmp_img, draw_pos, 2, (0, 255, 0), 3)
         if put_index:
-            cv2.putText(tmp_img, str(index), (draw_pos[0] + 3, draw_pos[1] + 3), cv2.FONT_HERSHEY_PLAIN, 1, (255,0,0), 1)
+            cv2.putText(
+                tmp_img, str(index), (draw_pos[0] + 3, draw_pos[1] + 3), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 0), 1
+            )
 
     img_fn = os.path.split(img_fn)[-1]
     fn = os.path.join(save_dir, img_fn)
     cv2_imwrite(fn, tmp_img)
-    np.save(fn.replace('.png', '.npy').replace('.jpg', '.npy'), lmk)
+    np.save(fn.replace(".png", ".npy").replace(".jpg", ".npy"), lmk)
 
 
 def multiprocessing_wrapper(conf):
@@ -330,20 +339,19 @@ def multiprocessing_wrapper(conf):
 
 
 def log_epoch(mode, epoch, metric_dict, use_wandb=False):
-    if mode == 'train':
+    if mode == "train":
         log_color = Colors.LIGHT_GREEN
-    elif mode == 'validation':
+    elif mode == "validation":
         log_color = Colors.LIGHT_CYAN
     else:
         log_color = Colors.BOLD
 
     for key in metric_dict.keys():
-        log_str = f'{mode} {key}: {metric_dict[key]}'
-        Logger().info(f'{log_color} {epoch} epoch / {log_str} {Colors.END}')
+        log_str = f"{mode} {key}: {metric_dict[key]}"
+        Logger().info(f"{log_color} {epoch} epoch / {log_str} {Colors.END}")
 
         if use_wandb:
-            wandb.log({f'{mode} {key}': metric_dict[key]},
-                      step=epoch)
+            wandb.log({f"{mode} {key}": metric_dict[key]}, step=epoch)
 
 
 def append_data_stats(data_stats, key, value):

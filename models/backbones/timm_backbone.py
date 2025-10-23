@@ -1,6 +1,5 @@
 import timm
 import torch.nn as nn
-import torch
 
 
 class BackboneLoader(nn.Module):

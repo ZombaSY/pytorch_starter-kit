@@ -1,8 +1,8 @@
+from abc import ABCMeta, abstractmethod
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from abc import ABCMeta, abstractmethod
 
 # https://github.com/SwinTransformer/Swin-Transformer-Semantic-Segmentation/blob/main/mmseg/models/decode_heads/uper_head.py
 # https://github.com/SwinTransformer/Swin-Transformer-Semantic-Segmentation/blob/main/mmseg/models/decode_heads/decode_head.py
@@ -41,24 +41,23 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
             Default: False.
     """
 
-    def __init__(self,
-                 in_channels,
-                 channels,
-                 *,
-                 num_class,
-                 dropout_ratio=0.1,
-                 conv_cfg=None,
-                 norm_cfg=None,
-                 act_cfg=dict(type='ReLU'),
-                 in_index=-1,
-                 input_transform=None,
-                 loss_decode=dict(
-                     type='CrossEntropyLoss',
-                     use_sigmoid=False,
-                     loss_weight=1.0),
-                 ignore_index=255,
-                 sampler=None,
-                 align_corners=False):
+    def __init__(
+        self,
+        in_channels,
+        channels,
+        *,
+        num_class,
+        dropout_ratio=0.1,
+        conv_cfg=None,
+        norm_cfg=None,
+        act_cfg=dict(type="ReLU"),
+        in_index=-1,
+        input_transform=None,
+        loss_decode=dict(type="CrossEntropyLoss", use_sigmoid=False, loss_weight=1.0),
+        ignore_index=255,
+        sampler=None,
+        align_corners=False,
+    ):
         super(BaseDecodeHead, self).__init__()
         self._init_inputs(in_channels, in_index, input_transform)
         self.channels = channels
@@ -80,9 +79,11 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
     def extra_repr(self):
         """Extra repr."""
-        s = f'input_transform={self.input_transform}, ' \
-            f'ignore_index={self.ignore_index}, ' \
-            f'align_corners={self.align_corners}'
+        s = (
+            f"input_transform={self.input_transform}, "
+            f"ignore_index={self.ignore_index}, "
+            f"align_corners={self.align_corners}"
+        )
         return s
 
     def _init_inputs(self, in_channels, in_index, input_transform):
@@ -107,14 +108,14 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         """
 
         if input_transform is not None:
-            assert input_transform in ['resize_concat', 'multiple_select']
+            assert input_transform in ["resize_concat", "multiple_select"]
         self.input_transform = input_transform
         self.in_index = in_index
         if input_transform is not None:
             assert isinstance(in_channels, (list, tuple))
             assert isinstance(in_index, (list, tuple))
             assert len(in_channels) == len(in_index)
-            if input_transform == 'resize_concat':
+            if input_transform == "resize_concat":
                 self.in_channels = sum(in_channels)
             else:
                 self.in_channels = in_channels
@@ -139,7 +140,6 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
     @abstractmethod
     def forward(self, inputs):
         """Placeholder of forward function."""
-        pass
 
     def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg):
         """Forward function for training.
@@ -218,24 +218,23 @@ class BaseDecodeHead_dsv(nn.Module, metaclass=ABCMeta):
             Default: False.
     """
 
-    def __init__(self,
-                 in_channels,
-                 channels,
-                 *,
-                 num_class,
-                 dropout_ratio=0.1,
-                 conv_cfg=None,
-                 norm_cfg=None,
-                 act_cfg=dict(type='ReLU'),
-                 in_index=-1,
-                 input_transform=None,
-                 loss_decode=dict(
-                     type='CrossEntropyLoss',
-                     use_sigmoid=False,
-                     loss_weight=1.0),
-                 ignore_index=255,
-                 sampler=None,
-                 align_corners=False):
+    def __init__(
+        self,
+        in_channels,
+        channels,
+        *,
+        num_class,
+        dropout_ratio=0.1,
+        conv_cfg=None,
+        norm_cfg=None,
+        act_cfg=dict(type="ReLU"),
+        in_index=-1,
+        input_transform=None,
+        loss_decode=dict(type="CrossEntropyLoss", use_sigmoid=False, loss_weight=1.0),
+        ignore_index=255,
+        sampler=None,
+        align_corners=False,
+    ):
         super(BaseDecodeHead_dsv, self).__init__()
         self._init_inputs(in_channels, in_index, input_transform)
         self.channels = channels
@@ -282,9 +281,11 @@ class BaseDecodeHead_dsv(nn.Module, metaclass=ABCMeta):
 
     def extra_repr(self):
         """Extra repr."""
-        s = f'input_transform={self.input_transform}, ' \
-            f'ignore_index={self.ignore_index}, ' \
-            f'align_corners={self.align_corners}'
+        s = (
+            f"input_transform={self.input_transform}, "
+            f"ignore_index={self.ignore_index}, "
+            f"align_corners={self.align_corners}"
+        )
         return s
 
     def _init_inputs(self, in_channels, in_index, input_transform):
@@ -309,14 +310,14 @@ class BaseDecodeHead_dsv(nn.Module, metaclass=ABCMeta):
         """
 
         if input_transform is not None:
-            assert input_transform in ['resize_concat', 'multiple_select']
+            assert input_transform in ["resize_concat", "multiple_select"]
         self.input_transform = input_transform
         self.in_index = in_index
         if input_transform is not None:
             assert isinstance(in_channels, (list, tuple))
             assert isinstance(in_index, (list, tuple))
             assert len(in_channels) == len(in_index)
-            if input_transform == 'resize_concat':
+            if input_transform == "resize_concat":
                 self.in_channels = sum(in_channels)
             else:
                 self.in_channels = in_channels
@@ -341,7 +342,6 @@ class BaseDecodeHead_dsv(nn.Module, metaclass=ABCMeta):
     @abstractmethod
     def forward(self, inputs):
         """Placeholder of forward function."""
-        pass
 
     def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg):
         """Forward function for training.
@@ -430,8 +430,7 @@ class M_PPM(nn.ModuleList):
         align_corners (bool): align_corners argument of F.interpolate.
     """
 
-    def __init__(self, pool_scales, in_channels, channels, conv_cfg, norm_cfg,
-                 act_cfg, align_corners):
+    def __init__(self, pool_scales, in_channels, channels, conv_cfg, norm_cfg, act_cfg, align_corners):
         super(M_PPM, self).__init__()
         self.pool_scales = pool_scales
         self.align_corners = align_corners
@@ -443,18 +442,16 @@ class M_PPM(nn.ModuleList):
         for pool_scale in pool_scales:
             self.append(
                 nn.Sequential(
-                    nn.AdaptiveAvgPool2d(pool_scale),
-                    nn.Conv2d(self.in_channels,
-                              self.channels,
-                              kernel_size=1)
-                ))
+                    nn.AdaptiveAvgPool2d(pool_scale), nn.Conv2d(self.in_channels, self.channels, kernel_size=1)
+                )
+            )
 
     def forward(self, x):
         """Forward function."""
         ppm_outs = []
         for ppm in self:
             ppm_out = ppm(x)
-            upsampled_ppm_out = F.interpolate(ppm_out, size=x.size()[2:], mode='bilinear', align_corners=False)
+            upsampled_ppm_out = F.interpolate(ppm_out, size=x.size()[2:], mode="bilinear", align_corners=False)
             ppm_outs.append(upsampled_ppm_out)
         return ppm_outs
 
@@ -471,8 +468,7 @@ class M_UPerHead(BaseDecodeHead):
     """
 
     def __init__(self, pool_scales=(1, 2, 3, 6), **kwargs):
-        super(M_UPerHead, self).__init__(
-            input_transform='multiple_select', **kwargs)
+        super(M_UPerHead, self).__init__(input_transform="multiple_select", **kwargs)
         # PSP Module
         self.psp_modules = M_PPM(
             pool_scales,
@@ -481,42 +477,25 @@ class M_UPerHead(BaseDecodeHead):
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg,
-            align_corners=self.align_corners)
+            align_corners=self.align_corners,
+        )
 
-        self.bottleneck = nn.Conv2d(self.in_channels[-1] + len(pool_scales) * self.channels,
-                                    self.channels,
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1)
+        self.bottleneck = nn.Conv2d(
+            self.in_channels[-1] + len(pool_scales) * self.channels, self.channels, kernel_size=3, stride=1, padding=1
+        )
 
         # FPN Module
         self.lateral_convs = nn.ModuleList()
         self.fpn_convs = nn.ModuleList()
         for in_channels in self.in_channels[:-1]:  # skip the top layer
-            l_conv = nn.Conv2d(in_channels,
-                               self.channels,
-                               kernel_size=1,
-                               stride=1,
-                               padding=0,
-                               dilation=1,
-                               groups=1)
+            l_conv = nn.Conv2d(in_channels, self.channels, kernel_size=1, stride=1, padding=0, dilation=1, groups=1)
 
-            fpn_conv = nn.Conv2d(self.channels,
-                                 self.channels,
-                                 kernel_size=3,
-                                 stride=1,
-                                 padding=1,
-                                 dilation=1,
-                                 groups=1)
+            fpn_conv = nn.Conv2d(self.channels, self.channels, kernel_size=3, stride=1, padding=1, dilation=1, groups=1)
 
             self.lateral_convs.append(l_conv)
             self.fpn_convs.append(fpn_conv)
 
-        self.fpn_bottleneck = nn.Conv2d(
-            len(self.in_channels) * self.channels,
-            self.channels,
-            kernel_size=3,
-            padding=1)
+        self.fpn_bottleneck = nn.Conv2d(len(self.in_channels) * self.channels, self.channels, kernel_size=3, padding=1)
 
     def psp_forward(self, inputs):
         """Forward function of PSP module."""
@@ -533,10 +512,7 @@ class M_UPerHead(BaseDecodeHead):
         inputs = self._transform_inputs(inputs)
 
         # build laterals
-        laterals = [    # ERROR POINT!!!
-            lateral_conv(inputs[i])
-            for i, lateral_conv in enumerate(self.lateral_convs)
-        ]
+        laterals = [lateral_conv(inputs[i]) for i, lateral_conv in enumerate(self.lateral_convs)]  # ERROR POINT!!!
 
         laterals.append(self.psp_forward(inputs))
 
@@ -545,17 +521,14 @@ class M_UPerHead(BaseDecodeHead):
         for i in range(used_backbone_levels - 1, 0, -1):
             prev_shape = laterals[i - 1].shape[2:]
 
-            laterals[i - 1] += F.interpolate(laterals[i], size=prev_shape, mode='bilinear', align_corners=False)
+            laterals[i - 1] += F.interpolate(laterals[i], size=prev_shape, mode="bilinear", align_corners=False)
 
         # build outputs
-        fpn_outs = [
-            self.fpn_convs[i](laterals[i])
-            for i in range(used_backbone_levels - 1)
-        ]
+        fpn_outs = [self.fpn_convs[i](laterals[i]) for i in range(used_backbone_levels - 1)]
         # append psp feature
         fpn_outs.append(laterals[-1])
         for i in range(used_backbone_levels - 1, 0, -1):
-            fpn_outs[i] = F.interpolate(fpn_outs[i], size=fpn_outs[0].shape[2:], mode='bilinear', align_corners=False)
+            fpn_outs[i] = F.interpolate(fpn_outs[i], size=fpn_outs[0].shape[2:], mode="bilinear", align_corners=False)
 
         fpn_outs = torch.cat(fpn_outs, dim=1)
         output = self.fpn_bottleneck(fpn_outs)
@@ -576,8 +549,7 @@ class M_UPerHead_no_seg(BaseDecodeHead):
     """
 
     def __init__(self, pool_scales=(1, 2, 3, 6), **kwargs):
-        super(M_UPerHead_no_seg, self).__init__(
-            input_transform='multiple_select', **kwargs)
+        super(M_UPerHead_no_seg, self).__init__(input_transform="multiple_select", **kwargs)
         # PSP Module
         self.psp_modules = M_PPM(
             pool_scales,
@@ -586,42 +558,25 @@ class M_UPerHead_no_seg(BaseDecodeHead):
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg,
-            align_corners=self.align_corners)
+            align_corners=self.align_corners,
+        )
 
-        self.bottleneck = nn.Conv2d(self.in_channels[-1] + len(pool_scales) * self.channels,
-                                    self.channels,
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1)
+        self.bottleneck = nn.Conv2d(
+            self.in_channels[-1] + len(pool_scales) * self.channels, self.channels, kernel_size=3, stride=1, padding=1
+        )
 
         # FPN Module
         self.lateral_convs = nn.ModuleList()
         self.fpn_convs = nn.ModuleList()
         for in_channels in self.in_channels[:-1]:  # skip the top layer
-            l_conv = nn.Conv2d(in_channels,
-                               self.channels,
-                               kernel_size=1,
-                               stride=1,
-                               padding=0,
-                               dilation=1,
-                               groups=1)
+            l_conv = nn.Conv2d(in_channels, self.channels, kernel_size=1, stride=1, padding=0, dilation=1, groups=1)
 
-            fpn_conv = nn.Conv2d(self.channels,
-                                 self.channels,
-                                 kernel_size=3,
-                                 stride=1,
-                                 padding=1,
-                                 dilation=1,
-                                 groups=1)
+            fpn_conv = nn.Conv2d(self.channels, self.channels, kernel_size=3, stride=1, padding=1, dilation=1, groups=1)
 
             self.lateral_convs.append(l_conv)
             self.fpn_convs.append(fpn_conv)
 
-        self.fpn_bottleneck = nn.Conv2d(
-            len(self.in_channels) * self.channels,
-            self.channels,
-            kernel_size=3,
-            padding=1)
+        self.fpn_bottleneck = nn.Conv2d(len(self.in_channels) * self.channels, self.channels, kernel_size=3, padding=1)
 
     def psp_forward(self, inputs):
         """Forward function of PSP module."""
@@ -638,10 +593,7 @@ class M_UPerHead_no_seg(BaseDecodeHead):
         inputs = self._transform_inputs(inputs)
 
         # build laterals
-        laterals = [    # ERROR POINT!!!
-            lateral_conv(inputs[i])
-            for i, lateral_conv in enumerate(self.lateral_convs)
-        ]
+        laterals = [lateral_conv(inputs[i]) for i, lateral_conv in enumerate(self.lateral_convs)]  # ERROR POINT!!!
 
         laterals.append(self.psp_forward(inputs))
 
@@ -649,17 +601,14 @@ class M_UPerHead_no_seg(BaseDecodeHead):
         used_backbone_levels = len(laterals)
         for i in range(used_backbone_levels - 1, 0, -1):
             prev_shape = laterals[i - 1].shape[2:]
-            laterals[i - 1] += F.interpolate(laterals[i], size=prev_shape, mode='bilinear', align_corners=False)
+            laterals[i - 1] += F.interpolate(laterals[i], size=prev_shape, mode="bilinear", align_corners=False)
 
         # build outputs
-        fpn_outs = [
-            self.fpn_convs[i](laterals[i])
-            for i in range(used_backbone_levels - 1)
-        ]
+        fpn_outs = [self.fpn_convs[i](laterals[i]) for i in range(used_backbone_levels - 1)]
         # append psp feature
         fpn_outs.append(laterals[-1])
         for i in range(used_backbone_levels - 1, 0, -1):
-            fpn_outs[i] = F.interpolate(fpn_outs[i], size=fpn_outs[0].shape[2:], mode='bilinear', align_corners=False)
+            fpn_outs[i] = F.interpolate(fpn_outs[i], size=fpn_outs[0].shape[2:], mode="bilinear", align_corners=False)
 
         fpn_outs = torch.cat(fpn_outs, dim=1)
         output = self.fpn_bottleneck(fpn_outs)
@@ -679,8 +628,7 @@ class M_UPerHead_dsv(BaseDecodeHead_dsv):
     """
 
     def __init__(self, pool_scales=(1, 2, 3, 6), **kwargs):
-        super(M_UPerHead_dsv, self).__init__(
-            input_transform='multiple_select', **kwargs)
+        super(M_UPerHead_dsv, self).__init__(input_transform="multiple_select", **kwargs)
         # PSP Module
         self.psp_modules = M_PPM(
             pool_scales,
@@ -689,42 +637,25 @@ class M_UPerHead_dsv(BaseDecodeHead_dsv):
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg,
-            align_corners=self.align_corners)
+            align_corners=self.align_corners,
+        )
 
-        self.bottleneck = nn.Conv2d(self.in_channels[-1] + len(pool_scales) * self.channels,
-                                    self.channels,
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1)
+        self.bottleneck = nn.Conv2d(
+            self.in_channels[-1] + len(pool_scales) * self.channels, self.channels, kernel_size=3, stride=1, padding=1
+        )
 
         # FPN Module
         self.lateral_convs = nn.ModuleList()
         self.fpn_convs = nn.ModuleList()
         for in_channels in self.in_channels[:-1]:  # skip the top layer
-            l_conv = nn.Conv2d(in_channels,
-                               self.channels,
-                               kernel_size=1,
-                               stride=1,
-                               padding=0,
-                               dilation=1,
-                               groups=1)
+            l_conv = nn.Conv2d(in_channels, self.channels, kernel_size=1, stride=1, padding=0, dilation=1, groups=1)
 
-            fpn_conv = nn.Conv2d(self.channels,
-                                 self.channels,
-                                 kernel_size=3,
-                                 stride=1,
-                                 padding=1,
-                                 dilation=1,
-                                 groups=1)
+            fpn_conv = nn.Conv2d(self.channels, self.channels, kernel_size=3, stride=1, padding=1, dilation=1, groups=1)
 
             self.lateral_convs.append(l_conv)
             self.fpn_convs.append(fpn_conv)
 
-        self.fpn_bottleneck = nn.Conv2d(
-            len(self.in_channels) * self.channels,
-            self.channels,
-            kernel_size=3,
-            padding=1)
+        self.fpn_bottleneck = nn.Conv2d(len(self.in_channels) * self.channels, self.channels, kernel_size=3, padding=1)
 
     def psp_forward(self, x):
         """Forward function of PSP module."""
@@ -755,7 +686,7 @@ class M_UPerHead_dsv(BaseDecodeHead_dsv):
         used_backbone_levels = len(laterals)
         for i in range(used_backbone_levels - 1, 0, -1):
             prev_shape = laterals[i - 1].shape[2:]
-            laterals[i - 1] += F.interpolate(laterals[i], size=prev_shape, mode='bilinear', align_corners=False)
+            laterals[i - 1] += F.interpolate(laterals[i], size=prev_shape, mode="bilinear", align_corners=False)
 
         fpn_outs = []
         for idx, layer in enumerate(self.fpn_convs):
@@ -764,7 +695,7 @@ class M_UPerHead_dsv(BaseDecodeHead_dsv):
         # append psp feature
         fpn_outs.append(laterals[-1])
         for i in range(used_backbone_levels - 1, 0, -1):
-            fpn_outs[i] = F.interpolate(fpn_outs[i], size=fpn_outs[0].shape[2:], mode='bilinear', align_corners=False)
+            fpn_outs[i] = F.interpolate(fpn_outs[i], size=fpn_outs[0].shape[2:], mode="bilinear", align_corners=False)
 
         output_aux1 = self.cls_seg_aux1(fpn_outs[0])
         output_aux2 = self.cls_seg_aux2(fpn_outs[1])
@@ -775,7 +706,6 @@ class M_UPerHead_dsv(BaseDecodeHead_dsv):
         output = self.fpn_bottleneck(fpn_outs)
         output = self.cls_seg(output)
 
-        out_dict = {'seg': output,
-                    'seg_aux': [output_aux1, output_aux2, output_aux3, output_aux4]}
+        out_dict = {"seg": output, "seg_aux": [output_aux1, output_aux2, output_aux3, output_aux4]}
 
         return out_dict
