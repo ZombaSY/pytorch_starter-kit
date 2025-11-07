@@ -55,41 +55,6 @@ def singleton(obj):
     return wrapper
 
 
-@singleton
-class Logger(logging.Logger):
-    def __init__(self, dst, level=logging.INFO):
-        super().__init__("logger")
-        self.setLevel(level)
-
-        # string formatting
-        print_formatter = logging.Formatter("%(message)s")
-        write_formatter = logging.Formatter("[%(asctime)s][%(levelname)s|%(filename)s:%(lineno)s] >> %(message)s")
-
-        # file writing handler
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(print_formatter)
-        self.addHandler(stream_handler)
-
-        # file name handler
-        if self.level is not logging.DEBUG:
-            file_handler = logging.FileHandler(filename=dst)
-            file_handler.setFormatter(write_formatter)
-            self.addHandler(file_handler)
-
-
-class FunctionTimer:
-    def __init__(self, _func):
-        self.__func = _func
-
-    def __call__(self, *conf, **kwargs):
-        tt = time.time()
-        self.__func(*conf, **kwargs)
-        Logger().info(f'"{self.__func.__name__}" play time: {time.time() - tt}')
-
-    def __enter__(self):
-        return self
-
-
 # https://arxiv.org/abs/1905.04899
 def cut_mix(_input, _refer, _input_label=None, _refer_label=None):
     """
@@ -359,6 +324,41 @@ def append_data_stats(data_stats, key, value):
         data_stats[key].append(value)
     else:
         data_stats[key] = [value]
+
+
+@singleton
+class Logger(logging.Logger):
+    def __init__(self, dst, level=logging.INFO):
+        super().__init__("logger")
+        self.setLevel(level)
+
+        # string formatting
+        print_formatter = logging.Formatter("%(message)s")
+        write_formatter = logging.Formatter("[%(asctime)s][%(levelname)s|%(filename)s:%(lineno)s] >> %(message)s")
+
+        # file writing handler
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(print_formatter)
+        self.addHandler(stream_handler)
+
+        # file name handler
+        if self.level is not logging.DEBUG:
+            file_handler = logging.FileHandler(filename=dst)
+            file_handler.setFormatter(write_formatter)
+            self.addHandler(file_handler)
+
+
+class FunctionTimer:
+    def __init__(self, _func):
+        self.__func = _func
+
+    def __call__(self, *conf, **kwargs):
+        tt = time.time()
+        self.__func(*conf, **kwargs)
+        Logger().info(f'"{self.__func.__name__}" play time: {time.time() - tt}')
+
+    def __enter__(self):
+        return self
 
 
 class TrainerCallBack:
