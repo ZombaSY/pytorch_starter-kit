@@ -10,8 +10,8 @@ class TrainerSegmentation(TrainerBase):
         super(TrainerSegmentation, self).__init__(conf, now=now, k_fold=k_fold)
 
     def _train(self, epoch):
-        self.callback.on_train_start()
         self.model.train()
+        self.callback.on_train_start()
 
         batch_losses = 0
         for iteration, data in enumerate(self.loader_train.Loader):
