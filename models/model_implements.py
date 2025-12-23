@@ -262,3 +262,27 @@ class SegmentatorRegressor(nn.Module):
         out_dict["feat"] = feat[-1]
 
         return out_dict
+
+
+class SimpleCNN(nn.Module):
+    def __init__(self, conf_model):
+        super().__init__()
+
+        self.features = nn.Sequential()
+        base_c = conf_model["base_c"]
+        layer_num = conf_model['num_layer']
+        in_channel = conf_model['in_channels']
+        for i in range(layer_num):
+            if i == 0:
+                self.features.append(nn.Conv2d(in_channel, base_c, kernel_size=3, stride=1, padding=1))
+                self.features.append(nn.BatchNorm2d(base_c))
+            else:
+                channel_in = base_c * i
+                self.features.append(nn.Conv2d(channel_in, base_c * (i + 1), kernel_size=3, stride=1, padding=1))
+                self.features.append(nn.BatchNorm2d(base_c * (i + 1)))
+
+            self.features.append(nn.ReLU(inplace=True))
+
+    def forward(self, x):
+
+        return self.features(x)

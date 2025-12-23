@@ -6,6 +6,9 @@ import cv2
 import numpy as np
 import ptflops
 import torch
+
+from tools import utils_tool
+from models import utils
 from accelerate import Accelerator
 
 from models import lr_scheduler
@@ -115,6 +118,26 @@ class ModelMini:
             self.model.eval()
             m = torch.jit.script(self.model)
             torch.jit.save(m, "model.torchscript")
+
+
+    def stress_test(self):
+        import time
+
+        conf = {
+            "model": {
+                "name": "SimpleCNN",
+                "base_c": 64,
+                "in_channels": 3,
+                "num_layer": 40,
+            }
+        }
+        x = torch.rand([4, 3, 128, 128]).to(self.device)
+        model = utils_tool.init_model(conf , self.device)
+        tt = time.time()
+        print(f'{utils.Colors.CYAN}Stress test started...{utils.Colors.END}')
+        while time.time() - tt < 600:  # run for 10 minutes
+            model(x)
+        print(f'{utils.Colors.CYAN}Stress test passed!{utils.Colors.END}')
 
 
 def main():
