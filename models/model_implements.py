@@ -270,8 +270,8 @@ class SimpleCNN(nn.Module):
 
         self.features = nn.Sequential()
         base_c = conf_model["base_c"]
-        layer_num = conf_model['num_layer']
-        in_channel = conf_model['in_channels']
+        layer_num = conf_model["num_layer"]
+        in_channel = conf_model["in_channels"]
         for i in range(layer_num):
             if i == 0:
                 self.features.append(nn.Conv2d(in_channel, base_c, kernel_size=3, stride=1, padding=1))
