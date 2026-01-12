@@ -1,5 +1,5 @@
 conf = dict(
-    env=dict(debug=True, CUDA_VISIBLE_DEVICES="0", mode="valid", cuda=True, task="regression", draw_results=False),
+    env=dict(debug=False, CUDA_VISIBLE_DEVICES="0", mode="valid", cuda=True, task="regression", draw_results=False),
     model=dict(
         name="Mobileone_s0_regression",
         num_class=1000,

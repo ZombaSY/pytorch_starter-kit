@@ -1,7 +1,7 @@
 crop_size = 128
 
 conf = dict(
-    env=dict(debug=True, CUDA_VISIBLE_DEVICES="0", mode="export", cuda=True, task="classification"),
+    env=dict(debug=False, CUDA_VISIBLE_DEVICES="0", mode="export", cuda=True, task="classification"),
     model=dict(
         name="Mobileone_s0_classification",
         num_class=1000,

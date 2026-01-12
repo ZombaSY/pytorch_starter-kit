@@ -4,13 +4,13 @@ data_cache = True
 
 conf = dict(
     env=dict(
-        debug=True,
+        debug=False,
         CUDA_VISIBLE_DEVICES="0",
         mode="train",
         cuda=True,
         wandb=True,
         saved_model_directory="model_ckpt",
-        project_name="wandb_project",
+        project_name="pytorch-starterkit",
         task="landmark",
         train_fold=1,
         epoch=10000,
