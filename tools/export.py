@@ -138,7 +138,7 @@ class Exportor:
 
         # pacakage description
         mlmodel.author = "Sunyong Seo"
-        mlmodel.license = "lululab.inc"
+        mlmodel.license = "miscellaneous.inc"
         mlmodel.version = "1.0.0"
         mlmodel.short_description = "The face landmarker network for the IQA-RT module."
 

@@ -52,34 +52,14 @@ def main():
     arg, unknown_arg = parser.parse_known_args()
 
     conf = {}
-    if arg.config_path is not None:
-        # Create a module spec using the directory path
-        spec = importlib.util.spec_from_file_location("conf", arg.config_path)
-        imported_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(imported_module)
 
-        conf = imported_module.conf
-        conf["config_path"] = arg.config_path
-    else:
-        # for sweeper case in WandB
-        conf = {"config_path": "configs/sweep_config.yaml"}
-        for item in unknown_arg:
-            item = item.strip("--")
-            key, value = item.split("=")
-            if key != "CUDA_VISIBLE_DEVICES":
-                try:
-                    if value == "true" or value == "false":
-                        value = value.title()
-                    value = ast.literal_eval(value)
-                except ValueError:
-                    if value.isalpha():
-                        pass
-                except SyntaxError as e:
-                    if "/" in value:
-                        pass
-                    else:
-                        raise e
-            conf[key] = value
+    # Create a module spec using the directory path
+    spec = importlib.util.spec_from_file_location("conf", arg.config_path)
+    imported_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(imported_module)
+
+    conf = imported_module.conf
+    conf["config_path"] = arg.config_path
 
     now_time = datetime.now().strftime("%Y-%m-%d %H%M%S")
     os.environ["CUDA_VISIBLE_DEVICES"] = conf["env"]["CUDA_VISIBLE_DEVICES"]
