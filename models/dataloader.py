@@ -1,17 +1,16 @@
-import copy
-import itertools
-import multiprocessing
 import os
+import torch
 import random
-
-import albumentations
-import cv2
 import numpy as np
 import pandas as pd
-import torch
-from torch.nn import functional as F
-from torch.utils.data import Dataset
+import cv2
+import multiprocessing
+import albumentations
+import itertools
+import copy
 
+from torch.utils.data import Dataset
+from torch.nn import functional as F
 from models import utils
 
 
@@ -24,52 +23,38 @@ def seed_worker(worker_id):
 
 def is_image(src):
     ext = os.path.splitext(src)[1]
-    return True if ext.lower() in [".jpeg", ".jpg", ".png", ".gif"] else False
+    return True if ext.lower() in ['.jpeg', '.jpg', '.png', '.gif'] else False
 
 
 def read_image_data(path, CV_COLOR):
     img = utils.cv2_imread(path, CV_COLOR)
-    return {"data": img, "path": path}
+    return {'data': img, 'path': path}
 
 
 def read_numpy_data(path):
     data = np.load(path)
-    return {"data": data, "path": path}
+    return {'data': data, 'path': path}
 
 
 def augmentations(conf_augmentation):
-    crop_size = conf_augmentation["transform_rand_crop"]
-    return [
-        albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=conf_augmentation["transform_rand_resize"]),
-        albumentations.RandomCrop(height=crop_size, width=crop_size, p=1.0),
-        albumentations.CoarseDropout(
-            num_holes_range=(1, 4),
-            hole_height_range=(crop_size // 16, crop_size // 4),
-            hole_width_range=(crop_size // 16, crop_size // 4),
-            p=conf_augmentation["transform_coarse_dropout"],
-        ),
-        albumentations.HorizontalFlip(p=conf_augmentation["transform_hflip"]),
-        albumentations.VerticalFlip(p=conf_augmentation["transform_vflip"]),
-        albumentations.ImageCompression(quality_range=(70, 100), p=conf_augmentation["transform_jpeg"]),
-        albumentations.GaussianBlur(p=conf_augmentation["transform_blur"]),
-        albumentations.CLAHE(p=conf_augmentation["transform_clahe"]),
-        albumentations.RandomRain(p=conf_augmentation["transform_rain"]),
-        albumentations.RandomFog(p=conf_augmentation["transform_fog"]),
-        albumentations.GaussNoise(p=conf_augmentation["transform_g_noise"]),
-        albumentations.FancyPCA(p=conf_augmentation["transform_fancyPCA"]),
-        albumentations.ColorJitter(
-            brightness=(0.7, 1.0),
-            contrast=(0.7, 1.0),
-            saturation=(0.7, 1.0),
-            hue=(-0.05, 0.05),
-            p=conf_augmentation["transform_jitter"],
-        ),
-        albumentations.Rotate(limit=(-30, 30), p=conf_augmentation["transform_rotate"]),
-        albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=conf_augmentation["transform_perspective"]),
-        albumentations.Resize(
-            conf_augmentation["transform_resize"][0], width=conf_augmentation["transform_resize"][1], p=1
-        ),
-    ]
+    crop_size = conf_augmentation['transform_rand_crop']
+    return [albumentations.RandomScale(interpolation=cv2.INTER_NEAREST, p=conf_augmentation['transform_rand_resize']),
+            albumentations.RandomCrop(height=crop_size, width=crop_size, p=1.0),
+            albumentations.CoarseDropout(num_holes_range=(1, 4), hole_height_range=(crop_size // 16, crop_size // 4), hole_width_range=(crop_size // 16, crop_size // 4), p=conf_augmentation['transform_coarse_dropout']),
+            albumentations.HorizontalFlip(p=conf_augmentation['transform_hflip']),
+            albumentations.VerticalFlip(p=conf_augmentation['transform_vflip']),
+            albumentations.ImageCompression(quality_range=(70, 100), p=conf_augmentation['transform_jpeg']),
+            albumentations.GaussianBlur(p=conf_augmentation['transform_blur']),
+            albumentations.CLAHE(p=conf_augmentation['transform_clahe']),
+            albumentations.RandomRain(p=conf_augmentation['transform_rain']),
+            albumentations.RandomFog(p=conf_augmentation['transform_fog']),
+            albumentations.GaussNoise(p=conf_augmentation['transform_g_noise']),
+            albumentations.FancyPCA(p=conf_augmentation['transform_fancyPCA']),
+            albumentations.ColorJitter(brightness=(0.7, 1.0), contrast=(0.7, 1.0), saturation=(0.7, 1.0), hue=(-0.05, 0.05), p=conf_augmentation['transform_jitter']),
+            albumentations.Rotate(limit=(-30, 30), p=conf_augmentation['transform_rotate']),
+            albumentations.Perspective(interpolation=cv2.INTER_NEAREST, p=conf_augmentation['transform_perspective']),
+            albumentations.Resize(conf_augmentation['transform_resize'][0], width=conf_augmentation['transform_resize'][1], p=1)
+            ]
 
 
 # https://github.com/rwightman/pytorch-image-models/blob/d72ac0db259275233877be8c1d4872163954dfbb/timm/data/loader.py
@@ -91,7 +76,7 @@ class MultiEpochsDataLoader(torch.utils.data.DataLoader):
 
 
 class _RepeatSampler(object):
-    """Sampler that repeats forever.
+    """ Sampler that repeats forever.
     conf:
         sampler (Sampler)
     """
@@ -113,50 +98,35 @@ class ImageLoader(Dataset):
         self.image_mean = [0.5, 0.5, 0.5]
         self.image_std = [0.25, 0.25, 0.25]
 
-        self.df = pd.read_csv(conf_dataloader["data_path"])
+        self.df = pd.read_csv(conf_dataloader['data_path'])
         self.len = len(self.df)
 
-        if self.conf_dataloader["data_cache"]:
-            utils.Logger().info(
-                f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}"
-            )
+        if self.conf_dataloader['data_cache']:
+            utils.Logger().info(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                self.memory_data_x = pools.map(
-                    utils.multiprocessing_wrapper,
-                    zip(itertools.repeat(read_image_data), self.df["input"], itertools.repeat(cv2.IMREAD_COLOR)),
-                )
+                self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['input'], itertools.repeat(cv2.IMREAD_COLOR)))
 
-        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(
-            self.conf_dataloader
-        )
+        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(self.conf_dataloader)
 
     def init_transform(self, conf_dataloader):
-        transform_resize = albumentations.Resize(
-            height=conf_dataloader["input_size"][0], width=self.conf_dataloader["input_size"][1], p=1
-        )
-        transform_augmentation = (
-            albumentations.Compose(augmentations(conf_dataloader["augmentations"]))
-            if conf_dataloader["mode"] == "train"
-            else None
-        )
-        transforms_normalize = albumentations.Compose(
-            [albumentations.Normalize(mean=self.image_mean, std=self.image_std)]
-        )
+        transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
+        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations'])) if conf_dataloader['mode'] == 'train' else None
+        transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
         return transform_resize, transform_augmentation, transforms_normalize
 
     def transform(self, _input):
-        if self.conf_dataloader["mode"] == "train":
+        if self.conf_dataloader['mode'] == 'train':
             transform = self.transform_resize(image=_input)
-            _input = transform["image"]
+            _input = transform['image']
 
             _input = _input.astype(np.uint8)
             transform = self.transform_augmentation(image=_input)
         else:
             transform = self.transform_resize(image=_input)
 
-        norm = self.transforms_normalize(image=transform["image"])
-        _input = norm["image"]
+        norm = self.transforms_normalize(image=transform['image'])
+        _input = norm['image']
         _input = np.transpose(_input, [2, 0, 1])
 
         _input = torch.from_numpy(_input.astype(np.float32))
@@ -164,16 +134,18 @@ class ImageLoader(Dataset):
         return _input
 
     def __getitem__(self, index):
-        if self.conf_dataloader["data_cache"]:
-            x_img = self.memory_data_x[index]["data"]
-            x_path = self.memory_data_x[index]["path"]
+        if self.conf_dataloader['data_cache']:
+            x_img = self.memory_data_x[index]['data']
+            x_path = self.memory_data_x[index]['path']
         else:
-            x_path = self.df["input"][index]
+            x_path = self.df['input'][index]
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
 
         x_img_tr = self.transform(copy.deepcopy(x_img))
 
-        return {"input": x_img_tr, "input_path": x_path, "label": torch.empty(0)}
+        return {'input': x_img_tr,
+                'input_path': x_path,
+                'label': torch.empty(0)}
 
     def __len__(self):
         return self.len
@@ -184,24 +156,22 @@ class ImageSSLLoader(ImageLoader):
     def __init__(self, conf, conf_dataloader):
         super(ImageSSLLoader, self).__init__(conf, conf_dataloader)
 
-        # overwrite inherited transforms with `train` status
-        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(
-            self.conf["dataloader_train"]
-        )
+        # overwrite inherited transforms
+        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(self.conf['dataloader_train'])
         _, self.transform_augmentation_ssl, _ = self.init_transform(self.conf_dataloader)
 
     def transform_ssl(self, _input):
-        if self.conf_dataloader["mode"] == "train":
+        if self.conf_dataloader['mode'] == 'train':
             transform = self.transform_resize(image=_input)
-            _input = transform["image"]
+            _input = transform['image']
 
             _input = _input.astype(np.uint8)
             transform = self.transform_augmentation_ssl(image=_input)
         else:
             transform = self.transform_resize(image=_input)
 
-        norm = self.transforms_normalize(image=transform["image"])
-        _input = norm["image"]
+        norm = self.transforms_normalize(image=transform['image'])
+        _input = norm['image']
         _input = np.transpose(_input, [2, 0, 1])
 
         _input = torch.from_numpy(_input.astype(np.float32))
@@ -209,27 +179,27 @@ class ImageSSLLoader(ImageLoader):
         return _input
 
     def __getitem__(self, index):
-        if self.conf_dataloader["data_cache"]:
-            x_img = self.memory_data_x[index]["data"]
-            x_path = self.memory_data_x[index]["path"]
+        if self.conf_dataloader['data_cache']:
+            x_img = self.memory_data_x[index]['data']
+            x_path = self.memory_data_x[index]['path']
         else:
-            x_path = self.df["input"][index]
+            x_path = self.df['input'][index]
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
 
-        if self.conf_dataloader["mode"] == "train":
-            x_img_target = self.transform(
-                copy.deepcopy(x_img)
-            )  # canonical target is once transformed by `dataloader_train.augmentation`
+        if self.conf_dataloader['mode'] == 'train':
+            x_img_target = self.transform(copy.deepcopy(x_img))  # canonical target is once transformed by `dataloader_train.augmentation`
 
             x_img_perturbs = torch.empty([0, *x_img_target.shape])
             x_img_target_np = (torch.permute(x_img_target, [1, 2, 0]).numpy() * self.image_std + self.image_mean) * 255
-            for i in range(self.conf_dataloader["perturbation_nums"]):
+            for i in range(self.conf_dataloader['perturbation_nums']):
                 x_img_tr = self.transform_ssl(copy.deepcopy(x_img_target_np)).unsqueeze(0)
                 x_img_perturbs = torch.cat([x_img_perturbs, x_img_tr], dim=0)
         else:
-            x_img_target = self.transform(x_img)
+           x_img_target = self.transform(x_img)
 
-        return {"input": x_img_target, "input_perturb": x_img_perturbs, "input_path": x_path}
+        return {'input': x_img_target,
+                'input_perturb': x_img_perturbs,
+                'input_path': x_path}
 
 
 class Image2ImageLoader(Dataset):
@@ -241,102 +211,88 @@ class Image2ImageLoader(Dataset):
         self.image_mean = [0.5, 0.5, 0.5]
         self.image_std = [0.25, 0.25, 0.25]
 
-        self.df = pd.read_csv(conf_dataloader["data_path"])
+        self.df = pd.read_csv(conf_dataloader['data_path'])
         self.len = len(self.df)
 
         # mount_data_on_memory
-        if self.conf_dataloader["data_cache"]:
-            utils.Logger().info(
-                f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}"
-            )
+        if self.conf_dataloader['data_cache']:
+            utils.Logger().info(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                self.memory_data_x = pools.map(
-                    utils.multiprocessing_wrapper,
-                    zip(itertools.repeat(read_image_data), self.df["input"], itertools.repeat(cv2.IMREAD_COLOR)),
-                )
-                self.memory_data_y = pools.map(
-                    utils.multiprocessing_wrapper,
-                    zip(itertools.repeat(read_image_data), self.df["label"], itertools.repeat(cv2.IMREAD_GRAYSCALE)),
-                )
+                self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['input'], itertools.repeat(cv2.IMREAD_COLOR)))
+                self.memory_data_y = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['label'], itertools.repeat(cv2.IMREAD_GRAYSCALE)))
 
-        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(
-            self.conf_dataloader
-        )
+        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(self.conf_dataloader)
 
     def init_transform(self, conf_dataloader):
-        transform_resize = albumentations.Resize(
-            height=conf_dataloader["input_size"][0], width=self.conf_dataloader["input_size"][1], p=1
-        )
-        transform_augmentation = (
-            albumentations.Compose(augmentations(conf_dataloader["augmentations"]))
-            if conf_dataloader["mode"] == "train"
-            else None
-        )
-        transforms_normalize = albumentations.Compose(
-            [albumentations.Normalize(mean=self.image_mean, std=self.image_std)]
-        )
+        transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
+        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations'])) if conf_dataloader['mode'] == 'train' else None
+        transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
         return transform_resize, transform_augmentation, transforms_normalize
 
     def transform(self, _input, _label):
         random_gen = random.Random()
 
-        if self.conf_dataloader["mode"] == "train":
+        if self.conf_dataloader['mode'] == 'train':
             transform = self.transform_resize(image=_input, mask=_label)
-            _input = transform["image"]
-            _label = transform["mask"]
+            _input = transform['image']
+            _label = transform['mask']
 
-            if random_gen.random() < self.conf_dataloader["augmentations"]["transform_cutmix"]:
+            if random_gen.random() < self.conf_dataloader['augmentations']['transform_cutmix']:
                 rand_n = random_gen.randint(0, self.len - 1)
-                if self.conf_dataloader["data_cache"]:
-                    _input_refer = self.memory_data_x[rand_n]["data"]
-                    _label_refer = self.memory_data_y[rand_n]["data"]
+                if self.conf_dataloader['data_cache']:
+                    _input_refer = self.memory_data_x[rand_n]['data']
+                    _label_refer = self.memory_data_y[rand_n]['data']
                 else:
-                    _input_refer = utils.cv2_imread(self.df["input"][rand_n], cv2.IMREAD_COLOR)
-                    _label_refer = utils.cv2_imread(self.df["label"][rand_n], cv2.IMREAD_GRAYSCALE)
+                    _input_refer = utils.cv2_imread(self.df['input'][rand_n], cv2.IMREAD_COLOR)
+                    _label_refer = utils.cv2_imread(self.df['label'][rand_n], cv2.IMREAD_GRAYSCALE)
                 transform_ref = self.transform_resize(image=_input_refer, mask=_label_refer)
-                _input_refer = transform_ref["image"]
-                _label_refer = transform_ref["mask"]
+                _input_refer = transform_ref['image']
+                _label_refer = transform_ref['mask']
                 _input, _label, cutout_mask = utils.cut_mix(_input, _input_refer, _label, _label_refer)
 
             _input = _input.astype(np.uint8)
             _label = _label.astype(np.uint8)
+
             transform = self.transform_augmentation(image=_input, mask=_label)
         else:
             transform = self.transform_resize(image=_input, mask=_label)
 
-        norm = self.transforms_normalize(image=transform["image"])
-        _input = norm["image"]
-        _label = transform["mask"]
+        norm = self.transforms_normalize(image=transform['image'])
+        _input = norm['image']
+        _label = transform['mask']
 
-        if self.conf["model"]["num_class"] == 2:  # for binary label
+        if self.conf['model']['num_class'] == 2:  # for binary label
             _label = np.where(_label >= 128, 1, 0)
 
         _input = np.transpose(_input, [2, 0, 1])
 
         _input = torch.from_numpy(_input.astype(np.float32))
         _label = torch.from_numpy(_label)
-        _label = _label.unsqueeze(0)  # expand 'grey channel' for loss function dependency
+        _label = _label.unsqueeze(0)    # expand 'grey channel' for loss function dependency
 
         return _input, _label
 
     def __getitem__(self, index):
-        if self.conf_dataloader["data_cache"]:
-            img_x = self.memory_data_x[index]["data"]
-            img_y = self.memory_data_y[index]["data"]
-            x_path = self.memory_data_x[index]["path"]
-            y_path = self.memory_data_y[index]["path"]
+        if self.conf_dataloader['data_cache']:
+            img_x = self.memory_data_x[index]['data']
+            img_y = self.memory_data_y[index]['data']
+            x_path = self.memory_data_x[index]['path']
+            y_path = self.memory_data_y[index]['path']
 
         else:
-            x_path = self.df["input"][index]
-            y_path = self.df["label"][index]
+            x_path = self.df['input'][index]
+            y_path = self.df['label'][index]
 
             img_x = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
             img_y = utils.cv2_imread(y_path, cv2.IMREAD_GRAYSCALE)
 
         img_x_tr, img_y_tr = self.transform(copy.deepcopy(img_x), copy.deepcopy(img_y))
 
-        return {"input": img_x_tr, "label": img_y_tr, "input_path": x_path, "label_path": y_path}
+        return {'input': img_x_tr,
+                'label': img_y_tr,
+                'input_path': x_path,
+                'label_path': y_path}
 
     def __len__(self):
         return self.len
@@ -351,35 +307,23 @@ class Image2VectorLoader(Dataset):
         self.image_mean = [0.5, 0.5, 0.5]
         self.image_std = [0.25, 0.25, 0.25]
 
-        self.df = pd.read_csv(conf_dataloader["data_path"])
+        self.df = pd.read_csv(conf_dataloader['data_path'])
         self.len = len(self.df)
 
         # mount_data_on_memory
-        if self.conf_dataloader["data_cache"]:
-            utils.Logger().info(
-                f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}"
-            )
+        if self.conf_dataloader['data_cache']:
+            utils.Logger().info(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
             x_img_path = []
             self.memory_data_y = []
             for idx in range(self.len):
-                x_img_path.append(self.df["input"][idx])
-                label = (
-                    F.one_hot(
-                        torch.tensor(self.df[self.conf_dataloader["label_cols"]].values[idx]),
-                        self.conf["model"]["num_class"],
-                    )
-                    if self.conf["env"]["task"] == "classification"
-                    else torch.tensor(self.df[self.conf_dataloader["label_cols"]].values[idx])
-                )
+                x_img_path.append(self.df['input'][idx])
+                label = F.one_hot(torch.tensor(self.df[self.conf_dataloader['label_cols']].values[idx]), self.conf['model']['num_class']) if self.conf['env']['task'] == 'classification' else torch.tensor(self.df[self.conf_dataloader['label_cols']].values[idx])
                 self.memory_data_y.append(label)
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                self.memory_data_x = pools.map(
-                    utils.multiprocessing_wrapper,
-                    zip(itertools.repeat(read_image_data), x_img_path, itertools.repeat(cv2.IMREAD_COLOR)),
-                )
+                self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), x_img_path, itertools.repeat(cv2.IMREAD_COLOR)))
 
-        if self.conf_dataloader["mode"] == "train":
-            if self.conf_dataloader["augmentations"]["transform_mixup"] > 0:
+        if self.conf_dataloader['mode'] == 'train':
+            if self.conf_dataloader['augmentations']['transform_mixup'] > 0:
                 # C-mixup
                 # self.mixup_sample_1 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col1']), -1)))
                 # self.mixup_sample_2 = np.array(utils.get_mixup_sample_rate(np.expand_dims(np.array(self.df['col2']), -1)))
@@ -388,46 +332,36 @@ class Image2VectorLoader(Dataset):
                 # mix-up
                 self.mixup_sample = np.ones(self.len) / self.len
 
-        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(
-            self.conf_dataloader
-        )
+        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(self.conf_dataloader)
 
     def init_transform(self, conf_dataloader):
-        transform_resize = albumentations.Resize(
-            height=conf_dataloader["input_size"][0], width=self.conf_dataloader["input_size"][1], p=1
-        )
-        transform_augmentation = (
-            albumentations.Compose(augmentations(conf_dataloader["augmentations"]))
-            if conf_dataloader["mode"] == "train"
-            else None
-        )
-        transforms_normalize = albumentations.Compose(
-            [albumentations.Normalize(mean=self.image_mean, std=self.image_std)]
-        )
+        transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
+        transform_augmentation = albumentations.Compose(augmentations(conf_dataloader['augmentations'])) if conf_dataloader['mode'] == 'train' else None
+        transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
         return transform_resize, transform_augmentation, transforms_normalize
 
     def transform(self, _input, _label):
         random_gen = random.Random()
 
-        if self.conf_dataloader["mode"] == "train":
+        if self.conf_dataloader['mode'] == 'train':
             transform = self.transform_resize(image=_input)
-            _input = transform["image"]
+            _input = transform['image']
 
             # MixUp
-            if random_gen.random() < self.conf_dataloader["augmentations"]["transform_mixup"]:
+            if random_gen.random() < self.conf_dataloader['augmentations']['transform_mixup']:
                 # select index from pre-defined sampler
                 idx_2 = np.random.choice(np.arange(self.len), p=self.mixup_sample)
 
                 # load the pair of X and Y
-                x_path = self.df["input"][idx_2]
+                x_path = self.df['input'][idx_2]
                 x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
                 transform = self.transform_resize(image=x_img)
-                _input_2 = transform["image"]
-                _label_2 = torch.tensor(self.df[self.conf_dataloader["label_cols"]].values[idx_2])
+                _input_2 = transform['image']
+                _label_2 = torch.tensor(self.df[self.conf_dataloader['label_cols']].values[idx_2])
 
-                if self.conf["env"]["task"] == "classification":
-                    _label_2 = F.one_hot(_label_2, num_classes=self.conf["model"]["num_class"])
+                if self.conf['env']['task'] == 'classification':
+                    _label_2 = F.one_hot(_label_2, num_classes=self.conf['model']['num_class'])
 
                 lam = np.random.beta(2, 2)
 
@@ -442,8 +376,8 @@ class Image2VectorLoader(Dataset):
         else:
             transform = self.transform_resize(image=_input)
 
-        norm = self.transforms_normalize(image=transform["image"])
-        _input = norm["image"]
+        norm = self.transforms_normalize(image=transform['image'])
+        _input = norm['image']
         _input = np.transpose(_input, [2, 0, 1])
 
         _input = torch.from_numpy(_input.astype(np.float32))
@@ -451,21 +385,23 @@ class Image2VectorLoader(Dataset):
         return _input, _label.float()
 
     def __getitem__(self, index):
-        if self.conf_dataloader["data_cache"]:
-            x_img = self.memory_data_x[index]["data"]
+        if self.conf_dataloader['data_cache']:
+            x_img = self.memory_data_x[index]['data']
             y_vec = self.memory_data_y[index]
-            x_path = self.memory_data_x[index]["path"]
+            x_path = self.memory_data_x[index]['path']
         else:
-            x_path = self.df["input"][index]
+            x_path = self.df['input'][index]
             x_img = utils.cv2_imread(x_path, cv2.IMREAD_COLOR)
-            y_vec = torch.tensor(self.df[self.conf_dataloader["label_cols"]].values[index])
+            y_vec = torch.tensor(self.df[self.conf_dataloader['label_cols']].values[index])
 
-            if self.conf["env"]["task"] == "classification" and self.conf_dataloader["mode"] != "test":
-                y_vec = F.one_hot(y_vec, num_classes=self.conf["model"]["num_class"])
+            if self.conf['env']['task'] == 'classification' and self.conf_dataloader['mode'] != 'test':
+                y_vec = F.one_hot(y_vec, num_classes=self.conf['model']['num_class'])
 
         x_img_tr, y_vec = self.transform(copy.deepcopy(x_img), copy.deepcopy(y_vec))
 
-        return {"input": x_img_tr, "label": y_vec, "input_path": x_path}
+        return {'input': x_img_tr,
+                'label': y_vec,
+                'input_path': x_path}
 
     def __len__(self):
         return self.len
@@ -477,7 +413,7 @@ class Image2LandmarkLoader(Dataset):
         self.conf = conf
         self.conf_dataloader = conf_dataloader
 
-        """
+        '''
         examples)
 
         origin landmark indices:
@@ -497,95 +433,91 @@ class Image2LandmarkLoader(Dataset):
          12, 13, 14, 15, 16, 17,
          6,  7,  8,  9,  10, 11,
          0,  1,  2,  3,  4,  5,]
-        """
-        self.points_hflip = [5, 4, 3, 2, 1, 0, 11, 10, 9, 8, 7, 6, 17, 16, 15, 14, 13, 12, 23, 22, 21, 20, 19, 18]
+        '''
+        self.points_hflip = [32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0,
+                            42, 41, 40, 39, 38, 37, 36, 35, 34, 33,
+                            43, 44, 45, 46,
+                            51, 50, 49, 48, 47,
+                            61, 60, 59, 58, 63, 62, 55, 54, 53, 52, 57, 56,
+                            71, 70, 69, 68, 67, 66, 65, 64,
+                            75, 76, 77, 72, 73, 74,
+                            79, 78, 81, 80, 83, 82,
+                            90, 89, 88, 87, 86, 85, 84, 95, 94, 93, 92, 91, 100, 99, 98, 97, 96, 103, 102, 101, 105, 104]
+
         self.image_mean = [0.5, 0.5, 0.5]
         self.image_std = [0.25, 0.25, 0.25]
 
-        self.df = pd.read_csv(conf_dataloader["data_path"])
+        self.df = pd.read_csv(conf_dataloader['data_path'])
         self.len = len(self.df)
 
         # mount_data_on_memory
-        if self.conf_dataloader["data_cache"]:
-            utils.Logger().info(
-                f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}"
-            )
+        if self.conf_dataloader['data_cache']:
+            utils.Logger().info(f"{utils.Colors.LIGHT_RED}Mounting data on memory...{self.__class__.__name__}:{self.conf_dataloader['mode']}{utils.Colors.END}")
             with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
-                self.memory_data_x = pools.map(
-                    utils.multiprocessing_wrapper,
-                    zip(itertools.repeat(read_image_data), self.df["input"], itertools.repeat(cv2.IMREAD_COLOR)),
-                )
-                self.memory_data_y = pools.map(
-                    utils.multiprocessing_wrapper, zip(itertools.repeat(read_numpy_data), self.df["label"])
-                )
+                self.memory_data_x = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_image_data), self.df['input'], itertools.repeat(cv2.IMREAD_COLOR)))
+                self.memory_data_y = pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(read_numpy_data), self.df['label']))
 
-        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(
-            self.conf_dataloader
-        )
+        self.transform_resize, self.transform_augmentation, self.transforms_normalize = self.init_transform(self.conf_dataloader)
 
     def init_transform(self, conf_dataloader):
-        transform_resize = albumentations.Resize(
-            height=conf_dataloader["input_size"][0], width=self.conf_dataloader["input_size"][1], p=1
-        )
-        transform_augmentation = (
-            albumentations.Compose(
-                augmentations(conf_dataloader["augmentations"]),
-                keypoint_params=albumentations.KeypointParams(format="xy", remove_invisible=False),
-            )
-            if conf_dataloader["mode"] == "train"
-            else None
-        )
-        transforms_normalize = albumentations.Compose(
-            [albumentations.Normalize(mean=self.image_mean, std=self.image_std)]
-        )
+        transform_resize = albumentations.Resize(height=conf_dataloader['input_size'][0], width=self.conf_dataloader['input_size'][1], p=1)
+        transform_augmentation = albumentations.Compose(
+                augmentations(conf_dataloader['augmentations']),
+                keypoint_params=albumentations.KeypointParams(format='xy', remove_invisible=False)
+                ) if conf_dataloader['mode'] == 'train' else None
+        transforms_normalize = albumentations.Compose([albumentations.Normalize(mean=self.image_mean, std=self.image_std)])
 
         return transform_resize, transform_augmentation, transforms_normalize
 
     def transform(self, _input, _label):
         random_gen = random.Random()
         transform = self.transform_resize(image=_input)
-        _input = transform["image"]
+        _input = transform['image']
+        _label = np.reshape(_label, [-1, 2])
 
-        if self.conf_dataloader["mode"] == "train":
+        if self.conf_dataloader['mode'] == 'train':
 
-            if random_gen.random() < self.conf_dataloader["augmentations"]["transform_landmark_hflip"]:
+            if random_gen.random() < self.conf_dataloader['augmentations']['transform_landmark_hflip']:
                 _input, _label = utils.random_hflip_landmark(_input, _label, self.points_hflip)
 
             _input = _input.astype(np.uint8)
-            _label[..., 0] = _label[..., 0] * self.conf_dataloader["input_size"][0]
-            _label[..., 1] = _label[..., 1] * self.conf_dataloader["input_size"][1]
+            _label[..., 0] = _label[..., 0] * self.conf_dataloader['input_size'][0]
+            _label[..., 1] = _label[..., 1] * self.conf_dataloader['input_size'][1]
             transform = self.transform_augmentation(image=_input, keypoints=_label)
 
-            _input, _label = transform["image"], np.array(transform["keypoints"]).astype(np.float32)
-            _label[..., 0] = _label[..., 0] / self.conf_dataloader["input_size"][0]
-            _label[..., 1] = _label[..., 1] / self.conf_dataloader["input_size"][1]
+            _input, _label = transform['image'], np.array(transform['keypoints']).astype(np.float32)
+            _label[..., 0] = _label[..., 0] / self.conf_dataloader['input_size'][0]
+            _label[..., 1] = _label[..., 1] / self.conf_dataloader['input_size'][1]
 
         norm = self.transforms_normalize(image=_input)
-        _input = norm["image"]
+        _input = norm['image']
         _input = np.transpose(_input, [2, 0, 1])
         _input = torch.from_numpy(_input.astype(np.float32))
         _label = torch.from_numpy(_label.astype(np.float32))
-        _label = _label.reshape(self.conf["model"]["num_class"])
+        _label = _label.reshape(self.conf['model']['num_class'])
 
         return _input, _label
 
     def __getitem__(self, index):
-        if self.conf_dataloader["data_cache"]:
-            img_x = self.memory_data_x[index]["data"]
-            img_y = self.memory_data_y[index]["data"]
-            x_path = self.memory_data_x[index]["path"]
-            y_path = self.memory_data_y[index]["path"]
+        if self.conf_dataloader['data_cache']:
+            img_x = self.memory_data_x[index]['data']
+            img_y = self.memory_data_y[index]['data']
+            x_path = self.memory_data_x[index]['path']
+            y_path = self.memory_data_y[index]['path']
 
         else:
-            x_path = self.df["input"][index]
-            y_path = self.df["label"][index]
+            x_path = self.df['input'][index]
+            y_path = self.df['label'][index]
 
-            img_x = read_image_data(x_path, cv2.IMREAD_COLOR)["data"]
-            img_y = read_numpy_data(y_path)["data"]
+            img_x = read_image_data(x_path, cv2.IMREAD_COLOR)['data']
+            img_y = read_numpy_data(y_path)['data']
 
         img_x_tr, img_y_tr = self.transform(copy.deepcopy(img_x), copy.deepcopy(img_y))
 
-        return {"input": img_x_tr, "label": img_y_tr, "input_path": x_path, "label_path": y_path}
+        return {'input': img_x_tr,
+                'label': img_y_tr,
+                'input_path': x_path,
+                'label_path': y_path}
 
     def __len__(self):
         return self.len
@@ -600,15 +532,13 @@ class Image:
         self.image_loader = ImageLoader(conf, conf_dataloader)
 
         # use your own data loader
-        self.Loader = MultiEpochsDataLoader(
-            self.image_loader,
-            batch_size=conf_dataloader["batch_size"],
-            num_workers=conf_dataloader["workers"],
-            shuffle=(conf_dataloader["mode"] == "train"),
-            worker_init_fn=seed_worker,
-            generator=g,
-            pin_memory=True,
-        )
+        self.Loader = MultiEpochsDataLoader(self.image_loader,
+                                            batch_size=conf_dataloader['batch_size'],
+                                            num_workers=conf_dataloader['workers'],
+                                            shuffle=(conf_dataloader['mode']=='train'),
+                                            worker_init_fn=seed_worker,
+                                            generator=g,
+                                            pin_memory=True)
 
     def __len__(self):
         return self.image_loader.__len__()
@@ -623,15 +553,13 @@ class ImageSSL:
         self.image_loader = ImageSSLLoader(conf, conf_dataloader)
 
         # use your own data loader
-        self.Loader = MultiEpochsDataLoader(
-            self.image_loader,
-            batch_size=conf_dataloader["batch_size"],
-            num_workers=conf_dataloader["workers"],
-            shuffle=(conf_dataloader["mode"] == "train"),
-            worker_init_fn=seed_worker,
-            generator=g,
-            pin_memory=True,
-        )
+        self.Loader = MultiEpochsDataLoader(self.image_loader,
+                                            batch_size=conf_dataloader['batch_size'],
+                                            num_workers=conf_dataloader['workers'],
+                                            shuffle=(conf_dataloader['mode']=='train'),
+                                            worker_init_fn=seed_worker,
+                                            generator=g,
+                                            pin_memory=True)
 
     def __len__(self):
         return self.image_loader.__len__()
@@ -646,15 +574,13 @@ class Image2Image:
         self.image_loader = Image2ImageLoader(conf, conf_dataloader)
 
         # use your own data loader
-        self.Loader = MultiEpochsDataLoader(
-            self.image_loader,
-            batch_size=conf_dataloader["batch_size"],
-            num_workers=conf_dataloader["workers"],
-            shuffle=(conf_dataloader["mode"] == "train"),
-            worker_init_fn=seed_worker,
-            generator=g,
-            pin_memory=True,
-        )
+        self.Loader = MultiEpochsDataLoader(self.image_loader,
+                                            batch_size=conf_dataloader['batch_size'],
+                                            num_workers=conf_dataloader['workers'],
+                                            shuffle=(conf_dataloader['mode']=='train'),
+                                            worker_init_fn=seed_worker,
+                                            generator=g,
+                                            pin_memory=True)
 
     def __len__(self):
         return self.image_loader.__len__()
@@ -668,32 +594,26 @@ class Image2Vector:
 
         self.image_loader = Image2VectorLoader(conf, conf_dataloader)
 
-        if conf_dataloader["weighted_sampler"] is True and conf_dataloader["mode"] == "train":
-            sampler1 = utils.get_frequency_in_list(np.array(self.image_loader.df["label1"]).tolist(), reciprocal=True)
-            sampler2 = utils.get_frequency_in_list(np.array(self.image_loader.df["label"]).tolist(), reciprocal=True)
-            sampler = torch.utils.data.WeightedRandomSampler(
-                sampler1 + sampler2, self.image_loader.__len__(), replacement=True
-            )
-            self.Loader = MultiEpochsDataLoader(
-                self.image_loader,
-                batch_size=conf_dataloader["batch_size"],
-                num_workers=conf_dataloader["workers"],
-                shuffle=(conf_dataloader["mode"] == "train"),
-                generator=g,
-                pin_memory=True,
-                sampler=sampler,
-            )
+        if conf_dataloader['weighted_sampler'] == True and conf_dataloader['mode'] == 'train':
+            sampler1 = utils.get_frequency_in_list(np.array(self.image_loader.df['label1']).tolist(), reciprocal=True)
+            sampler2 = utils.get_frequency_in_list(np.array(self.image_loader.df['label']).tolist(), reciprocal=True)
+            sampler = torch.utils.data.WeightedRandomSampler(sampler1 + sampler2, self.image_loader.__len__(), replacement=True)
+            self.Loader = MultiEpochsDataLoader(self.image_loader,
+                                                batch_size=conf_dataloader['batch_size'],
+                                                num_workers=conf_dataloader['workers'],
+                                                shuffle=(conf_dataloader['mode']=='train'),
+                                                generator=g,
+                                                pin_memory=True,
+                                                sampler=sampler)
 
         else:
-            self.Loader = MultiEpochsDataLoader(
-                self.image_loader,
-                batch_size=conf_dataloader["batch_size"],
-                num_workers=conf_dataloader["workers"],
-                shuffle=(conf_dataloader["mode"] == "train"),
-                worker_init_fn=seed_worker,
-                generator=g,
-                pin_memory=True,
-            )
+            self.Loader = MultiEpochsDataLoader(self.image_loader,
+                                                batch_size=conf_dataloader['batch_size'],
+                                                num_workers=conf_dataloader['workers'],
+                                                shuffle=(conf_dataloader['mode']=='train'),
+                                                worker_init_fn=seed_worker,
+                                                generator=g,
+                                                pin_memory=True)
 
     def __len__(self):
         return self.image_loader.__len__()
@@ -707,15 +627,13 @@ class Image2Landmark:
         self.image_loader = Image2LandmarkLoader(conf, conf_dataloader)
 
         # use your own data loader
-        self.Loader = MultiEpochsDataLoader(
-            self.image_loader,
-            batch_size=conf_dataloader["batch_size"],
-            num_workers=conf_dataloader["workers"],
-            shuffle=(conf_dataloader["mode"] == "train"),
-            worker_init_fn=seed_worker,
-            generator=g,
-            pin_memory=True,
-        )
+        self.Loader = MultiEpochsDataLoader(self.image_loader,
+                                            batch_size=conf_dataloader['batch_size'],
+                                            num_workers=conf_dataloader['workers'],
+                                            shuffle=(conf_dataloader['mode']=='train'),
+                                            worker_init_fn=seed_worker,
+                                            generator=g,
+                                            pin_memory=True)
 
     def __len__(self):
         return self.image_loader.__len__()

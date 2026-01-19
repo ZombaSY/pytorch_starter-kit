@@ -1,12 +1,13 @@
-import itertools
-import math
-
-import numpy as np
 import torch
 import torch.nn.functional as F
-from scipy.ndimage.morphology import distance_transform_edt as edt
-from sklearn.metrics import accuracy_score, auc, cohen_kappa_score, confusion_matrix, f1_score, roc_curve
+import math
+import numpy as np
+import itertools
+
 from torch.autograd import Variable
+from sklearn.metrics import cohen_kappa_score, accuracy_score, f1_score
+from scipy.ndimage.morphology import distance_transform_edt as edt
+from sklearn.metrics import auc, roc_curve, confusion_matrix
 
 
 class SSIM(torch.nn.Module):
@@ -19,9 +20,7 @@ class SSIM(torch.nn.Module):
 
     @staticmethod
     def gaussian(window_size, sigma):
-        gauss = torch.Tensor(
-            [math.exp(-((x - window_size // 2) ** 2) / float(2 * sigma**2)) for x in range(window_size)]
-        )
+        gauss = torch.Tensor([math.exp(-(x - window_size // 2) ** 2 / float(2 * sigma ** 2)) for x in range(window_size)])
         return gauss / gauss.sum()
 
     @staticmethod
@@ -44,8 +43,8 @@ class SSIM(torch.nn.Module):
         sigma2_sq = F.conv2d(img2 * img2, window, padding=window_size // 2, groups=channel) - mu2_sq
         sigma12 = F.conv2d(img1 * img2, window, padding=window_size // 2, groups=channel) - mu1_mu2
 
-        C1 = 0.01**2
-        C2 = 0.03**2
+        C1 = 0.01 ** 2
+        C2 = 0.03 ** 2
 
         ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / ((mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2))
 
@@ -98,37 +97,43 @@ class HausdorffDistance:
         return np.array(np.max(distances[indexes]))
 
     def compute(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        assert pred.shape[1] == 1 and target.shape[1] == 1, "Only binary channel supported"
+        assert (
+            pred.shape[1] == 1 and target.shape[1] == 1
+        ), "Only binary channel supported"
 
         pred = (pred > 0.5).byte()
         target = (target > 0.5).byte()
 
-        right_hd = torch.from_numpy(self.hd_distance(pred.cpu().numpy(), target.cpu().numpy())).float()
+        right_hd = torch.from_numpy(
+            self.hd_distance(pred.cpu().numpy(), target.cpu().numpy())
+        ).float()
 
-        left_hd = torch.from_numpy(self.hd_distance(target.cpu().numpy(), pred.cpu().numpy())).float()
+        left_hd = torch.from_numpy(
+            self.hd_distance(target.cpu().numpy(), pred.cpu().numpy())
+        ).float()
 
         return torch.max(right_hd, left_hd)
 
 
 class _StreamMetrics(object):
     def __init__(self):
-        """Overridden by subclasses"""
+        """ Overridden by subclasses """
         raise NotImplementedError()
 
     def update(self, gt, pred):
-        """Overridden by subclasses"""
+        """ Overridden by subclasses """
         raise NotImplementedError()
 
     def get_results(self):
-        """Overridden by subclasses"""
+        """ Overridden by subclasses """
         raise NotImplementedError()
 
     def to_str(self, metrics):
-        """Overridden by subclasses"""
+        """ Overridden by subclasses """
         raise NotImplementedError()
 
     def reset(self):
-        """Overridden by subclasses"""
+        """ Overridden by subclasses """
         raise NotImplementedError()
 
 
@@ -140,7 +145,13 @@ class StreamSegMetrics_segmentation(_StreamMetrics):
     def __init__(self, n_classes):
         self.n_classes = n_classes
         self.confusion_matrix = np.zeros((n_classes, n_classes))
-        self.metric_dict = {"Overall Acc": 0, "Mean Acc": 0, "FreqW Acc": 0, "Mean IoU": 0, "Class IoU": 0}
+        self.metric_dict = {
+            "Overall Acc": 0,
+            "Mean Acc": 0,
+            "FreqW Acc": 0,
+            "Mean IoU": 0,
+            "Class IoU": 0
+        }
 
     def update(self, label_trues, label_preds):
         for lt, lp in zip(label_trues, label_preds):
@@ -161,16 +172,17 @@ class StreamSegMetrics_segmentation(_StreamMetrics):
     def _fast_hist(self, label_true, label_pred):
         mask = (label_true >= 0) & (label_true < self.n_classes)
         hist = np.bincount(
-            self.n_classes * label_true[mask].astype(int) + label_pred[mask], minlength=self.n_classes**2
+            self.n_classes * label_true[mask].astype(int) + label_pred[mask],
+            minlength=self.n_classes ** 2,
         ).reshape(self.n_classes, self.n_classes)
         return hist
 
     def get_results(self):
         """Returns accuracy score evaluation result.
-        - overall accuracy
-        - mean accuracy
-        - mean iou
-        - fwavacc
+            - overall accuracy
+            - mean accuracy
+            - mean iou
+            - fwavacc
         """
         hist = self.confusion_matrix
         acc = np.diag(hist).sum() / hist.sum()
@@ -182,11 +194,11 @@ class StreamSegMetrics_segmentation(_StreamMetrics):
         fwavacc = (freq[freq > 0] * iou[freq > 0]).sum()
         cls_iou = dict(zip(range(self.n_classes), iou))
 
-        self.metric_dict["Overall Acc"] = acc
-        self.metric_dict["Mean Acc"] = acc_cls
-        self.metric_dict["FreqW Acc"] = fwavacc
-        self.metric_dict["Mean IoU"] = mean_iou
-        self.metric_dict["Class IoU"] = cls_iou
+        self.metric_dict['Overall Acc'] = acc
+        self.metric_dict['Mean Acc'] = acc_cls
+        self.metric_dict['FreqW Acc'] = fwavacc
+        self.metric_dict['Mean IoU'] = mean_iou
+        self.metric_dict['Class IoU'] = cls_iou
 
         return self.metric_dict
 
@@ -196,7 +208,9 @@ class StreamSegMetrics_segmentation(_StreamMetrics):
 
 class StreamSegMetrics_classification:
     def __init__(self, n_classes):
-        self.metric_dict = {"kappa_score": -1, "acc": -1, "f1": -1}
+        self.metric_dict = {'kappa_score': -1,
+                            'acc': -1,
+                            'f1': -1}
         self.pred_list = []
         self.target_list = []
         self.n_classes = n_classes
@@ -209,9 +223,9 @@ class StreamSegMetrics_classification:
         pred_np_flatten = np.array([item for item in itertools.chain.from_iterable(self.pred_list)])
         target_np_flatten = np.array([item for item in itertools.chain.from_iterable(self.target_list)])
 
-        self.metric_dict["kappa_score"] = cohen_kappa_score(pred_np_flatten, pred_np_flatten)
-        self.metric_dict["acc"] = accuracy_score(target_np_flatten, pred_np_flatten)
-        self.metric_dict["f1"] = f1_score(target_np_flatten, pred_np_flatten, average="macro")
+        self.metric_dict['kappa_score'] = cohen_kappa_score(pred_np_flatten, pred_np_flatten)
+        self.metric_dict['acc'] = accuracy_score(target_np_flatten, pred_np_flatten)
+        self.metric_dict['f1'] = f1_score(target_np_flatten, pred_np_flatten, average='macro')
 
         return self.metric_dict
 
@@ -236,7 +250,7 @@ def metrics_np(np_res, np_gnd, b_auc=False):
     epsilon = 2.22045e-16
     for i in range(np_res.shape[0]):
         label = np_gnd[i, ...]
-        pred = np_res[i, ...]
+        pred = np_res[i,...]
         label = label.flatten()
         pred = pred.flatten()
         # assert label.max() == 1 and (pred).max() <= 1
@@ -247,7 +261,7 @@ def metrics_np(np_res, np_gnd, b_auc=False):
 
         try:
             tn, fp, fn, tp = confusion_matrix(y_true=label, y_pred=pred).ravel()  # for binary
-        except ValueError:
+        except ValueError as e:
             tn, fp, fn, tp = 0, 0, 0, 0
         accuracy = (tp + tn) / (tp + tn + fp + fn + epsilon)
         specificity = tn / (tn + fp + epsilon)  #
@@ -256,10 +270,8 @@ def metrics_np(np_res, np_gnd, b_auc=False):
         f1_score = (2 * sensitivity * precision) / (sensitivity + precision + epsilon)
         iou = tp + (tp + fp + fn + epsilon)
 
-        tp_tmp, tn_tmp, fp_tmp, fn_tmp = tp / 1000, tn / 1000, fp / 1000, fn / 1000  # to prevent overflowing
-        mcc = (tp_tmp * tn_tmp - fp_tmp * fn_tmp) / math.sqrt(
-            (tp_tmp + fp_tmp) * (tp_tmp + fn_tmp) * (tn_tmp + fp_tmp) * (tn_tmp + fn_tmp) + epsilon
-        )  # Matthews correlation coefficient
+        tp_tmp, tn_tmp, fp_tmp, fn_tmp = tp / 1000, tn / 1000, fp / 1000, fn / 1000     # to prevent overflowing
+        mcc = (tp_tmp * tn_tmp - fp_tmp * fn_tmp) / math.sqrt((tp_tmp + fp_tmp) * (tp_tmp + fn_tmp) * (tn_tmp + fp_tmp) * (tn_tmp + fn_tmp) + epsilon)  # Matthews correlation coefficient
 
         f1m.append(f1_score)
         accm.append(accuracy)
@@ -274,15 +286,15 @@ def metrics_np(np_res, np_gnd, b_auc=False):
             aucm.append(AUC)
 
     output = dict()
-    output["f1"] = np.array(f1m).mean()
-    output["acc"] = np.array(accm).mean()
-    output["spe"] = np.array(specificitym).mean()
-    output["sen"] = np.array(sensitivitym).mean()
-    output["iou"] = np.array(ioum).mean()
-    output["pre"] = np.array(precisionm).mean()
-    output["mcc"] = np.array(mccm).mean()
+    output['f1'] = np.array(f1m).mean()
+    output['acc'] = np.array(accm).mean()
+    output['spe'] = np.array(specificitym).mean()
+    output['sen'] = np.array(sensitivitym).mean()
+    output['iou'] = np.array(ioum).mean()
+    output['pre'] = np.array(precisionm).mean()
+    output['mcc'] = np.array(mccm).mean()
 
     if b_auc:
-        output["auc"] = np.array(aucm).mean()
+        output['auc'] = np.array(aucm).mean()
 
     return output

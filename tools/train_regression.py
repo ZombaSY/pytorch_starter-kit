@@ -80,16 +80,16 @@ class TrainerRegression(TrainerBase):
                     list_score.append(score_item[b].tolist())
                     list_target.append(target_item[b].tolist())
 
-        # Calculate the correlation between the two lists
-        # correlation1 = np.corrcoef(np.array(list_score).T[0], np.array(list_target).T[0])[0, 1]
-        # correlation2 = np.corrcoef(np.array(list_score).T[1], np.array(list_target).T[1])[0, 1]
-        # correlation = (correlation1 + correlation2) / 2
+        # Calculate the correlation between the two lists. TODO: Modify torch-based code later
+        correlation1 = np.corrcoef(np.array(list_score).T[0], np.array(list_target).T[0])[0, 1]
+        correlation2 = np.corrcoef(np.array(list_score).T[1], np.array(list_target).T[1])[0, 1]
+        correlation = (correlation1 + correlation2) / 2
 
         loss_mean = batch_losses / self.loader_valid.Loader.__len__()
 
         metric_dict = {}
         metric_dict[log_prefix + 'loss'] = loss_mean
-        # metric_dict[log_prefix + 'corr'] = correlation
+        metric_dict[log_prefix + 'corr'] = correlation
 
         utils.log_epoch('validation', epoch, metric_dict, self.conf['env']['wandb'], prefix=log_prefix)
         self.evaluate_model(model, epoch, metric_dict)

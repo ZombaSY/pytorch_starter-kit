@@ -161,14 +161,13 @@ class Inferencer:
                 # utils.append_data_stats(self.data_stat, target_dis + '_score', out1)
                 # utils.append_data_stats(self.data_stat, target_dis + '_level', out2)
 
-
     def __post_process_landmark(self, x_img, target, output, img_id):
         if self.conf['env']['draw_results']:
 
             if not os.path.exists(self.save_dir):
                 os.mkdir(self.save_dir)
 
-            with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
+            with multiprocessing.Pool(4) as pools:
                 x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std).detach().cpu().numpy()
                 output_np = output['vec'].detach().cpu().numpy()
                 pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_landmark), x_img, output_np, itertools.repeat(self.save_dir), img_id))
@@ -181,7 +180,7 @@ class Inferencer:
                 self.metric_val.update(target[b][0].cpu().detach().numpy(), output_argmax[b].cpu().detach().numpy())
 
         if self.conf['env']['draw_results']:
-            with multiprocessing.Pool(multiprocessing.cpu_count() // 2) as pools:
+            with multiprocessing.Pool(4) as pools:
                 x_img = utils.denormalize_img(x_img, self.image_mean, self.image_std).detach().cpu().numpy()
                 output_prob = F.softmax(output['seg'], dim=1).detach().cpu().numpy()
                 pools.map(utils.multiprocessing_wrapper, zip(itertools.repeat(utils.draw_image), x_img, output_prob, itertools.repeat(self.save_dir), img_id, itertools.repeat(self.conf['model']['num_class'])))
