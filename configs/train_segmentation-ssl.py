@@ -1,45 +1,43 @@
-input_size=[448, 448]   # (height, width)
-crop_size=384
+input_size = [448, 448]  # (height, width)
+crop_size = 384
 
-conf=dict(
+conf = dict(
     env=dict(
         debug=False,
-        CUDA_VISIBLE_DEVICES='0',
-        mode='train',
+        CUDA_VISIBLE_DEVICES="0",
+        mode="train",
         cuda=True,
         wandb=True,
-        saved_model_directory='model_ckpt',
-        project_name='pytorch-starterkit',
-        task='segmentation-ssl',
-
+        saved_model_directory="model_ckpt",
+        project_name="pytorch-starterkit",
+        task="segmentation-ssl",
         train_fold=1,
         epoch=10000,
         early_stop_epoch=300,
     ),
-
     model=dict(
-        name='Swin_t_semanticSegmentation_dsv',
+        name="Swin_t_semanticSegmentation_dsv",
         num_class=2,
         in_channel=3,
         base_c=16,
-        saved_ckpt='pretrained/ImageNet/swin_tiny_patch4_window7_224.pth',
+        saved_ckpt="pretrained/ImageNet/swin_tiny_patch4_window7_224.pth",
         use_ema=False,
     ),
-
     dataloader_train=dict(
-        name='Image2Image',
-        mode='train',
+        name="Image2Image",
+        mode="train",
         # data_path="/path/to/train.csv",
-        data_path_folds=['/path/to/train-fold_0.csv',
-                         '/path/to/train-fold_1.csv',
-                         '/path/to/train-fold_2.csv',
-                         '/path/to/train-fold_3.csv',
-                         '/path/to/train-fold_4.csv'],
+        data_path_folds=[
+            "/path/to/train-fold_0.csv",
+            "/path/to/train-fold_1.csv",
+            "/path/to/train-fold_2.csv",
+            "/path/to/train-fold_3.csv",
+            "/path/to/train-fold_4.csv",
+        ],
         data_cache=True,
         batch_size=32,
         input_size=input_size,
         workers=4,
-
         augmentations=dict(
             transform_blur=0.3,
             transform_clahe=0.1,
@@ -58,33 +56,34 @@ conf=dict(
             transform_resize=input_size,
             transform_rain=0.01,
             transform_rotate=0.1,
-        )
+        ),
     ),
     dataloader_valid=dict(
-        name='Image2Image',
-        mode='valid',
+        name="Image2Image",
+        mode="valid",
         # data_path="/path/to/valid.csv",
-        data_path_folds=['/path/to/valid-fold_0.csv',
-                         '/path/to/valid-fold_1.csv',
-                         '/path/to/valid-fold_2.csv',
-                         '/path/to/valid-fold_3.csv',
-                         '/path/to/valid-fold_4.csv'],
+        data_path_folds=[
+            "/path/to/valid-fold_0.csv",
+            "/path/to/valid-fold_1.csv",
+            "/path/to/valid-fold_2.csv",
+            "/path/to/valid-fold_3.csv",
+            "/path/to/valid-fold_4.csv",
+        ],
         data_cache=True,
         batch_size=32,
         input_size=input_size,
         workers=4,
     ),
     dataloader_ssl=dict(
-        name='ImageSSL',
-        mode='train',
-        data_path='/path/to/valid/train.csv',
+        name="ImageSSL",
+        mode="train",
+        data_path="/path/to/valid/train.csv",
         data_cache=True,
         batch_size=8,
         input_size=input_size,
         workers=8,
         perturbation_nums=4,
         train_warmup_epoch=1,
-
         augmentations=dict(
             transform_blur=0.5,
             transform_clahe=0.5,
@@ -103,34 +102,16 @@ conf=dict(
             transform_resize=input_size,
             transform_rain=0.0,
             transform_rotate=0.0,
-        )
+        ),
     ),
-
-    criterion=dict(
-        name='CrossEntropyLoss'
-    ),
-    criterion_ssl=dict(
-        name='KLDivergenceLoss',
-        weight_lambda=1,
-        temperature=1,
-        reduction='batchmean'
-    ),
-
+    criterion=dict(name="CrossEntropyLoss"),
+    criterion_ssl=dict(name="KLDivergenceLoss", weight_lambda=1, temperature=1, reduction="batchmean"),
     optimizer=dict(
-        name='AdamW',
+        name="AdamW",
         lr=1e-5,
         lr_min=5e-7,
         weight_decay=5e-3,
-
-        scheduler=dict(
-            name='WarmupCosine',
-            cycles=50,
-            warmup_epoch=20
-        ),
+        scheduler=dict(name="WarmupCosine", cycles=50, warmup_epoch=20),
     ),
-    optimizer_ssl=dict(
-        name='Adam',
-        lr=1e-6,
-        weight_decay=0,
-    ),
+    optimizer_ssl=dict(name="Adam", lr=1e-6, weight_decay=0),
 )

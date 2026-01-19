@@ -4,7 +4,7 @@ import pandas as pd
 np.random.seed(3407)
 
 K_FOLDS = 5
-CSV_PATH = 'train.csv'
+CSV_PATH = "train.csv"
 
 
 def main():
@@ -26,9 +26,9 @@ def main():
         for item in train_input:
             train_input_unchained = pd.concat([train_input_unchained, item])
 
-        train_input_unchained.to_csv(f'train-fold_{i}.csv', encoding='utf-8-sig', index=False)
-        val_input.to_csv(f'valid-fold_{i}.csv', encoding='utf-8-sig', index=False)
+        train_input_unchained.to_csv(f"train-fold_{i}.csv", encoding="utf-8-sig", index=False)
+        val_input.to_csv(f"valid-fold_{i}.csv", encoding="utf-8-sig", index=False)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
